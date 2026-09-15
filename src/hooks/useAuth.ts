@@ -9,11 +9,29 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety net: make sure a profile row exists for the signed-in user.
+    const ensureProfile = (u: User) => {
+      setTimeout(async () => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", u.id)
+          .maybeSingle();
+        if (!data) {
+          await supabase.from("profiles").insert({
+            id: u.id,
+            full_name: (u.user_metadata?.full_name as string) || "",
+          });
+        }
+      }, 0);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (session?.user) ensureProfile(session.user);
       }
     );
 
