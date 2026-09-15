@@ -42,22 +42,11 @@ const Auth = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { user, loading, signIn, signUp, signInWithGoogle } = useAuth();
   const { toast } = useToast();
 
-  const onTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-  }, []);
-  const onTurnstileError = useCallback(() => setTurnstileToken(null), []);
-  const onTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
-
-  const { containerRef: turnstileRef, reset: resetTurnstile } = useTurnstile({
-    siteKey: TURNSTILE_SITE_KEY,
-    onVerify: onTurnstileVerify,
-    onError: onTurnstileError,
-    onExpire: onTurnstileExpire,
-  });
+  // Single-user private app: no bot challenge on sign-in.
+  const resetTurnstile = () => {};
 
   if (loading) {
     return (
