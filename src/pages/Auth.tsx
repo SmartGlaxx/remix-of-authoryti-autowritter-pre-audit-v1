@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Mail, Lock, ArrowRight, Sparkles, CheckCircle, Star, User } from "lucide-react";
@@ -8,10 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useTurnstile } from "@/hooks/useTurnstile";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { TURNSTILE_SITE_KEY } from "@/lib/security";
 
 const GlowingSphereScene = lazy(() => import("@/components/3d/GlowingSphere"));
 
@@ -42,22 +40,11 @@ const Auth = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { user, loading, signIn, signUp, signInWithGoogle } = useAuth();
   const { toast } = useToast();
 
-  const onTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-  }, []);
-  const onTurnstileError = useCallback(() => setTurnstileToken(null), []);
-  const onTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
-
-  const { containerRef: turnstileRef, reset: resetTurnstile } = useTurnstile({
-    siteKey: TURNSTILE_SITE_KEY,
-    onVerify: onTurnstileVerify,
-    onError: onTurnstileError,
-    onExpire: onTurnstileExpire,
-  });
+  // Single-user private app: no bot challenge on sign-in.
+  const resetTurnstile = () => {};
 
   if (loading) {
     return (
@@ -72,26 +59,7 @@ const Auth = () => {
 
   if (user) return <Navigate to="/dashboard" replace />;
 
-  const verifyTurnstile = async (): Promise<boolean> => {
-    if (!turnstileToken) {
-      toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
-      return false;
-    }
-    try {
-      const { data, error } = await supabase.functions.invoke("verify-turnstile", {
-        body: { token: turnstileToken },
-      });
-      if (error || !data?.success) {
-        toast({ title: "Verification failed", description: "Please try again.", variant: "destructive" });
-        resetTurnstile();
-        setTurnstileToken(null);
-        return false;
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  };
+  const verifyTurnstile = async (): Promise<boolean> => true;
 
   const handleGoogleSignIn = async () => {
     const { error } = await signInWithGoogle();
@@ -122,7 +90,6 @@ const Auth = () => {
     } finally {
       setIsSubmitting(false);
       resetTurnstile();
-      setTurnstileToken(null);
     }
   };
 
@@ -165,7 +132,6 @@ const Auth = () => {
     } finally {
       setIsSubmitting(false);
       resetTurnstile();
-      setTurnstileToken(null);
     }
   };
 
@@ -279,7 +245,6 @@ const Auth = () => {
                           <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 h-11" autoComplete="email" />
                         </div>
                       </div>
-                      <div ref={turnstileRef} className="flex justify-center box-border overflow-hidden max-w-full" />
                       <Button type="submit" className="w-full h-11" variant="hero" disabled={isSubmitting}>
                         {isSubmitting ? "Sending..." : "Send Reset Link"}
                         <ArrowRight className="w-4 h-4" />
@@ -358,7 +323,6 @@ const Auth = () => {
                           </div>
                         )}
 
-                        <div ref={turnstileRef} className="flex justify-center box-border overflow-hidden max-w-full" />
 
                         <Button type="submit" className="w-full h-11" variant="hero" disabled={isSubmitting}>
                           {isSubmitting ? (
