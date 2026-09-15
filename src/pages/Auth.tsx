@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Mail, Lock, ArrowRight, Sparkles, CheckCircle, Star, User } from "lucide-react";
@@ -8,10 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useTurnstile } from "@/hooks/useTurnstile";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { TURNSTILE_SITE_KEY } from "@/lib/security";
 
 const GlowingSphereScene = lazy(() => import("@/components/3d/GlowingSphere"));
 
@@ -92,7 +90,6 @@ const Auth = () => {
     } finally {
       setIsSubmitting(false);
       resetTurnstile();
-      setTurnstileToken(null);
     }
   };
 
@@ -135,7 +132,6 @@ const Auth = () => {
     } finally {
       setIsSubmitting(false);
       resetTurnstile();
-      setTurnstileToken(null);
     }
   };
 
@@ -249,7 +245,6 @@ const Auth = () => {
                           <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 h-11" autoComplete="email" />
                         </div>
                       </div>
-                      <div ref={turnstileRef} className="flex justify-center box-border overflow-hidden max-w-full" />
                       <Button type="submit" className="w-full h-11" variant="hero" disabled={isSubmitting}>
                         {isSubmitting ? "Sending..." : "Send Reset Link"}
                         <ArrowRight className="w-4 h-4" />
@@ -328,7 +323,6 @@ const Auth = () => {
                           </div>
                         )}
 
-                        <div ref={turnstileRef} className="flex justify-center box-border overflow-hidden max-w-full" />
 
                         <Button type="submit" className="w-full h-11" variant="hero" disabled={isSubmitting}>
                           {isSubmitting ? (
