@@ -61,26 +61,7 @@ const Auth = () => {
 
   if (user) return <Navigate to="/dashboard" replace />;
 
-  const verifyTurnstile = async (): Promise<boolean> => {
-    if (!turnstileToken) {
-      toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
-      return false;
-    }
-    try {
-      const { data, error } = await supabase.functions.invoke("verify-turnstile", {
-        body: { token: turnstileToken },
-      });
-      if (error || !data?.success) {
-        toast({ title: "Verification failed", description: "Please try again.", variant: "destructive" });
-        resetTurnstile();
-        setTurnstileToken(null);
-        return false;
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  };
+  const verifyTurnstile = async (): Promise<boolean> => true;
 
   const handleGoogleSignIn = async () => {
     const { error } = await signInWithGoogle();
