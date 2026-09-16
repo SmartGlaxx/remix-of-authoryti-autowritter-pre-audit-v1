@@ -660,9 +660,8 @@ export const BOOK_TYPE_GENRES: Partial<Record<BookType, string[]>> = {
   ],
 };
 
-// Book types that are enabled in the Creation Engine right now.
-// Other types are visible but disabled (coming soon) for the test launch.
-export const ENABLED_BOOK_TYPES: BookType[] = ["novel", "self-help", "business"];
+// All book types are enabled in the Creation Engine.
+export const ENABLED_BOOK_TYPES: BookType[] = Object.keys(BOOK_TYPE_INFO) as BookType[];
 
 // Helper to get default controls based on book type
 export const getDefaultControls = (bookType: BookType): BookControls => {
