@@ -499,7 +499,7 @@ export const AUTOMATION_OPTIONS: { value: AutomationLevel; label: string; descri
   { value: "guided", label: "Guided", description: "You write, AI suggests. Prompt for ideas based on your context." },
   { value: "assisted", label: "Assisted", description: "Generates paragraphs/sections, you review before continuing." },
   { value: "semi-auto", label: "Semi-Auto", description: "Generates full chapters, you approve per chapter." },
-  { value: "auto-draft", label: "Auto Draft", description: "Generates large portions automatically. Requires Turbo unlock.", locked: true },
+  { value: "auto-draft", label: "Auto Draft", description: "Generates the entire book automatically from your title and setup." },
 ];
 
 export const DEPTH_OPTIONS: { value: DepthLevel; label: string; description: string }[] = [
