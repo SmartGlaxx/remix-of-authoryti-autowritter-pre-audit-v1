@@ -43,8 +43,7 @@ const MODES = [
 ];
 
 export function WritingModeSelector({ value, onChange, disabled }: WritingModeSelectorProps) {
-  const turbo = useTurbo();
-  const canAutoDraft = turbo.canUseAutoDraft;
+  const canAutoDraft = true;
   const activeMode = MODES.find((m) => m.value === value);
 
   return (
