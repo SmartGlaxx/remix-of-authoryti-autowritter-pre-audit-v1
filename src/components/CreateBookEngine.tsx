@@ -422,29 +422,25 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
                       </Select>
                     </FieldGroup>
 
-                    <FieldGroup label="Automation" tooltip="Controls generation flow. Auto Draft requires Pro+ plan and Turbo unlock.">
+                    <FieldGroup label="Automation" tooltip="Controls generation flow. Auto Draft writes the whole book for you.">
                       <Select
                         value={formData.controls?.automationLevel || ""}
                         onValueChange={(v) => {
-                          if (v === "auto-draft") return;
                           updateControls("automationLevel", v as AutomationLevel);
                         }}
                       >
                         <SelectTrigger className="text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent className="bg-popover z-50">
                           {AUTOMATION_OPTIONS.map((opt) => {
-                            const isLocked = opt.value === "auto-draft";
                             return (
                               <SelectItem 
                                 key={opt.value} 
                                 value={opt.value}
-                                disabled={isLocked}
                               >
                                 <div className="flex items-center gap-2">
                                   <div>
                                     <div className="flex items-center gap-1">
                                       {opt.label}
-                                      {isLocked && <span className="text-[10px] text-muted-foreground">🔒 Pro+</span>}
                                     </div>
                                     <div className="text-xs text-muted-foreground">{opt.description}</div>
                                   </div>
