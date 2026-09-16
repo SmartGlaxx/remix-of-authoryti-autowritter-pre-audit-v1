@@ -499,7 +499,7 @@ export const AUTOMATION_OPTIONS: { value: AutomationLevel; label: string; descri
   { value: "guided", label: "Guided", description: "You write, AI suggests. Prompt for ideas based on your context." },
   { value: "assisted", label: "Assisted", description: "Generates paragraphs/sections, you review before continuing." },
   { value: "semi-auto", label: "Semi-Auto", description: "Generates full chapters, you approve per chapter." },
-  { value: "auto-draft", label: "Auto Draft", description: "Generates large portions automatically. Requires Turbo unlock.", locked: true },
+  { value: "auto-draft", label: "Auto Draft", description: "Generates the entire book automatically from your title and setup." },
 ];
 
 export const DEPTH_OPTIONS: { value: DepthLevel; label: string; description: string }[] = [
@@ -660,9 +660,8 @@ export const BOOK_TYPE_GENRES: Partial<Record<BookType, string[]>> = {
   ],
 };
 
-// Book types that are enabled in the Creation Engine right now.
-// Other types are visible but disabled (coming soon) for the test launch.
-export const ENABLED_BOOK_TYPES: BookType[] = ["novel", "self-help", "business"];
+// All book types are enabled in the Creation Engine.
+export const ENABLED_BOOK_TYPES: BookType[] = Object.keys(BOOK_TYPE_INFO) as BookType[];
 
 // Helper to get default controls based on book type
 export const getDefaultControls = (bookType: BookType): BookControls => {
