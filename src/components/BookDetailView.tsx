@@ -176,10 +176,6 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
   };
 
   const handleStartFullGeneration = () => {
-    if (automationLevel === "auto-draft" && !turbo.canUseAutoDraft) {
-      toast.error("Auto Draft requires Turbo unlock. Maintain a 30-day streak and write 100K+ words.");
-      return;
-    }
     startGeneration();
   };
 
