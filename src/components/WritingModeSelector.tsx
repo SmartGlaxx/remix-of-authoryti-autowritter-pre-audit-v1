@@ -36,9 +36,8 @@ const MODES = [
     value: "auto-draft" as const,
     label: "Auto Draft Mode",
     description: "Full book generation",
-    helper: "Generate entire book automatically (unlocked by progress)",
+    helper: "Generate the entire book automatically",
     icon: Rocket,
-    locked: true,
   },
 ];
 
