@@ -395,7 +395,11 @@ export type Database = {
     }
     Functions: {
       check_and_deduct_word_credits: {
-        Args: { _estimated_words: number; _user_id: string }
+        Args: {
+          _estimated_words: number
+          _skip_daily_cap?: boolean
+          _user_id: string
+        }
         Returns: Json
       }
       check_rate_limit: {
