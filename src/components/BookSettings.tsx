@@ -6,6 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { useState } from "react";
+import { Cpu } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+
+const AI_MODELS = [
+  { value: "deepseek-reasoner", label: "DeepSeek Reasoner", desc: "Default. Deep reasoning, cheapest for long novels (with caching)." },
+  { value: "gpt-6-astra", label: "GPT-6 Astra", desc: "Most capable, richest prose. Slower and pricier." },
+  { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro", desc: "Strong long-form reasoning and consistency." },
+  { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash", desc: "Fastest writing, good quality." },
+];
 import {
   Book,
   BOOK_TYPE_INFO,
@@ -62,6 +72,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
       <main className="flex-1 container mx-auto px-4 py-6" style={{ maxWidth: "calc(100vw - 16rem)" }}>
         <ScrollArea className="h-[calc(100vh-120px)]">
           <div className="space-y-6 pr-4">
+            <AiModelCard />
             {/* Book Type Section */}
             <Card>
               <CardHeader className="pb-3">
@@ -372,3 +383,29 @@ const ToggleBadge = ({ label, enabled }: { label: string; enabled: boolean }) =>
 );
 
 export default BookSettings;
+
+function AiModelCard() {
+  const [model, setModel] = useState(() => localStorage.getItem("authoryti_ai_model") || "deepseek-reasoner");
+  const choose = (v: string) => { setModel(v); localStorage.setItem("authoryti_ai_model", v); };
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Cpu className="w-4 h-4 text-primary" />
+          AI Writing Model
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {AI_MODELS.map((m) => (
+          <label key={m.value} className="flex items-center justify-between gap-4 rounded-md border border-border p-3 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium">{m.label}</p>
+              <p className="text-xs text-muted-foreground">{m.desc}</p>
+            </div>
+            <Switch checked={model === m.value} onCheckedChange={(on) => on && choose(m.value)} />
+          </label>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
