@@ -271,6 +271,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       targetWordsPerSubsection: effectiveWordsPerSubsection,
       teaserStyle: bookData.controls?.teaserStyle || "none",
       automationLevel,
+      aiModel: localStorage.getItem("authoryti_ai_model") || "deepseek-reasoner",
     };
 
     const payloadJson = JSON.stringify(payload);

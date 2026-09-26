@@ -441,7 +441,7 @@ serve(async (req) => {
       });
     }
 
-    const { book, chapterIndex, subsectionIndex, previousSummary, previousRawContent, tonalAnchors, ieltsBand, targetWordsPerSubsection, teaserStyle, automationLevel: reqAutomationLevel } = body;
+    const { book, chapterIndex, subsectionIndex, previousSummary, previousRawContent, tonalAnchors, ieltsBand, targetWordsPerSubsection, teaserStyle, automationLevel: reqAutomationLevel, aiModel: reqAiModel } = body;
 
     // ── Credit & daily word cap enforcement ──
     const estimatedWords = targetWordsPerSubsection || 600;
@@ -449,7 +449,7 @@ serve(async (req) => {
     
     const { data: creditCheck, error: creditError } = await adminSupabase.rpc(
       "check_and_deduct_word_credits",
-      { _user_id: auth.user.id, _estimated_words: estimatedWords }
+      { _user_id: auth.user.id, _estimated_words: estimatedWords, _skip_daily_cap: reqAutomationLevel === "auto-draft" }
     );
 
     if (creditError) { console.error("Credit check failed:", creditError); throw new Error("Credit check failed"); }
@@ -525,7 +525,13 @@ serve(async (req) => {
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    const useDeepSeek = !!DEEPSEEK_API_KEY;
+    const GATEWAY_MODELS: Record<string, string> = {
+      "gpt-6-astra": "openai/gpt-6-astra",
+      "gemini-3.1-pro": "google/gemini-3.1-pro-preview",
+      "gemini-3.8-flash": "google/gemini-3.8-flash",
+    };
+    const gatewayModel = typeof reqAiModel === "string" ? GATEWAY_MODELS[reqAiModel] : undefined;
+    const useDeepSeek = !!DEEPSEEK_API_KEY && !gatewayModel;
     
     if (!useDeepSeek && !LOVABLE_API_KEY) {
       throw new Error("No AI API key configured");
@@ -567,12 +573,13 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: gatewayModel || "google/gemini-3.1-pro-preview",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           stream: true,
+          ...((gatewayModel || "").startsWith("openai/") ? { reasoning_effort: "medium" } : {}),
         }),
       });
     }

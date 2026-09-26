@@ -57,9 +57,9 @@ const BookCard = ({ book, onSelect, onDelete, onUpdateCover, index }: BookCardPr
         <Play className="w-4 h-4 mr-2" />
         Open
       </DropdownMenuItem>
-      <DropdownMenuItem disabled className="opacity-60">
+      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCoverModalOpen(true); }}>
         {hasCover ? <Image className="w-4 h-4 mr-2" /> : <ImagePlus className="w-4 h-4 mr-2" />}
-        {hasCover ? "Change Book Cover" : "Add Book Cover"} (coming soon)
+        {hasCover ? "Change Book Cover" : "Add Book Cover"}
       </DropdownMenuItem>
       <DropdownMenuItem
         onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}
