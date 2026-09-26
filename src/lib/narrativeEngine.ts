@@ -18,7 +18,8 @@ async function ownerId(): Promise<string> {
   if (!data.user) throw new Error("Not signed in");
   return data.user.id;
 }
-function check<T>(res: { data: T; error: { message: string } | null }): T {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function check(res: { data: any; error: { message: string } | null }): any {
   if (res.error) throw new Error(res.error.message);
   return res.data;
 }
