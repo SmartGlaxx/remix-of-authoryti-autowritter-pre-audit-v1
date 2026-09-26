@@ -1,34 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 
-// ── Security Config ──
-const MAX_PAYLOAD_BYTES = 50_000;
+// Editing sends the chosen cover image back, so allow larger bodies.
+const MAX_PAYLOAD_BYTES = 15_000_000;
+const IMAGE_MODEL = "google/gemini-3-pro-image";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function wafCheck(req: Request): string | null {
-  const ua = (req.headers.get("user-agent") || "").toLowerCase();
-  const blocked = ["sqlmap", "nikto", "nessus", "masscan", "zgrab"];
-  for (const b of blocked) { if (ua.includes(b)) return `Blocked: ${b}`; }
-  return null;
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-function detectPromptInjection(text: string): boolean {
-  if (!text || typeof text !== "string") return false;
-  const patterns = [
-    /ignore\s+(all\s+)?previous\s+instructions/i,
-    /you\s+are\s+now\s+/i,
-    /system\s*:\s*/i,
-    /\[INST\]/i,
-    /<<SYS>>/i,
-    /forget\s+(everything|all|your)\s/i,
-    /override\s+(your|the)\s+/i,
-  ];
-  return patterns.some(p => p.test(text));
-}
+const str = (v: unknown, max = 500) => (typeof v === "string" ? v.slice(0, max).trim() : "");
 
 async function getAuthUser(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -37,118 +22,108 @@ async function getAuthUser(req: Request) {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
   const { data, error } = await supabase.auth.getClaims(token);
   if (error || !data?.claims) return null;
-  return { id: data.claims.sub as string, email: data.claims.email as string };
+  return { id: data.claims.sub as string };
 }
 
-async function checkRateLimit(userId: string) {
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data } = await supabase.rpc("check_rate_limit", { _user_id: userId, _function_name: "generate-cover", _max_per_hour: 10, _max_per_day: 30 });
-  return data as boolean ?? true;
+class GatewayError extends Error { constructor(msg: string, public status: number) { super(msg); } }
+
+async function callImageModel(apiKey: string, content: unknown): Promise<string> {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: IMAGE_MODEL, messages: [{ role: "user", content }], modalities: ["image", "text"] }),
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    console.error("image gateway error", response.status, t);
+    if (response.status === 429) throw new GatewayError("Too many requests right now. Please wait a moment and try again.", 429);
+    if (response.status === 402) throw new GatewayError("AI credits have run out. Please add credits to continue.", 402);
+    throw new GatewayError(`Image service error (${response.status})`, response.status >= 500 ? 502 : response.status);
+  }
+  const data = await response.json();
+  const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (!url) throw new GatewayError("The AI did not return an image. Try adjusting your description.", 422);
+  return url;
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
   try {
-    // WAF check
-    const wafResult = wafCheck(req);
-    if (wafResult) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    // Payload size check
-    const contentLength = parseInt(req.headers.get("content-length") || "0");
-    if (contentLength > MAX_PAYLOAD_BYTES) return new Response(JSON.stringify({ error: "Payload too large" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const len = parseInt(req.headers.get("content-length") || "0");
+    if (len > MAX_PAYLOAD_BYTES) return json({ error: "Payload too large" }, 413);
 
     const user = await getAuthUser(req);
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const allowed = await checkRateLimit(user.id);
-    if (!allowed) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
     const body = await req.json();
-    const { description, count, bookTitle, bookType, theme } = body;
+    const mode = body.mode === "edit" ? "edit" : "generate";
 
-    if (!description || typeof description !== "string" || description.length < 5) {
-      return new Response(JSON.stringify({ error: "Description must be at least 5 characters" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (description.length > 2000) {
-      return new Response(JSON.stringify({ error: "Description too long" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (bookTitle && typeof bookTitle === "string" && bookTitle.length > 500) {
-      return new Response(JSON.stringify({ error: "Book title too long" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: creditCheck } = await admin.rpc("check_and_deduct_word_credits", { _user_id: user.id, _estimated_words: 1000, _skip_daily_cap: true });
+    const credit = creditCheck as Record<string, unknown> | null;
+    if (!credit?.allowed) return json({ error: (credit?.reason as string) || "Insufficient credits" }, 402);
 
-    // Prompt injection check on user-controlled fields
-    const fieldsToCheck = [description, bookTitle, theme].filter(Boolean);
-    for (const f of fieldsToCheck) {
-      if (typeof f === "string" && detectPromptInjection(f)) {
-        return new Response(JSON.stringify({ error: "Input contains prohibited patterns" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-    }
+    if (mode === "edit") {
+      const image = typeof body.image === "string" ? body.image : "";
+      const instruction = str(body.instruction, 1000);
+      if (!image.startsWith("data:image/") && !image.startsWith("https://")) return json({ error: "Missing image to edit" }, 400);
+      if (instruction.length < 3) return json({ error: "Tell the AI what to change" }, 400);
+      const prompt = `Edit this book cover. Apply ONLY this change: ${instruction}
 
-    const numCovers = Math.min(5, Math.max(1, count || 3));
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-    // Deduct 1 credit
-    const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: creditCheck } = await adminClient.rpc("check_and_deduct_word_credits", { _user_id: user.id, _estimated_words: 1000 });
-    const creditResult = creditCheck as Record<string, unknown> | null;
-    if (!creditResult?.allowed) {
-      return new Response(JSON.stringify({ error: creditResult?.reason || "Insufficient credits" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+Keep everything else exactly the same: same composition, same colors, same lighting, same typography, same text wording and placement, same aspect ratio. Do not add or remove anything that was not asked for.`;
+      const url = await callImageModel(apiKey, [
+        { type: "text", text: prompt },
+        { type: "image_url", image_url: { url: image } },
+      ]);
+      return json({ cover: url });
     }
 
-    const coverPromises = Array.from({ length: numCovers }, async (_, i) => {
-      const variationHint = numCovers > 1 ? ` (Variation ${i + 1} of ${numCovers} — create a distinct interpretation)` : "";
-      const prompt = `Create a professional book cover illustration for a ${bookType || "book"} titled "${bookTitle || "Untitled"}".
+    const o = body.options || {};
+    const description = str(o.description, 1500);
+    const title = str(o.title, 200) || "Untitled";
+    const author = str(o.author, 120);
+    const subtitle = str(o.subtitle, 200);
+    const font = str(o.font, 80) || "elegant serif";
+    const textColor = str(o.textColor, 60) || "white";
+    const textPosition = str(o.textPosition, 60) || "top";
+    const imageType = str(o.imageType, 80) || "digital painting";
+    const theme = str(o.theme, 80) || "dramatic";
+    const bookType = str(o.bookType, 60) || "book";
+    const toggles: string[] = [];
+    if (o.minimalist) toggles.push("minimalist, clean composition with generous empty space");
+    if (o.darkMood) toggles.push("dark, moody palette with deep shadows");
+    if (o.showCharacter) toggles.push("feature a main character as the focal point");
+    if (o.textured) toggles.push("subtle paper or canvas texture");
+    if (o.border) toggles.push("a thin decorative border frame");
+    const numCovers = Math.min(4, Math.max(1, Number(o.count) || 4));
 
-Theme: ${theme || "general"}
-Cover description: ${description}${variationHint}
+    const results = await Promise.allSettled(Array.from({ length: numCovers }, (_, i) => {
+      const prompt = `Design a complete, finished, print-ready front book cover for a ${bookType}.
 
-Requirements:
-- Portrait orientation, 2:3 aspect ratio (book cover proportions)
-- Professional, publishable book cover quality
-- NO text, NO title, NO author name — pure visual illustration only
-- Rich, detailed artwork suitable for a real book cover
-- Strong focal point and balanced composition
-- Dramatic lighting and atmosphere`;
+Title text (spell exactly): "${title}"
+${subtitle ? `Subtitle text (spell exactly): "${subtitle}"\n` : ""}${author ? `Author name (spell exactly): "${author}"\n` : ""}
+Artwork style: ${imageType}
+Theme / mood: ${theme}
+Scene: ${description || "an evocative scene that fits the title"}
+${toggles.length ? `Extra style: ${toggles.join("; ")}\n` : ""}
+Typography: render the title in a ${font} typeface, colored ${textColor}, positioned at the ${textPosition} of the cover. Text must be crisp, legible, correctly spelled, and integrated professionally with the artwork. Include no other words.
+Format: portrait, 2:3 book cover proportions, full bleed.
+This is option ${i + 1} of ${numCovers}: make it a clearly distinct interpretation from the others.`;
+      return callImageModel(apiKey, prompt);
+    }));
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-pro-image-preview",
-          messages: [{ role: "user", content: prompt }],
-          modalities: ["image", "text"],
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) throw new Error("Rate limit exceeded");
-        if (response.status === 402) throw new Error("Payment required");
-        throw new Error(`AI gateway error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (!imageUrl) throw new Error("No image generated");
-      return imageUrl;
-    });
-
-    const results = await Promise.allSettled(coverPromises);
-    const covers = results
-      .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-      .map(r => r.value);
-
+    const covers = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
     if (covers.length === 0) {
-      throw new Error("Failed to generate any covers");
+      const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      throw first?.reason ?? new Error("Failed to generate any covers");
     }
-
-    return new Response(JSON.stringify({ covers }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return json({ covers });
   } catch (error) {
     console.error("generate-cover error:", error);
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    const status = msg.includes("Rate limit") ? 429 : msg.includes("Payment") ? 402 : 500;
-    return new Response(JSON.stringify({ error: msg }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const status = error instanceof GatewayError ? error.status : 500;
+    return json({ error: error instanceof Error ? error.message : "Unknown error" }, status);
   }
 });
