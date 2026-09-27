@@ -48,7 +48,7 @@ const posOf = (ch: unknown, sub: unknown): number | null =>
   typeof ch === "number" ? toPosition({ chapterIndex: ch, subsectionIndex: typeof sub === "number" ? sub : 0 }) : null;
 const fromPos = (p: number): StoryPosition => ({ chapterIndex: Math.floor(p / 10000), subsectionIndex: p % 10000 });
 const rowPos = (r: Row): number | null => (typeof r.position === "number" ? r.position : posOf(r.chapter_index, r.subsection_index));
-const nonEmpty = (a: unknown): a is unknown[] => Array.isArray(a) && a.length > 0;
+const nonEmpty = (a: unknown): a is string[] => Array.isArray(a) && a.length > 0;
 const uniq = (a: string[]) => Array.from(new Set(a.filter((s) => typeof s === "string" && s.trim())));
 
 /** Merge sparse state records (ordered oldest → newest). Unknown stays unknown. */
