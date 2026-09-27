@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
+import { AIProviderError } from "../_shared/ai/providers.ts";
+import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 50_000;
@@ -179,32 +182,17 @@ function getStructureGuidelines(band: number): string {
   }
 }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Create a detailed outline for the book "${book.title}" with theme: "${book.theme}". Generate the complete chapter and subsection structure now.` },
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+    const __admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const __ctx = await aiBookContext(__admin, book.id, auth.user.id);
+    let content: string;
+    try {
+      const __r = await generateAIText({ role: "planner", config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { system: systemPrompt, user: `Create a detailed outline for the book "${book.title}" with theme: "${book.theme}". Generate the complete chapter and subsection structure now.`, temperature: 0.7 } }, createAIDeps(__admin, auth.user.id));
+      content = __r.text;
+    } catch (e) {
+      if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
     
     let outline;
     try {

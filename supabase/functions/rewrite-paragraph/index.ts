@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
+import { AIProviderError } from "../_shared/ai/providers.ts";
+import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 50_000;
@@ -172,31 +175,17 @@ serve(async (req) => {
 
     const userMessage = guidedAction ? "Execute the instruction above." : paragraph;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errText = await response.text();
-      console.error("[rewrite-paragraph] AI error:", response.status, errText);
-      throw new Error("AI request failed");
+    const __admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const __ctx = await aiBookContext(__admin, (body as Record<string, unknown>)?.bookId, userId);
+    let __text: string;
+    try {
+      const __r = await generateAIText({ role: "editor", config: __ctx.config, userId: userId, bookId: __ctx.bookId, request: { system: systemPrompt, user: userMessage } }, createAIDeps(__admin, userId));
+      __text = __r.text;
+    } catch (e) {
+      if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
     }
-
-    const result = await response.json();
-    const content = result.choices?.[0]?.message?.content?.trim();
+    const content = __text.trim();
 
     if (!content) throw new Error("No content returned from AI");
 

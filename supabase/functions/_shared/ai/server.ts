@@ -41,3 +41,13 @@ export async function loadBookModelConfig(admin: any, bookId: string | null | un
   const { data } = await admin.from("book_model_configs").select("mode, single_model, role_models, fallbacks").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
   return normalizeConfig(data);
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Owner-verified book id (or null) + its model config. Unowned/unknown books get the default config. */
+export async function aiBookContext(admin: any, bookId: unknown, userId: string): Promise<{ bookId: string | null; config: BookModelConfig }> {
+  if (typeof bookId !== "string" || !UUID_RE.test(bookId)) return { bookId: null, config: normalizeConfig(null) };
+  const { data } = await admin.from("books").select("id").eq("id", bookId).eq("user_id", userId).maybeSingle();
+  if (!data) return { bookId: null, config: normalizeConfig(null) };
+  return { bookId, config: await loadBookModelConfig(admin, bookId, userId) };
+}
