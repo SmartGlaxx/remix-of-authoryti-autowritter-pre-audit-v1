@@ -2,7 +2,8 @@
 // Not yet wired into generation (Pass 2).
 import { supabase } from "@/integrations/supabase/client";
 import type { Book, BookOutline } from "@/types/book";
-import { decideFactInsertion, validateThreadTransition } from "./narrativeRules";
+import { validateThreadTransition } from "./narrativeRules";
+import { applyCanonicalFact } from "../../supabase/functions/_shared/narrative/factMutation";
 import {
   toPosition,
   type Authority, type CanonicalFact, type CharacterState, type FactCategory, type FactSourceType,
