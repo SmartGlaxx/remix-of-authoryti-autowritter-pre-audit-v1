@@ -40,8 +40,18 @@ export const MATERIAL_MIN_CONFIDENCE = 0.6;
 export const MAX_REVISION_CYCLES = 3;
 export const MAX_SECTION_CHARS = 60_000;
 
+// Detection (evidence + classification + severity) is separate from repair eligibility.
+// HIGH/CRITICAL errors are always material regardless of confidence; confidence only
+// gates MEDIUM issues and automatic repair.
 export const isMaterial = (i: ContinuityIssue) =>
-  i.classification === "ERROR" && SEVERITY_RANK[i.severity] >= SEVERITY_RANK.MEDIUM && i.confidence >= MATERIAL_MIN_CONFIDENCE;
+  i.classification === "ERROR" && (
+    SEVERITY_RANK[i.severity] >= SEVERITY_RANK.HIGH ||
+    (SEVERITY_RANK[i.severity] >= SEVERITY_RANK.MEDIUM && i.confidence >= MATERIAL_MIN_CONFIDENCE)
+  );
+
+/** Repair eligibility: material + repairable + confident enough to edit automatically. */
+export const isAutoRepairable = (i: ContinuityIssue) =>
+  isMaterial(i) && i.repairable && i.confidence >= MATERIAL_MIN_CONFIDENCE;
 
 // ---------------------------------------------------------------------------
 // Prompts
