@@ -46,7 +46,11 @@ Rules:
 - Character changes: include only fields the text explicitly changes or reveals in this section; leave all others null/empty.
 - Plot threads: refer to existing threads ONLY by their given id. Use "resolves" only when the text clearly and conclusively resolves the thread; "abandons" only when the text explicitly drops it; "supersedes" only when a new thread clearly replaces it (give superseded_by_title equal to a new_threads title).
 - new_threads: only genuinely new, unresolved questions/promises the text sets up.
-- facts: durable truths (names, relations, ages, appearances, rules of the world, places). Not transient moods.
+- facts: record a fact ONLY when it is useful, persistent information that a later section would need in order to stay consistent. Ask: "if a future section contradicted this, would it be a continuity error?" If no, omit it.
+  In story writing, useful facts include: established character attributes, relationships, what a character knows or believes, secrets, important possessions, established locations, rules of the world, significant past events, and concrete plot revelations.
+  In non-fiction or business writing, record only the concrete commitments the book has made that later sections must respect: named frameworks, defined terms, numbered steps, stated figures, case examples introduced by name, and promises of what will be covered later. Do not force story-style facts onto non-fiction.
+  NEVER record: rhetorical arguments, persuasive claims, metaphors or similes, mathematical or illustrative analogies, hypothetical or illustrative examples that are not part of the book's own world, generic advice or truisms, transient moods, and phrasing with no continuity value.
+  Record as many genuine facts as the section establishes, and no filler.
 Return ONLY a JSON object with keys: events, character_changes, facts, thread_updates, new_threads, entities.
 events[]: {title, summary, location, participants[], causes[], consequences[], information_revealed[], information_withheld[], is_flashback, story_date, story_time, evidence}
 character_changes[]: {name, location, physical_condition, emotional_state, goals[], motivations, knowledge[], beliefs{}, secrets[], relationships{otherName: description}, inventory[], key_changes, evidence}
