@@ -213,12 +213,14 @@ export function validateRevision(original: string, revised: string): { ok: true;
   if (/^#{1,6}\s|^\s*(revised section|here is|here's)\b/im.test(t)) return { ok: false, reason: "revision_contains_commentary" };
   const ratio = t.length / Math.max(1, original.trim().length);
   if (ratio < 0.6 || ratio > 1.5) return { ok: false, reason: `revision_length_drift_${ratio.toFixed(2)}` };
-  // Minimal-edit guard: most original sentences must survive verbatim.
+  // Minimal-edit guard: most original sentences must survive verbatim. Short sections
+  // (<8 long sentences) are protected by the length-ratio check only, because fixing one
+  // contradiction legitimately touches a large share of a handful of sentences.
   const sentences = original.split(/(?<=[.!?])\s+/).map((s) => normText(s)).filter((s) => s.length > 25);
-  if (sentences.length >= 4) {
+  if (sentences.length >= 8) {
     const nt = normText(t);
     const kept = sentences.filter((s) => nt.includes(s)).length / sentences.length;
-    if (kept < 0.5) return { ok: false, reason: `revision_not_minimal_${kept.toFixed(2)}` };
+    if (kept < 0.4) return { ok: false, reason: `revision_not_minimal_${kept.toFixed(2)}` };
   }
   return { ok: true, text: t };
 }
@@ -257,7 +259,14 @@ const split = (issues: ContinuityIssue[]) => ({ issues: issues.filter(isMaterial
  * Checker failure → CHECK_FAILED with the text preserved (never reported clean).
  * Reviser failure/unsafe revision → best version kept, NEEDS_REVIEW.
  */
-export async function runContinuityLoop(original: string, deps: LoopDeps, maxCycles = MAX_REVISION_CYCLES): Promise<LoopResult> {
+export const REVISION_TIME_BUDGET_MS = 100_000;
+
+export async function runContinuityLoop(
+  original: string, deps: LoopDeps, maxCycles = MAX_REVISION_CYCLES,
+  opts: { budgetMs?: number; now?: () => number } = {},
+): Promise<LoopResult> {
+  const now = opts.now ?? Date.now;
+  const deadline = now() + (opts.budgetMs ?? REVISION_TIME_BUDGET_MS);
   const attempts: LoopAttempt[] = [];
   let current = original;
   let currentIssues: ContinuityIssue[];
@@ -276,8 +285,10 @@ export async function runContinuityLoop(original: string, deps: LoopDeps, maxCyc
     if (d.kind === "accept") {
       return { status: revisions > 0 ? "REVISED" : d.status, finalText: current, revised: revisions > 0, revisionCount: revisions, ...split(currentIssues), attempts, error: null };
     }
-    if (d.kind === "review" || revisions >= maxCycles) {
-      if (d.kind !== "review") attempts[attempts.length - 1].note = `Revision limit (${maxCycles}) reached`;
+    const outOfTime = d.kind !== "review" && revisions < maxCycles && now() >= deadline;
+    if (d.kind === "review" || revisions >= maxCycles || outOfTime) {
+      if (outOfTime) attempts[attempts.length - 1].note = "Revision time budget exhausted";
+      else if (d.kind !== "review") attempts[attempts.length - 1].note = `Revision limit (${maxCycles}) reached`;
       return { status: "NEEDS_REVIEW", finalText: best.text, revised: best.text !== original, revisionCount: revisions, ...split(best.issues), attempts, error: null };
     }
     // revise
