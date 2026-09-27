@@ -495,6 +495,92 @@ export type Database = {
           },
         ]
       }
+      continuity_checks: {
+        Row: {
+          attempts: Json
+          book_id: string
+          chapter_index: number
+          confidence: number | null
+          created_at: string
+          error: string | null
+          final_hash: string | null
+          final_text: string | null
+          generation_id: string
+          id: string
+          issues: Json
+          max_severity: string | null
+          model_identifier: string | null
+          original_hash: string
+          original_text: string
+          resolution_status: string
+          revision_count: number
+          status: string
+          subsection_id: string | null
+          subsection_index: number
+          updated_at: string
+          user_id: string
+          warnings: Json
+        }
+        Insert: {
+          attempts?: Json
+          book_id: string
+          chapter_index: number
+          confidence?: number | null
+          created_at?: string
+          error?: string | null
+          final_hash?: string | null
+          final_text?: string | null
+          generation_id?: string
+          id?: string
+          issues?: Json
+          max_severity?: string | null
+          model_identifier?: string | null
+          original_hash: string
+          original_text: string
+          resolution_status?: string
+          revision_count?: number
+          status: string
+          subsection_id?: string | null
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+          warnings?: Json
+        }
+        Update: {
+          attempts?: Json
+          book_id?: string
+          chapter_index?: number
+          confidence?: number | null
+          created_at?: string
+          error?: string | null
+          final_hash?: string | null
+          final_text?: string | null
+          generation_id?: string
+          id?: string
+          issues?: Json
+          max_severity?: string | null
+          model_identifier?: string | null
+          original_hash?: string
+          original_text?: string
+          resolution_status?: string
+          revision_count?: number
+          status?: string
+          subsection_id?: string | null
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "continuity_checks_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       error_logs: {
         Row: {
           context: Json | null
