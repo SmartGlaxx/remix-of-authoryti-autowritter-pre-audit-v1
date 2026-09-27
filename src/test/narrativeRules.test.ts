@@ -5,7 +5,11 @@ describe("decideFactInsertion", () => {
   const ex = { id: "e1", value: "brown", authority: "OUTLINE_CANON" as const };
   it("inserts clean when nothing exists", () => expect(decideFactInsertion({ value: "brown", authority: "AI_INFERENCE" }, null).kind).toBe("insert_clean"));
   it("detects duplicates ignoring case/space", () => expect(decideFactInsertion({ value: " Brown ", authority: "AI_INFERENCE" }, ex).kind).toBe("duplicate"));
-  it("rejects lower authority", () => expect(decideFactInsertion({ value: "blue", authority: "AI_INFERENCE" }, ex).kind).toBe("insert_rejected"));
+  it("keeps a lower-authority conflict as disputed and non-canonical (never rejected)", () => {
+    const d = decideFactInsertion({ value: "blue", authority: "AI_INFERENCE" }, ex);
+    expect(d.kind).toBe("insert_disputed_noncanonical");
+    expect(d).toEqual({ kind: "insert_disputed_noncanonical", existingId: "e1" });
+  });
   it("disputes equal authority", () => expect(decideFactInsertion({ value: "blue", authority: "OUTLINE_CANON" }, ex).kind).toBe("insert_disputed"));
   it("disputes higher authority (never overwrites)", () => expect(decideFactInsertion({ value: "blue", authority: "USER_CANON" }, ex).kind).toBe("insert_disputed"));
 });
