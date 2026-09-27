@@ -268,6 +268,16 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
           <h3 className="font-medium text-lg">{sub.title}</h3>
           {/* Teasers are now woven into the prose itself — no separate display */}
         </div>
+        {sub.status === "completed" && sub.continuity?.status === "NEEDS_REVIEW" && (
+          <Badge variant="outline" className="shrink-0 border-warning/50 text-warning" title={`${sub.continuity.issueCount ?? 0} continuity issue(s) could not be fixed automatically`}>
+            Continuity: review
+          </Badge>
+        )}
+        {sub.status === "completed" && sub.continuity?.status === "CHECK_FAILED" && (
+          <Badge variant="outline" className="shrink-0 text-muted-foreground" title="The continuity check could not run for this section">
+            Not checked
+          </Badge>
+        )}
         {sub.status === "completed" && <CheckCircle2 className="w-5 h-5 text-success shrink-0" />}
         {sub.status === "writing" && <Loader2 className="w-5 h-5 text-primary shrink-0 animate-spin" />}
       </div>

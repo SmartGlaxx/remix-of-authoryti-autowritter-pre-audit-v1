@@ -265,6 +265,8 @@ export interface Subsection {
   imageOpportunity?: string;
   status: "pending" | "writing" | "completed";
   imageUrl?: string;
+  /** Pass 4 continuity result for the current text of this section. */
+  continuity?: { status: "PASSED" | "PASSED_WITH_WARNINGS" | "REVISED" | "NEEDS_REVIEW" | "CHECK_FAILED"; checkId?: string; issueCount?: number };
 }
 
 export interface Chapter {
