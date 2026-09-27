@@ -3,6 +3,9 @@
 // records it in the narrative ledgers. Idempotent per (book, chapter, section, text hash).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { processSectionExtraction, type ModelCaller } from "../_shared/narrative/extraction.ts";
+import { generateAIText } from "../_shared/ai/client.ts";
+import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
+import type { BookModelConfig } from "../_shared/ai/roles.ts";
 import { createSupabaseNarrativeRepo, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 
 const corsHeaders = {
@@ -12,24 +15,14 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Extraction model boundary — Pass 3 will replace this caller, nothing else.
-const EXTRACTION_MODEL = "google/gemini-2.5-flash";
-const callExtractionModel: ModelCaller = async ({ system, user }) => {
-  const key = Deno.env.get("LOVABLE_API_KEY");
-  if (!key) throw new Error("Extraction model not configured");
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 90_000);
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST", signal: ctrl.signal,
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: EXTRACTION_MODEL, temperature: 0, response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
-    });
-    if (!res.ok) throw new Error(`Extraction model error ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const data = await res.json();
-    return { content: data?.choices?.[0]?.message?.content ?? "", model: EXTRACTION_MODEL };
-  } finally { clearTimeout(timer); }
-};
+// Extraction model boundary — Pass 3: resolved per book through the provider-neutral AI layer
+// (role = narrative_extractor). Nothing else in this function knows about providers.
+function makeExtractionCaller(db: ReturnType<typeof createClient>, userId: string, bookId: string, config: BookModelConfig): ModelCaller {
+  return async ({ system, user }) => {
+    const { text, meta } = await generateAIText({ role: "narrative_extractor", config, userId, bookId, request: { system, user, json: true, temperature: 0, reasoning: "low" } }, createAIDeps(db, userId));
+    return { content: text, model: meta.model };
+  };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -59,7 +52,8 @@ Deno.serve(async (req) => {
     if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
 
     const repo = createSupabaseNarrativeRepo(db, userId);
-    const outcome = await processSectionExtraction(repo, callExtractionModel, bookId, { chapterIndex: chapterIndex as number, subsectionIndex: subsectionIndex as number });
+    const config = await loadBookModelConfig(db, bookId, userId);
+    const outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: chapterIndex as number, subsectionIndex: subsectionIndex as number });
     console.log("[extract-narrative-state]", JSON.stringify(outcome));
     // no_prose = section not saved yet → 409 so the client can retry shortly.
     const status = outcome.status === "no_prose" ? 409 : outcome.status === "failed" ? 500 : 200;

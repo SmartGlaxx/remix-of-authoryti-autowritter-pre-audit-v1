@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
+import { AIProviderError } from "../_shared/ai/providers.ts";
+import { aiBookContext } from "../_shared/ai/server.ts";
+import { createAIDeps } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 50_000;
@@ -77,8 +81,6 @@ serve(async (req) => {
     if (validationError) return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { content, type } = body;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const wordLimit = type === "chapter" ? "300-500" : "50-100";
     
@@ -92,28 +94,16 @@ REQUIREMENTS:
 
 Return ONLY the summary text, nothing else.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Summarize this ${type}:\n\n${content}` },
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const ctx = await aiBookContext(admin, body.bookId, auth.user.id);
+    let summary: string;
+    try {
+      const r = await generateAIText({ role: "summarizer", config: ctx.config, userId: auth.user.id, bookId: ctx.bookId, request: { system: systemPrompt, user: `Summarize this ${type}:\n\n${content}`, temperature: 0.3, reasoning: "low" } }, createAIDeps(admin, auth.user.id));
+      summary = r.text;
+    } catch (e) {
+      if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
     }
-
-    const data = await response.json();
-    const summary = data.choices?.[0]?.message?.content || "";
 
     return new Response(JSON.stringify({ summary: summary.trim() }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

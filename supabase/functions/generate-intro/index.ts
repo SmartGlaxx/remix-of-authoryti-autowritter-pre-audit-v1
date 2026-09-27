@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
+import { AIProviderError } from "../_shared/ai/providers.ts";
+import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 const MAX_PAYLOAD_BYTES = 200_000;
 
@@ -163,55 +166,17 @@ ${sourceExcerpt}
 
 Now write the 150–220 word cliffhanger intro snippet.`;
 
-    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-    let resp: Response;
-    if (DEEPSEEK_API_KEY) {
-      resp = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: false,
-        }),
-      });
-    } else if (LOVABLE_API_KEY) {
-      resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        }),
-      });
-    } else {
-      throw new Error("No AI key configured");
+    const __admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const __ctx = await aiBookContext(__admin, book.id, auth.user.id);
+    let __text: string;
+    try {
+      const __r = await generateAIText({ role: "intro_writer", config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { system: systemPrompt, user: userPrompt } }, createAIDeps(__admin, auth.user.id));
+      __text = __r.text;
+    } catch (e) {
+      if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
     }
-
-    if (!resp.ok) {
-      const t = await resp.text();
-      console.error("AI error", resp.status, t);
-      return new Response(JSON.stringify({ error: `AI error: ${resp.status}` }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const data = await resp.json();
-    const intro = (data.choices?.[0]?.message?.content || "").trim();
+    const intro = __text.trim();
     if (!intro) throw new Error("Empty intro");
 
     return new Response(JSON.stringify({ intro }), {
