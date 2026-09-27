@@ -44,6 +44,68 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_records: {
+        Row: {
+          book_id: string | null
+          cached_input_tokens: number | null
+          created_at: string
+          credential_source: string
+          error_code: string | null
+          estimated_cost_usd: number | null
+          id: string
+          input_tokens: number | null
+          model: string
+          output_tokens: number | null
+          provider: string
+          request_id: string | null
+          role: string
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          book_id?: string | null
+          cached_input_tokens?: number | null
+          created_at?: string
+          credential_source: string
+          error_code?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          model: string
+          output_tokens?: number | null
+          provider: string
+          request_id?: string | null
+          role: string
+          success: boolean
+          user_id: string
+        }
+        Update: {
+          book_id?: string | null
+          cached_input_tokens?: number | null
+          created_at?: string
+          credential_source?: string
+          error_code?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          model?: string
+          output_tokens?: number | null
+          provider?: string
+          request_id?: string | null
+          role?: string
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_records_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -73,6 +135,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      book_model_configs: {
+        Row: {
+          book_id: string
+          created_at: string
+          fallbacks: Json
+          id: string
+          mode: string
+          role_models: Json
+          single_model: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          fallbacks?: Json
+          id?: string
+          mode?: string
+          role_models?: Json
+          single_model?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          fallbacks?: Json
+          id?: string
+          mode?: string
+          role_models?: Json
+          single_model?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_model_configs_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       books: {
         Row: {
@@ -1260,6 +1366,48 @@ export type Database = {
           message?: string
           rating?: number
           reviewed?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_provider_keys: {
+        Row: {
+          ciphertext: string
+          created_at: string
+          id: string
+          iv: string
+          last_tested_at: string | null
+          last4: string
+          prefix: string | null
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ciphertext: string
+          created_at?: string
+          id?: string
+          iv: string
+          last_tested_at?: string | null
+          last4: string
+          prefix?: string | null
+          provider: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ciphertext?: string
+          created_at?: string
+          id?: string
+          iv?: string
+          last_tested_at?: string | null
+          last4?: string
+          prefix?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
