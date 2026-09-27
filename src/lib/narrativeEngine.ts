@@ -115,8 +115,8 @@ export async function recordCanonicalFact(bookId: string, f: NewFact): Promise<{
   if (decision.kind === "insert_clean") {
     return { fact: check(await db.from("canonical_facts").insert({ ...base, conflict_status: "clean", is_canonical: true }).select().single()), outcome: "inserted" };
   }
-  if (decision.kind === "insert_rejected") {
-    return { fact: check(await db.from("canonical_facts").insert({ ...base, conflict_status: "rejected", is_canonical: false, conflicting_fact_id: decision.existingId, notes: "Lower authority than existing canon." }).select().single()), outcome: "rejected" };
+  if (decision.kind === "insert_disputed_noncanonical") {
+    return { fact: check(await db.from("canonical_facts").insert({ ...base, conflict_status: "disputed", is_canonical: false, conflicting_fact_id: decision.existingId, notes: "Lower authority than existing canon; disputed pending review." }).select().single()), outcome: "disputed_noncanonical" };
   }
   const fact = check(await db.from("canonical_facts").insert({ ...base, conflict_status: "disputed", is_canonical: true, conflicting_fact_id: decision.existingId }).select().single());
   check(await db.from("canonical_facts").update({ conflict_status: "disputed", conflicting_fact_id: fact.id }).eq("id", decision.existingId));

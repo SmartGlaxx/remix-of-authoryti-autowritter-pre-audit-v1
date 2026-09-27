@@ -4,13 +4,14 @@ import { AUTHORITY_RANK, type Authority, type PlotThreadStatus } from "@/types/n
 export type FactDecision =
   | { kind: "insert_clean" }                  // no existing fact for subject+predicate
   | { kind: "duplicate"; existingId: string } // same value, nothing to do
-  | { kind: "insert_rejected"; existingId: string }  // lower authority: stored non-canonical
+  | { kind: "insert_disputed_noncanonical"; existingId: string } // lower authority: kept, disputed, non-canonical
   | { kind: "insert_disputed"; existingId: string }; // equal or higher: both flagged, human decides
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /**
- * Never auto-overwrite. Lower authority → incoming rejected (kept for audit).
+ * Never auto-overwrite. Lower authority → incoming kept as disputed + non-canonical
+ * (existing higher-authority fact stays canonical and clean).
  * Equal/higher authority → both marked disputed for review.
  */
 export function decideFactInsertion(
@@ -20,10 +21,11 @@ export function decideFactInsertion(
   if (!existing) return { kind: "insert_clean" };
   if (norm(existing.value) === norm(incoming.value)) return { kind: "duplicate", existingId: existing.id };
   if (AUTHORITY_RANK[incoming.authority] < AUTHORITY_RANK[existing.authority]) {
-    return { kind: "insert_rejected", existingId: existing.id };
+    return { kind: "insert_disputed_noncanonical", existingId: existing.id };
   }
   return { kind: "insert_disputed", existingId: existing.id };
 }
+
 
 export function validateThreadTransition(
   status: PlotThreadStatus,
