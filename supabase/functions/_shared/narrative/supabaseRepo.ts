@@ -1,7 +1,8 @@
 // Database implementation of the narrative repository (runs in edge functions with a
 // service-role client). Callers MUST verify book ownership before using it; every
 // write stamps the verified owner's user_id and is scoped by book_id.
-import { decideFactInsertion, normText, toPosition, type StoryPosition } from "./rules.ts";
+import { normText, toPosition, type StoryPosition } from "./rules.ts";
+import { applyCanonicalFact } from "./factMutation.ts";
 import { selectNarrativeState, type NarrativeRows } from "./context.ts";
 import { EXTRACTION_AUTHORITY, threadTransitionFor, type ExtractionPlan, type ExtractionRecord, type NarrativeRepo } from "./extraction.ts";
 
