@@ -342,7 +342,7 @@ describe("Pass 2 fiction validation — multi-scene story", () => {
     }
     // an existing higher-authority fact is never displaced by extraction
     const db = fakeDb(facts);
-    facts.push({ id: "user1", subject: "Mara", predicate: "age", value: "32", authority: "USER_CANON", is_canonical: true, conflict_status: "clean", conflicting_fact_id: null });
+    facts.push({ id: "user1", book_id: "book1", subject: "Mara", predicate: "age", value: "32", authority: "USER_CANON", is_canonical: true, conflict_status: "clean", conflicting_fact_id: null });
     const res = await applyCanonicalFact(db, { bookId: "book1", userId: "u1", fact: { subject: "Mara", predicate: "age", value: "41", authority: "AI_INFERENCE", sourceType: "extraction" } });
     expect(res.outcome).toBe("disputed_noncanonical");
     expect(res.fact!.is_canonical).toBe(false);
