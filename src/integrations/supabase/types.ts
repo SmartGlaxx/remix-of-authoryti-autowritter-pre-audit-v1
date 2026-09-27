@@ -164,6 +164,7 @@ export type Database = {
           conflict_status: string
           conflicting_fact_id: string | null
           created_at: string
+          extraction_id: string | null
           id: string
           is_canonical: boolean
           notes: string | null
@@ -187,6 +188,7 @@ export type Database = {
           conflict_status?: string
           conflicting_fact_id?: string | null
           created_at?: string
+          extraction_id?: string | null
           id?: string
           is_canonical?: boolean
           notes?: string | null
@@ -210,6 +212,7 @@ export type Database = {
           conflict_status?: string
           conflicting_fact_id?: string | null
           created_at?: string
+          extraction_id?: string | null
           id?: string
           is_canonical?: boolean
           notes?: string | null
@@ -241,6 +244,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "canonical_facts_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "canonical_facts_subject_character_id_fkey"
             columns: ["subject_character_id"]
             isOneToOne: false
@@ -267,6 +277,7 @@ export type Database = {
           current_goals: string[]
           current_motivations: string | null
           emotional_state: string | null
+          extraction_id: string | null
           id: string
           inventory: string[]
           is_current: boolean
@@ -294,6 +305,7 @@ export type Database = {
           current_goals?: string[]
           current_motivations?: string | null
           emotional_state?: string | null
+          extraction_id?: string | null
           id?: string
           inventory?: string[]
           is_current?: boolean
@@ -321,6 +333,7 @@ export type Database = {
           current_goals?: string[]
           current_motivations?: string | null
           emotional_state?: string | null
+          extraction_id?: string | null
           id?: string
           inventory?: string[]
           is_current?: boolean
@@ -351,6 +364,13 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "story_characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_states_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
             referencedColumns: ["id"]
           },
           {
@@ -466,6 +486,7 @@ export type Database = {
           chronological_order: number | null
           consequences: string[]
           created_at: string
+          extraction_id: string | null
           id: string
           information_revealed: string[]
           information_withheld: string[]
@@ -489,6 +510,7 @@ export type Database = {
           chronological_order?: number | null
           consequences?: string[]
           created_at?: string
+          extraction_id?: string | null
           id?: string
           information_revealed?: string[]
           information_withheld?: string[]
@@ -512,6 +534,7 @@ export type Database = {
           chronological_order?: number | null
           consequences?: string[]
           created_at?: string
+          extraction_id?: string | null
           id?: string
           information_revealed?: string[]
           information_withheld?: string[]
@@ -536,10 +559,76 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "narrative_events_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "narrative_events_location_entity_id_fkey"
             columns: ["location_entity_id"]
             isOneToOne: false
             referencedRelation: "story_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      narrative_extractions: {
+        Row: {
+          applied: Json
+          attempts: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at: string
+          error: string | null
+          id: string
+          model_identifier: string | null
+          status: string
+          subsection_id: string | null
+          subsection_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applied?: Json
+          attempts?: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          model_identifier?: string | null
+          status?: string
+          subsection_id?: string | null
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applied?: Json
+          attempts?: number
+          book_id?: string
+          chapter_index?: number
+          content_hash?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          model_identifier?: string | null
+          status?: string
+          subsection_id?: string | null
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrative_extractions_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
             referencedColumns: ["id"]
           },
         ]
@@ -646,6 +735,7 @@ export type Database = {
           clues: string[]
           created_at: string
           description: string | null
+          extraction_id: string | null
           id: string
           importance: string
           introduced_chapter_index: number | null
@@ -669,6 +759,7 @@ export type Database = {
           clues?: string[]
           created_at?: string
           description?: string | null
+          extraction_id?: string | null
           id?: string
           importance?: string
           introduced_chapter_index?: number | null
@@ -692,6 +783,7 @@ export type Database = {
           clues?: string[]
           created_at?: string
           description?: string | null
+          extraction_id?: string | null
           id?: string
           importance?: string
           introduced_chapter_index?: number | null
@@ -715,6 +807,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plot_threads_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
             referencedColumns: ["id"]
           },
           {
@@ -843,6 +942,7 @@ export type Database = {
           aliases: string[]
           book_id: string
           created_at: string
+          extraction_id: string | null
           id: string
           is_active: boolean
           name: string
@@ -855,6 +955,7 @@ export type Database = {
           aliases?: string[]
           book_id: string
           created_at?: string
+          extraction_id?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -867,6 +968,7 @@ export type Database = {
           aliases?: string[]
           book_id?: string
           created_at?: string
+          extraction_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -881,6 +983,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_characters_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
             referencedColumns: ["id"]
           },
         ]
@@ -1005,6 +1114,7 @@ export type Database = {
           duration: string | null
           event_id: string | null
           event_summary: string
+          extraction_id: string | null
           id: string
           is_flashback: boolean
           location_entity_id: string | null
@@ -1024,6 +1134,7 @@ export type Database = {
           duration?: string | null
           event_id?: string | null
           event_summary: string
+          extraction_id?: string | null
           id?: string
           is_flashback?: boolean
           location_entity_id?: string | null
@@ -1043,6 +1154,7 @@ export type Database = {
           duration?: string | null
           event_id?: string | null
           event_summary?: string
+          extraction_id?: string | null
           id?: string
           is_flashback?: boolean
           location_entity_id?: string | null
@@ -1068,6 +1180,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "narrative_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_timeline_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_extractions"
             referencedColumns: ["id"]
           },
           {
