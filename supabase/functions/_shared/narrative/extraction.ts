@@ -142,7 +142,7 @@ export function planExtraction(raw: Record<string, unknown>, ctx: { text: string
     plan.characterChanges.push({ ...change, characterId: matchCharacter(name, ctx.characters)?.id ?? null });
   }
 
-  for (const f of arr(raw.facts) as Record<string, unknown>[]) {
+  for (const f of factArr(raw.facts) as Record<string, unknown>[]) {
     const subject = str(f?.subject, 200), predicate = str(f?.predicate, 200), value = str(f?.value, 500), evidence = str(f?.evidence, 600);
     if (!subject || !predicate || !value) { drop("fact", "incomplete fact", f); continue; }
     if (!ok(evidence)) { drop("fact", "evidence not found in text", f); continue; }
