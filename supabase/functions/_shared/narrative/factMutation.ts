@@ -64,7 +64,7 @@ export async function applyCanonicalFact(
 ): Promise<FactApplyResult> {
   const { bookId, userId, fact: f } = args;
   const existing = await findCompetingFact(db, bookId, f.subject, f.predicate);
-  const decision = decideFactInsertion({ value: f.value, authority: f.authority }, existing);
+  const decision = decideFactInsertion({ value: f.value, authority: f.authority }, existing as { id: string; value: string; authority: Authority } | null);
   if (decision.kind === "duplicate") return { outcome: "duplicate", fact: existing, existingBefore: null };
 
   const row: Row = {
