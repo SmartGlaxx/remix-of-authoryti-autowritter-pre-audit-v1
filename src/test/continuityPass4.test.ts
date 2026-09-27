@@ -68,7 +68,7 @@ describe("Pass 4 — checker output validation", () => {
 describe("Pass 4 — decisions", () => {
   it("11. LOW / low-confidence issues are warnings, never revised", () => {
     expect(isMaterial(issue({ severity: "LOW" }))).toBe(false);
-    expect(isMaterial(issue({ confidence: 0.4 }))).toBe(false);
+    expect(isMaterial(issue({ severity: "MEDIUM", confidence: 0.4 }))).toBe(false);
     expect(decide([issue({ severity: "LOW" })])).toEqual({ kind: "accept", status: "PASSED_WITH_WARNINGS" });
   });
   it("12. high-severity ambiguity escalates to review", () => {
