@@ -200,8 +200,8 @@ export function decide(issues: ContinuityIssue[]): Decision {
     if (needsHuman) return { kind: "review", reason: "High-severity ambiguity needs human review" };
     return { kind: "accept", status: issues.length ? "PASSED_WITH_WARNINGS" : "PASSED" };
   }
-  const unrepairable = material.filter((i) => !i.repairable);
-  if (unrepairable.length) return { kind: "review", reason: `${unrepairable.length} material issue(s) marked not repairable` };
+  const unrepairable = material.filter((i) => !isAutoRepairable(i));
+  if (unrepairable.length) return { kind: "review", reason: `${unrepairable.length} material issue(s) not safely auto-repairable (unrepairable or low confidence)` };
   return { kind: "revise", targets: material };
 }
 
