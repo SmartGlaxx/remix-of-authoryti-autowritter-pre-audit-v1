@@ -280,7 +280,7 @@ export async function runContinuityLoop(original: string, deps: LoopDeps, maxCyc
     }
     revisions++;
     const v = validateRevision(original, candidate);
-    if (!v.ok) {
+    if (v.ok === false) {
       attempts.push({ cycle: cycle + 1, issues: [], decision: "revision_rejected", note: v.reason });
       if (revisions >= maxCycles) return { status: "NEEDS_REVIEW", finalText: best.text, revised: best.text !== original, revisionCount: revisions, ...split(best.issues), attempts, error: null };
       continue; // retry revising the same current text
