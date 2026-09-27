@@ -10,6 +10,7 @@ export type Role =
   | "writer"
   | "narrative_extractor"
   | "continuity_checker"
+  | "continuity_reviser"
   | "editor"
   | "difficult_chapter"
   | "manuscript_auditor"
@@ -18,17 +19,18 @@ export type Role =
   | "summarizer"
   | "intro_writer";
 
-export const USER_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "continuity_checker", "editor", "difficult_chapter", "manuscript_auditor"];
+export const USER_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "continuity_checker", "continuity_reviser", "editor", "difficult_chapter", "manuscript_auditor"];
 export const AUX_ROLES: Role[] = ["character_generator", "summarizer", "intro_writer"];
 export const ALL_ROLES: Role[] = [...USER_ROLES, ...AUX_ROLES];
 /** Roles with a real pipeline behind them today. Others are stored but never invoked. */
-export const ACTIVE_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "editor", "character_generator", "summarizer", "intro_writer"];
+export const ACTIVE_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "continuity_checker", "continuity_reviser", "editor", "character_generator", "summarizer", "intro_writer"];
 
 export const ROLE_LABELS: Record<Role, string> = {
   planner: "Planner (outlines)",
   writer: "Writer (prose)",
   narrative_extractor: "Story-memory extractor",
   continuity_checker: "Continuity checker",
+  continuity_reviser: "Continuity reviser",
   editor: "Editor (rewrites)",
   difficult_chapter: "Difficult chapters",
   manuscript_auditor: "Manuscript auditor",
