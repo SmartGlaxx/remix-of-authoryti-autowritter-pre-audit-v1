@@ -164,8 +164,6 @@ serve(async (req) => {
 
     const { paragraph, bookTitle, chapterTitle, subsectionTitle, guidedAction, fullContent, subsectionGoal } = body;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const formatBanRule = "\n\nFORMAT & WORD BAN RULES (STRICTLY ENFORCED):\n- NEVER use markdown formatting such as **, *, ##, or any markdown syntax. Write in plain prose only.\n- NEVER use the word \"magic\" or \"magical\". Use alternatives like \"enchantment\", \"sorcery\", \"extraordinary\", \"remarkable\", \"uncanny\".\n- Do not use asterisks for emphasis.";
 

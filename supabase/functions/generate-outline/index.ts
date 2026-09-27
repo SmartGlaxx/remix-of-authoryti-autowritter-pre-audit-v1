@@ -78,8 +78,6 @@ serve(async (req) => {
     if (validationError) return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { book, ieltsBand } = body;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     await auditLog(auth.user.id, "generate_outline", "book", book.id, { title: book.title });
 
