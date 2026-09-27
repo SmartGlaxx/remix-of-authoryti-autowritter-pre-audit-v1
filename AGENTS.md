@@ -1,0 +1,2 @@
+- Narrative engine pure logic lives in `supabase/functions/_shared/narrative/` (rules, context, extraction) and is imported by both edge functions and `src/` — one source of truth for browser, backend and tests.
+- Story-state extraction runs server-side (`extract-narrative-state`) from the saved section text, idempotent per section via `narrative_extractions` (content hash + undo log) — prevents duplicates and never trusts client prose.
