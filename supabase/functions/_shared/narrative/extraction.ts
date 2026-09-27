@@ -82,6 +82,8 @@ const strMap = (v: unknown): Record<string, string> => {
   return out;
 };
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v.slice(0, 30) : []);
+/** Facts have no arbitrary cap — only a sanity bound against a runaway model response. */
+const factArr = (v: unknown): unknown[] => (Array.isArray(v) ? v.slice(0, 1000) : []);
 
 export function parseModelJson(raw: string): Record<string, unknown> {
   let s = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
