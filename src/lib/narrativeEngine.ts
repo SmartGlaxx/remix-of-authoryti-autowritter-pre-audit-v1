@@ -98,29 +98,17 @@ export interface NewFact {
 
 export async function recordCanonicalFact(bookId: string, f: NewFact): Promise<{ fact: CanonicalFact | null; outcome: string }> {
   const user_id = await ownerId();
-  const existing: CanonicalFact | null = check(await db.from("canonical_facts").select("*")
-    .eq("book_id", bookId).ilike("subject", f.subject).ilike("predicate", f.predicate)
-    .eq("is_canonical", true).in("conflict_status", ["clean", "disputed"])
-    .order("created_at", { ascending: true }).limit(1).maybeSingle());
-  const decision = decideFactInsertion({ value: f.value, authority: f.authority }, existing);
-  if (decision.kind === "duplicate") return { fact: existing, outcome: "duplicate" };
-
-  const base = {
-    book_id: bookId, user_id, subject: f.subject, predicate: f.predicate, value: f.value,
-    category: f.category ?? "general", authority: f.authority, source_type: f.sourceType,
-    source_chapter_index: f.position?.chapterIndex ?? null, source_subsection_index: f.position?.subsectionIndex ?? null,
-    source_excerpt: f.sourceExcerpt ?? null, confidence: f.confidence ?? 0.7,
-    subject_character_id: f.subjectCharacterId ?? null, subject_entity_id: f.subjectEntityId ?? null,
-  };
-  if (decision.kind === "insert_clean") {
-    return { fact: check(await db.from("canonical_facts").insert({ ...base, conflict_status: "clean", is_canonical: true }).select().single()), outcome: "inserted" };
-  }
-  if (decision.kind === "insert_disputed_noncanonical") {
-    return { fact: check(await db.from("canonical_facts").insert({ ...base, conflict_status: "disputed", is_canonical: false, conflicting_fact_id: decision.existingId, notes: "Lower authority than existing canon; disputed pending review." }).select().single()), outcome: "disputed_noncanonical" };
-  }
-  const fact = check(await db.from("canonical_facts").insert({ ...base, conflict_status: "disputed", is_canonical: true, conflicting_fact_id: decision.existingId }).select().single());
-  check(await db.from("canonical_facts").update({ conflict_status: "disputed", conflicting_fact_id: fact.id }).eq("id", decision.existingId));
-  return { fact, outcome: "disputed" };
+  // Single shared implementation — identical rules in the browser and in edge functions.
+  const res = await applyCanonicalFact(db, {
+    bookId, userId: user_id,
+    fact: {
+      subject: f.subject, predicate: f.predicate, value: f.value, category: f.category,
+      authority: f.authority, sourceType: f.sourceType, position: f.position ?? null,
+      sourceExcerpt: f.sourceExcerpt ?? null, confidence: f.confidence,
+      subjectCharacterId: f.subjectCharacterId ?? null, subjectEntityId: f.subjectEntityId ?? null,
+    },
+  });
+  return { fact: (res.fact as CanonicalFact | null) ?? null, outcome: res.outcome };
 }
 
 /** Explicit human/authority resolution of a dispute. */
