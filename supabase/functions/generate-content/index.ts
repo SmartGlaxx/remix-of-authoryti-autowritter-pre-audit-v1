@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { buildNarrativeContext } from "../_shared/narrative/context.ts";
+import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 200_000;
@@ -514,12 +516,31 @@ serve(async (req) => {
     const systemPrompt = buildStaticSystemPrompt(book, band, isScreenplay, isChildren, isComic, isNarrative, book.controls);
     
     // Variable user prompt = changes per subsection (not cached)
-    const userPrompt = buildVariablePrompt(
+    let userPrompt = buildVariablePrompt(
       book, chapter, subsection,
       previousNovelText,
       previousSummary, previousRawContent, tonalAnchors, teaserStyle,
       isScreenplay, isChildren, isComic, targetWordsPerSubsection, reqAutomationLevel
     );
+
+    // ── Pass 2: structured narrative memory (point-in-time, strictly before this section) ──
+    // Supplements (never replaces) the linear manuscript context. Any failure here is
+    // non-fatal: the section is written exactly as before.
+    if (book.id) {
+      try {
+        const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
+        if (owned) {
+          const rows = await loadNarrativeRows(adminSupabase, book.id);
+          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex, subsectionIndex }, owned.outline?.characters ?? []);
+          if (narrativeBlock) {
+            userPrompt = userPrompt.replace(/\n\n/, `\n\n${narrativeBlock}\n\n`);
+            console.log(`[narrative-context] injected chars=${narrativeBlock.length}`);
+          }
+        }
+      } catch (e) {
+        console.warn("[narrative-context] skipped:", e instanceof Error ? e.message : e);
+      }
+    }
 
     // ── Choose AI provider: DeepSeek (preferred for novels) vs Lovable AI (fallback) ──
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
