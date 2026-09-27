@@ -493,8 +493,11 @@ serve(async (req) => {
           .maybeSingle();
 
         if (bookRow && bookRow.user_id === auth.user.id) {
-          const charCount = bookRow.total_char_count || 0;
-          const cacheKey = `novel_full_v1_${book.id}_${charCount}`;
+          // Content-hash versioning: any change to the manuscript (even same-length
+          // continuity revisions) yields a new key, so stale text is never served.
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bookRow.full_text || ""));
+          const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+          const cacheKey = `novel_full_v2_${book.id}_${hash}`;
           let cached = getCachedNovelText(cacheKey);
           if (!cached) {
             let fullText = bookRow.full_text || "";
@@ -581,15 +584,15 @@ serve(async (req) => {
           .eq("id", book.id)
           .maybeSingle();
         if (!row || row.user_id !== auth.user.id) return;
-        const oldCharCount = row.total_char_count || 0;
         const updated = ((row.full_text || "") + (row.full_text ? "\n\n" : "") + newContent).slice(-500_000); // safety cap 500k
         const newCharCount = updated.length;
         await adminSupabase
           .from("books")
           .update({ full_text: updated, total_char_count: newCharCount })
           .eq("id", book.id);
-        NOVEL_TEXT_CACHE.delete(`novel_full_v1_${book.id}_${oldCharCount}`);
-        console.log(`[novel-cache] invalidated old key, new chars=${newCharCount}`);
+        // Old hash-keyed entries become unreachable; drop this book's entries to free memory.
+        for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k);
+        console.log(`[novel-cache] invalidated book entries, new chars=${newCharCount}`);
       } catch (e) {
         console.warn("[novel-cache] full_text update failed:", e);
       }

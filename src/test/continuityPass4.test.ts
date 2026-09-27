@@ -68,7 +68,7 @@ describe("Pass 4 — checker output validation", () => {
 describe("Pass 4 — decisions", () => {
   it("11. LOW / low-confidence issues are warnings, never revised", () => {
     expect(isMaterial(issue({ severity: "LOW" }))).toBe(false);
-    expect(isMaterial(issue({ confidence: 0.4 }))).toBe(false);
+    expect(isMaterial(issue({ severity: "MEDIUM", confidence: 0.4 }))).toBe(false);
     expect(decide([issue({ severity: "LOW" })])).toEqual({ kind: "accept", status: "PASSED_WITH_WARNINGS" });
   });
   it("12. high-severity ambiguity escalates to review", () => {
@@ -151,4 +151,17 @@ describe("Pass 4 — state, prompts, roles", () => {
     expect(resolveModelForRole(null, "continuity_reviser").model).toBe("google/gemini-2.5-pro");
     expect(resolveModelForRole({ mode: "optimized" }, "continuity_checker").model).toBe("openai/gpt-6-luna");
   });
+});
+
+import { isMaterial as _isMat, decide as _decide } from "../../supabase/functions/_shared/narrative/continuity";
+describe("severity protection vs repair eligibility", () => {
+  const base = { type: "FACT_CONTRADICTION", classification: "ERROR", excerpt: "x", conflictingEvidence: "y", explanation: "z", repairable: true } as any;
+  it("HIGH low-confidence stays an error but is not auto-repaired", () => {
+    const i = { ...base, severity: "HIGH", confidence: 0.3 };
+    expect(_isMat(i)).toBe(true);
+    expect(_decide([i]).kind).toBe("review");
+  });
+  it("CRITICAL is material at any confidence", () => expect(_isMat({ ...base, severity: "CRITICAL", confidence: 0.1 })).toBe(true));
+  it("MEDIUM low-confidence is a warning", () => expect(_isMat({ ...base, severity: "MEDIUM", confidence: 0.4 })).toBe(false));
+  it("HIGH confident repairable is revised", () => expect(_decide([{ ...base, severity: "HIGH", confidence: 0.9 }]).kind).toBe("revise"));
 });
