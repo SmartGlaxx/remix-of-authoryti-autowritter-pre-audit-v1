@@ -153,7 +153,7 @@ export function selectNarrativeState(rows: NarrativeRows, position: StoryPositio
 
   const timeline = rows.timeline
     .filter((t) => { const tp = posOf(t.chapter_index, t.subsection_index); return tp != null && tp < p; })
-    .sort((a, b) => Number(a.relative_order) - Number(b.relative_order)).at(-1) ?? null;
+    .sort((a, b) => Number(a.relative_order) - Number(b.relative_order)).slice(-1)[0] ?? null;
 
   const entities = rows.entities
     .filter((e) => e.is_active !== false && before(posOf(e.first_chapter_index, e.first_subsection_index)))
@@ -161,7 +161,7 @@ export function selectNarrativeState(rows: NarrativeRows, position: StoryPositio
 
   const snapshot = rows.snapshots
     .filter((s) => (posOf(s.chapter_index, s.subsection_index) ?? Infinity) < p)
-    .sort((a, b) => posOf(a.chapter_index, a.subsection_index)! - posOf(b.chapter_index, b.subsection_index)!).at(-1) ?? null;
+    .sort((a, b) => posOf(a.chapter_index, a.subsection_index)! - posOf(b.chapter_index, b.subsection_index)!).slice(-1)[0] ?? null;
 
   return {
     position,

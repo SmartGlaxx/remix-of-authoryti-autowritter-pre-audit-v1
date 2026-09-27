@@ -205,7 +205,7 @@ export function contentHash(text: string): string {
 }
 
 // ---------- Orchestrator ----------
-export interface ExtractionRecord { id: string; content_hash: string; status: "processing" | "completed" | "failed"; attempts: number; applied: Record<string, unknown>; updated_at?: string }
+export interface ExtractionRecord { id: string; book_id?: string; content_hash: string; status: "processing" | "completed" | "failed"; attempts: number; applied: Record<string, unknown>; updated_at?: string }
 
 export interface NarrativeRepo {
   getSectionText(bookId: string, pos: StoryPosition): Promise<{ text: string; subsectionId: string | null } | null>;

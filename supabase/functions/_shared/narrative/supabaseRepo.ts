@@ -76,7 +76,7 @@ export function createSupabaseNarrativeRepo(db: Db, userId: string): NarrativeRe
       const del = (t: string) => db.from(t).delete().eq("extraction_id", rec.id);
       for (const t of ["story_timeline", "canonical_facts", "character_states", "narrative_events", "plot_threads"]) check(await del(t));
       // Restore is_current on the latest remaining state per character at this position.
-      const remaining: Row[] = check(await db.from("character_states").select("id, character_id, version").eq("book_id", rec["book_id" as never] ?? "")
+      const remaining: Row[] = check(await db.from("character_states").select("id, character_id, version").eq("book_id", rec.book_id ?? "")
         .eq("chapter_index", pos.chapterIndex).eq("subsection_index", pos.subsectionIndex)) ?? [];
       const latest = new Map<string, Row>();
       for (const r of remaining) if (!latest.has(r.character_id) || latest.get(r.character_id)!.version < r.version) latest.set(r.character_id, r);

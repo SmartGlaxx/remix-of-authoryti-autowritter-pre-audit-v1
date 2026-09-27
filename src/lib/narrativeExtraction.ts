@@ -41,7 +41,7 @@ export async function runNarrativeExtraction(bookId: string, chapterIndex: numbe
   const timeout = new Promise<ExtractionResult>((r) => setTimeout(() => r({ status: "timeout" }), opts.timeoutMs ?? 60_000));
   const result = await Promise.race([work, timeout]).catch((e) => ({ status: "failed", error: String(e) }));
   if (result.status === "failed") {
-    try { reportError?.(new Error(`Narrative extraction failed: ${String(result.error ?? "")}`), { bookId, chapterIndex, subsectionIndex }); } catch { /* ignore */ }
+    void reportError(`Narrative extraction failed: ${String(result.error ?? "")}`, { context: { bookId, chapterIndex, subsectionIndex } });
   }
   return result;
 }
