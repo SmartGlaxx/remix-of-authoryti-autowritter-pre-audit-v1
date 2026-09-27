@@ -165,3 +165,22 @@ describe("severity protection vs repair eligibility", () => {
   it("MEDIUM low-confidence is a warning", () => expect(_isMat({ ...base, severity: "MEDIUM", confidence: 0.4 })).toBe(false));
   it("HIGH confident repairable is revised", () => expect(_decide([{ ...base, severity: "HIGH", confidence: 0.9 }]).kind).toBe("revise"));
 });
+
+describe("Pass 4 follow-up fixes", async () => {
+  const m = await import("../../supabase/functions/_shared/narrative/continuity");
+  it("short section: a one-sentence fix is accepted", () => {
+    const o = "Mara held the brass key tightly in her hand. She walked toward the old door slowly. The hallway smelled of dust and rain. She turned the key and stepped inside the room.";
+    const r = o.replace("brass key", "silver key").replace("turned the key", "turned the silver key");
+    expect(m.validateRevision(o, r).ok).toBe(true);
+  });
+  it("time budget stops further revision and sends to review", async () => {
+    let t = 0;
+    const issue = { type: "FACT_CONTRADICTION", classification: "ERROR", severity: "HIGH", confidence: 0.9, excerpt: "x", conflictingEvidence: "y", repairable: true, explanation: "", suggestedResolution: "" } as any;
+    const res = await m.runContinuityLoop("orig text here.", {
+      check: async () => [issue],
+      revise: async (s: string) => { t += 200_000; return s; },
+    }, 3, { budgetMs: 100_000, now: () => t });
+    expect(res.status).toBe("NEEDS_REVIEW");
+    expect(res.revisionCount).toBe(1);
+  });
+});
