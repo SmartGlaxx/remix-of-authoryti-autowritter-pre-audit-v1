@@ -607,7 +607,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           onUpdateBook(book.id, { outline });
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
-          await runNarrativeExtraction(book.id, chIdx, subIdx);
+          // Unresolved contradictions must not become story memory until the author decides.
+          if (cont.status !== "NEEDS_REVIEW") await runNarrativeExtraction(book.id, chIdx, subIdx);
 
           // APPROVAL GATES based on automation level
           if (automationLevel === "guided") {
@@ -861,7 +862,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           onUpdateBook(book.id, { outline });
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
-          await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+          // Unresolved contradictions must not become story memory until the author decides.
+          if (cont.status !== "NEEDS_REVIEW") await runNarrativeExtraction(book.id, chapterIndex, subIdx);
 
         // In guided mode, pause after each section
         if (automationLevel === "guided") {

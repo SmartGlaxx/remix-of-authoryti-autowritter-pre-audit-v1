@@ -39,7 +39,7 @@ export async function runContinuityCheck(bookId: string, chapterIndex: number, s
     }
     return last;
   })();
-  const timeout = new Promise<ContinuityResult>((r) => setTimeout(() => r({ status: "CHECK_FAILED", error: "timeout" }), opts.timeoutMs ?? 180_000));
+  const timeout = new Promise<ContinuityResult>((r) => setTimeout(() => r({ status: "CHECK_FAILED", error: "timeout" }), opts.timeoutMs ?? 300_000));
   const result = await Promise.race([work, timeout]);
   if (result.status === "CHECK_FAILED") void reportError(`Continuity check failed: ${result.error ?? ""}`, { context: { bookId, chapterIndex, subsectionIndex } });
   return result;
