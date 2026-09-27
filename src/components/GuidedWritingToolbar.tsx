@@ -36,6 +36,7 @@ export function GuidedWritingToolbar({
     try {
       const { data, error } = await supabase.functions.invoke("rewrite-paragraph", {
         body: {
+          bookId,
           paragraph: currentContent.split(/\n\n+/).filter(Boolean).pop() || currentContent,
           bookTitle,
           chapterTitle,
