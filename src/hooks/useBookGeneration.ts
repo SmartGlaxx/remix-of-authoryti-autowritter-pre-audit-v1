@@ -1,6 +1,24 @@
 import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
+import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
+
+/** Applies a continuity result (revised text + status) to one section of an outline. */
+function applyContinuityResult(outline: BookOutline, chIdx: number, subIdx: number, r: ContinuityResult): BookOutline {
+  const chapters = [...outline.chapters];
+  const ch = chapters[chIdx];
+  if (!ch) return outline;
+  const subs = [...ch.subsections];
+  const sub = subs[subIdx];
+  if (!sub) return outline;
+  subs[subIdx] = {
+    ...sub,
+    content: r.revised && r.finalText ? r.finalText : sub.content,
+    continuity: { status: r.status, checkId: r.checkId, issueCount: r.issueCount },
+  };
+  chapters[chIdx] = { ...ch, subsections: subs };
+  return { ...outline, chapters };
+}
 import { Book, BookOutline, Chapter, Subsection, CharacterReference, getIELTSBandForAudience, AutomationLevel } from "@/types/book";
 import { toast } from "sonner";
 
@@ -576,6 +594,19 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           );
 
           // Narrative memory: record what this section established. Non-blocking on failure.
+          // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
+          // accepted final text ever reaches narrative state.
+          const cont = await runContinuityCheck(book.id, chIdx, subIdx);
+          outline = applyContinuityResult(outline, chIdx, subIdx, cont);
+          updatedSubsections[subIdx] = outline.chapters[chIdx].subsections[subIdx];
+          currentBook = { ...currentBook, outline };
+          if (cont.revised && cont.finalText) {
+            const w = cont.finalText.split(/\s+/);
+            previousRawContent = w.slice(-Math.min(1000, w.length)).join(" ");
+          }
+          onUpdateBook(book.id, { outline });
+          if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
+
           await runNarrativeExtraction(book.id, chIdx, subIdx);
 
           // APPROVAL GATES based on automation level
@@ -817,7 +848,20 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         });
 
         // Narrative memory: record what this section established. Non-blocking on failure.
-        await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+        // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
+          // accepted final text ever reaches narrative state.
+          const cont = await runContinuityCheck(book.id, chapterIndex, subIdx);
+          outline = applyContinuityResult(outline, chapterIndex, subIdx, cont);
+          updatedSubsections[subIdx] = outline.chapters[chapterIndex].subsections[subIdx];
+          currentBook = { ...currentBook, outline };
+          if (cont.revised && cont.finalText) {
+            const w = cont.finalText.split(/\s+/);
+            previousRawContent = w.slice(-Math.min(1000, w.length)).join(" ");
+          }
+          onUpdateBook(book.id, { outline });
+          if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
+
+          await runNarrativeExtraction(book.id, chapterIndex, subIdx);
 
         // In guided mode, pause after each section
         if (automationLevel === "guided") {
