@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
+import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
+import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
+import { LEGACY_PICKER_MAP } from "../_shared/ai/roles.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 200_000;
@@ -542,84 +545,31 @@ serve(async (req) => {
       }
     }
 
-    // ── Choose AI provider: DeepSeek (preferred for novels) vs Lovable AI (fallback) ──
-    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    const GATEWAY_MODELS: Record<string, string> = {
-      "gpt-6-astra": "openai/gpt-6-astra",
-      "gemini-3.1-pro": "google/gemini-3.1-pro-preview",
-      "gemini-3.8-flash": "google/gemini-3.8-flash",
-    };
-    const gatewayModel = typeof reqAiModel === "string" ? GATEWAY_MODELS[reqAiModel] : undefined;
-    const useDeepSeek = !!DEEPSEEK_API_KEY && !gatewayModel;
-    
-    if (!useDeepSeek && !LOVABLE_API_KEY) {
-      throw new Error("No AI API key configured");
-    }
+    // ── Pass 3: provider-neutral AI call (role = writer) ──
+    const bookModelConfig = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
+    const modelOverride = bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null;
+    const aiMeta: Record<string, unknown> = {};
+    const chunks = streamAI({
+      role: "writer",
+      config: bookModelConfig,
+      userId: auth.user.id,
+      bookId: book.id ?? null,
+      modelOverride,
+      request: { system: systemPrompt, user: userPrompt, reasoning: "medium" },
+    }, createAIDeps(adminSupabase, auth.user.id), aiMeta);
 
-    let response: Response;
-
-    if (useDeepSeek) {
-      // ── DeepSeek with automatic prefix caching ──
-      // DeepSeek caches the PREFIX of the prompt automatically.
-      // By putting the static system prompt first, all subsections of the same book
-      // share the cached prefix → 90% cheaper input tokens on cache hits.
-      // Cache hit tokens: $0.03/M, Cache miss: $0.30/M, Output: $0.50/M
-      console.log("[generate-content] Using DeepSeek with prefix caching");
-      
-      response = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-reasoner",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: true,
-        }),
-      });
-    } else {
-      // ── Lovable AI Gateway fallback ──
-      console.log("[generate-content] Using Lovable AI Gateway");
-      
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: gatewayModel || "google/gemini-3.1-pro-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: true,
-          ...((gatewayModel || "").startsWith("openai/") ? { reasoning_effort: "medium" } : {}),
-        }),
+    // Prime the first chunk so provider failures return a clean JSON error instead of a broken stream.
+    let first: IteratorResult<string>;
+    try {
+      first = await chunks.next();
+    } catch (e) {
+      const status = statusForAIError(e);
+      console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
+      return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "AI error" }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required. Please add credits." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error(`AI error (${useDeepSeek ? "DeepSeek" : "Lovable"}):`, response.status, errorText);
-      throw new Error(`AI error: ${response.status}`);
-    }
+    console.log(`[generate-content] model=${aiMeta.model} via=${aiMeta.provider} source=${aiMeta.credentialSource} fallback=${aiMeta.usedFallback}`);
 
     // ── Helper: append generated text to book.full_text and invalidate cache ──
     const finalizeFullText = async (newContent: string) => {
@@ -638,7 +588,6 @@ serve(async (req) => {
           .from("books")
           .update({ full_text: updated, total_char_count: newCharCount })
           .eq("id", book.id);
-        // Invalidate any cached entry for the prior char count
         NOVEL_TEXT_CACHE.delete(`novel_full_v1_${book.id}_${oldCharCount}`);
         console.log(`[novel-cache] invalidated old key, new chars=${newCharCount}`);
       } catch (e) {
@@ -652,108 +601,18 @@ serve(async (req) => {
         .replace(/^\s*(?:Hook|Teaser|Scene|Beat|Note)\s*:\s*/gim, "")
         .replace(/\[\/?(?:HOOK|TEASER|SCENE|BEAT|NOTE)\]/gi, "");
 
-    // ── For DeepSeek reasoner, we need to filter out reasoning_content from SSE ──
-    if (useDeepSeek) {
-      // DeepSeek reasoner streams with reasoning_content + content fields.
-      // We only want the final content, not the thinking tokens.
-      const reader = response.body!.getReader();
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      let collected = "";
-
-      const stream = new ReadableStream({
-        async pull(controller) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              controller.close();
-              // Persist the cleaned full content
-              const cleaned = stripMetaLabels(collected).trim();
-              if (cleaned) finalizeFullText(cleaned);
-              return;
-            }
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n");
-            
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (jsonStr === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                continue;
-              }
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const delta = parsed.choices?.[0]?.delta;
-                // Only forward content tokens, skip reasoning_content
-                if (delta?.content) {
-                  collected += delta.content;
-                  const forwarded = {
-                    ...parsed,
-                    choices: [{
-                      ...parsed.choices[0],
-                      delta: { content: delta.content }
-                    }]
-                  };
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(forwarded)}\n\n`));
-                }
-                // Log cache stats from usage if present (final chunk)
-                if (parsed.usage) {
-                  const u = parsed.usage;
-                  console.log(`[DeepSeek Cache] hit: ${u.prompt_cache_hit_tokens || 0}, miss: ${u.prompt_cache_miss_tokens || 0}, total: ${u.prompt_tokens || 0}`);
-                }
-              } catch {
-                // Pass through unparseable lines
-              }
-            }
-          }
-        }
-      });
-
-      return new Response(stream, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
+    async function* all(): AsyncGenerator<string> {
+      if (!first.done) yield first.value;
+      yield* chunks;
     }
+    const stream = toChatSSE(all(), async (full) => {
+      const u = aiMeta.usage as { cachedInputTokens?: number | null; inputTokens?: number | null } | undefined;
+      if (u) console.log(`[cache] cached=${u.cachedInputTokens ?? "unknown"} input=${u.inputTokens ?? "unknown"}`);
+      const cleaned = stripMetaLabels(full).trim();
+      if (cleaned) await finalizeFullText(cleaned);
+    }, (e) => console.error("[generate-content] stream error:", e instanceof Error ? e.message : e));
 
-    // Lovable AI — wrap stream to also collect content for full_text persistence
-    {
-      const reader = response.body!.getReader();
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      let collected = "";
-
-      const stream = new ReadableStream({
-        async pull(controller) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              controller.close();
-              const cleaned = stripMetaLabels(collected).trim();
-              if (cleaned) finalizeFullText(cleaned);
-              return;
-            }
-            const chunk = decoder.decode(value, { stream: true });
-            // Forward as-is to client
-            controller.enqueue(value);
-            // Best-effort parse to collect text
-            for (const line of chunk.split("\n")) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (!jsonStr || jsonStr === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const c = parsed.choices?.[0]?.delta?.content;
-                if (c) collected += c;
-              } catch { /* ignore */ }
-            }
-          }
-        }
-      });
-
-      return new Response(stream, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
-    }
+    return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {
     console.error("generate-content error:", error);
     return new Response(
