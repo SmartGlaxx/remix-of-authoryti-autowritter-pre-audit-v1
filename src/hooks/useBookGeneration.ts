@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { Book, BookOutline, Chapter, Subsection, CharacterReference, getIELTSBandForAudience, AutomationLevel } from "@/types/book";
 import { toast } from "sonner";
 
@@ -574,6 +575,9 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
             MAX_RETRIES,
           );
 
+          // Narrative memory: record what this section established. Non-blocking on failure.
+          await runNarrativeExtraction(book.id, chIdx, subIdx);
+
           // APPROVAL GATES based on automation level
           if (automationLevel === "guided") {
             // Guided: approval after every section
@@ -811,6 +815,9 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           currentSubsectionIndex: subIdx + 1,
           wordCount: currentBook.wordCount,
         });
+
+        // Narrative memory: record what this section established. Non-blocking on failure.
+        await runNarrativeExtraction(book.id, chapterIndex, subIdx);
 
         // In guided mode, pause after each section
         if (automationLevel === "guided") {

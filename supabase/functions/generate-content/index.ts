@@ -533,7 +533,7 @@ serve(async (req) => {
           const rows = await loadNarrativeRows(adminSupabase, book.id);
           const narrativeBlock = buildNarrativeContext(rows, { chapterIndex, subsectionIndex }, owned.outline?.characters ?? []);
           if (narrativeBlock) {
-            userPrompt = userPrompt.replace(/\n\n/, `\n\n${narrativeBlock}\n\n`);
+            userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${narrativeBlock}\n\n`);
             console.log(`[narrative-context] injected chars=${narrativeBlock.length}`);
           }
         }
