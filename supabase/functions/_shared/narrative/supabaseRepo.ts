@@ -1,7 +1,8 @@
 // Database implementation of the narrative repository (runs in edge functions with a
 // service-role client). Callers MUST verify book ownership before using it; every
 // write stamps the verified owner's user_id and is scoped by book_id.
-import { decideFactInsertion, normText, toPosition, type StoryPosition } from "./rules.ts";
+import { normText, toPosition, type StoryPosition } from "./rules.ts";
+import { applyCanonicalFact } from "./factMutation.ts";
 import { selectNarrativeState, type NarrativeRows } from "./context.ts";
 import { EXTRACTION_AUTHORITY, threadTransitionFor, type ExtractionPlan, type ExtractionRecord, type NarrativeRepo } from "./extraction.ts";
 
@@ -165,29 +166,21 @@ export function createSupabaseNarrativeRepo(db: Db, userId: string): NarrativeRe
         if (prev) check(await db.from("character_states").update({ is_current: false, superseded_by: ins.id }).eq("id", prev.id));
       }
 
-      // Facts — same decision rule as Pass 1 (decideFactInsertion); never overwrites.
+      // Facts — one shared implementation with the browser service (factMutation.ts).
       const factOutcomes: Record<string, number> = {};
       for (const f of plan.facts) {
-        const existing = check(await db.from("canonical_facts").select("id, value, authority, conflict_status, is_canonical, conflicting_fact_id")
-          .eq("book_id", bookId).ilike("subject", f.subject).ilike("predicate", f.predicate).eq("is_canonical", true)
-          .in("conflict_status", ["clean", "disputed"]).order("created_at", { ascending: true }).limit(1).maybeSingle());
-        const d = decideFactInsertion({ value: f.value, authority: EXTRACTION_AUTHORITY }, existing);
-        factOutcomes[d.kind] = (factOutcomes[d.kind] ?? 0) + 1;
-        if (d.kind === "duplicate") continue;
-        const row = {
-          ...base, subject: f.subject, predicate: f.predicate, value: f.value, category: f.category, authority: EXTRACTION_AUTHORITY,
-          source_type: "extraction", source_chapter_index: pos.chapterIndex, source_subsection_index: pos.subsectionIndex,
-          source_excerpt: f.evidence, confidence: f.confidence,
-        };
-        if (d.kind === "insert_clean") { check(await db.from("canonical_facts").insert({ ...row, conflict_status: "clean", is_canonical: true })); continue; }
-        if (d.kind === "insert_disputed_noncanonical") {
-          check(await db.from("canonical_facts").insert({ ...row, conflict_status: "disputed", is_canonical: false, conflicting_fact_id: d.existingId, notes: "Lower authority than existing canon; disputed pending review." }));
-          continue;
-        }
-        undo.push({ table: "canonical_facts", id: existing.id, before: { conflict_status: existing.conflict_status, conflicting_fact_id: existing.conflicting_fact_id } });
-        await saveUndo(extractionId, undo);
-        const ins = check(await db.from("canonical_facts").insert({ ...row, conflict_status: "disputed", is_canonical: true, conflicting_fact_id: d.existingId }).select("id").single());
-        check(await db.from("canonical_facts").update({ conflict_status: "disputed", conflicting_fact_id: ins.id }).eq("id", d.existingId));
+        const res = await applyCanonicalFact(db, {
+          bookId, userId: user_id,
+          fact: {
+            subject: f.subject, predicate: f.predicate, value: f.value, category: f.category,
+            authority: EXTRACTION_AUTHORITY, sourceType: "extraction", position: pos,
+            sourceExcerpt: f.evidence, confidence: f.confidence, extractionId,
+          },
+        }, async (before) => {
+          undo.push({ table: "canonical_facts", id: before.id, before: { conflict_status: before.conflict_status, conflicting_fact_id: before.conflicting_fact_id } });
+          await saveUndo(extractionId, undo);
+        });
+        factOutcomes[res.outcome] = (factOutcomes[res.outcome] ?? 0) + 1;
       }
 
       // New plot threads (introduced here — the text established them at this position)
