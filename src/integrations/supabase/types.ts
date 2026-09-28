@@ -669,6 +669,188 @@ export type Database = {
           },
         ]
       }
+      manuscript_audit_findings: {
+        Row: {
+          audit_id: string
+          auto_fixable: boolean
+          book_id: string
+          category: string
+          concise_description: string
+          confidence: number
+          contradicting_evidence: string | null
+          contradicting_location: Json | null
+          created_at: string
+          dedup_key: string
+          evidence_excerpt: string | null
+          evidence_location: Json | null
+          explanation: string | null
+          id: string
+          related_character_ids: string[]
+          related_continuity_check_ids: string[]
+          related_event_ids: string[]
+          related_fact_ids: string[]
+          related_plot_thread_ids: string[]
+          severity: string
+          status: string
+          suggested_action: string | null
+          title: string
+          updated_at: string
+          user_canon_protected: boolean
+          user_id: string
+          user_notes: string | null
+          verification: string
+        }
+        Insert: {
+          audit_id: string
+          auto_fixable?: boolean
+          book_id: string
+          category: string
+          concise_description?: string
+          confidence?: number
+          contradicting_evidence?: string | null
+          contradicting_location?: Json | null
+          created_at?: string
+          dedup_key: string
+          evidence_excerpt?: string | null
+          evidence_location?: Json | null
+          explanation?: string | null
+          id?: string
+          related_character_ids?: string[]
+          related_continuity_check_ids?: string[]
+          related_event_ids?: string[]
+          related_fact_ids?: string[]
+          related_plot_thread_ids?: string[]
+          severity: string
+          status?: string
+          suggested_action?: string | null
+          title: string
+          updated_at?: string
+          user_canon_protected?: boolean
+          user_id: string
+          user_notes?: string | null
+          verification?: string
+        }
+        Update: {
+          audit_id?: string
+          auto_fixable?: boolean
+          book_id?: string
+          category?: string
+          concise_description?: string
+          confidence?: number
+          contradicting_evidence?: string | null
+          contradicting_location?: Json | null
+          created_at?: string
+          dedup_key?: string
+          evidence_excerpt?: string | null
+          evidence_location?: Json | null
+          explanation?: string | null
+          id?: string
+          related_character_ids?: string[]
+          related_continuity_check_ids?: string[]
+          related_event_ids?: string[]
+          related_fact_ids?: string[]
+          related_plot_thread_ids?: string[]
+          severity?: string
+          status?: string
+          suggested_action?: string | null
+          title?: string
+          updated_at?: string
+          user_canon_protected?: boolean
+          user_id?: string
+          user_notes?: string | null
+          verification?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manuscript_audit_findings_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "manuscript_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manuscript_audit_findings_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manuscript_audits: {
+        Row: {
+          book_id: string
+          cache_key: string
+          chapter_count: number
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          manuscript_hash: string
+          metadata: Json
+          model_identifier: string | null
+          narrative_state_version: string
+          outline_hash: string
+          section_count: number
+          stage_progress: Json
+          status: string
+          summary: Json
+          updated_at: string
+          user_id: string
+          word_count: number
+        }
+        Insert: {
+          book_id: string
+          cache_key: string
+          chapter_count?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          manuscript_hash: string
+          metadata?: Json
+          model_identifier?: string | null
+          narrative_state_version: string
+          outline_hash: string
+          section_count?: number
+          stage_progress?: Json
+          status?: string
+          summary?: Json
+          updated_at?: string
+          user_id: string
+          word_count?: number
+        }
+        Update: {
+          book_id?: string
+          cache_key?: string
+          chapter_count?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          manuscript_hash?: string
+          metadata?: Json
+          model_identifier?: string | null
+          narrative_state_version?: string
+          outline_hash?: string
+          section_count?: number
+          stage_progress?: Json
+          status?: string
+          summary?: Json
+          updated_at?: string
+          user_id?: string
+          word_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manuscript_audits_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       narrative_events: {
         Row: {
           authority: string
