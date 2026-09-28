@@ -272,7 +272,7 @@ export function validateFinding(f: RawFinding, sections: ManuscriptSection[], id
 export function crossStageKey(f: ValidatedFinding): string {
   if (!f.evidenceExcerpt) return f.dedupKey;
   const loc = (l: EvidenceLocation | null) => (l ? `${l.chapterIndex}.${l.subsectionIndex}` : "-");
-  return `x|${loc(f.evidenceLocation)}|${quoteNorm(f.evidenceExcerpt).slice(0, 40)}|${loc(f.contradictingLocation)}`;
+  return `x|${loc(f.evidenceLocation)}|${quoteNorm(f.evidenceExcerpt).split(" ").slice(0, 5).join(" ")}|${loc(f.contradictingLocation)}`;
 }
 
 export function deduplicateFindings(list: ValidatedFinding[]): ValidatedFinding[] {
