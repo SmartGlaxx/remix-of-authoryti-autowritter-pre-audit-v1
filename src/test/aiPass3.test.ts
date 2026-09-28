@@ -69,8 +69,9 @@ describe("Pass 3 — role resolution", () => {
   });
   it("future roles never execute", async () => {
     const { deps } = makeDeps(vi.fn() as never);
-    expect(ACTIVE_ROLES).not.toContain("manuscript_auditor");
-    await expect(generateAIText({ role: "manuscript_auditor", config: null, userId: "u", request: { user: "x" } }, deps)).rejects.toMatchObject({ code: "inactive_role" });
+    expect(ACTIVE_ROLES).toContain("manuscript_auditor"); // activated in Pass 5
+    expect(ACTIVE_ROLES).not.toContain("difficult_chapter");
+    await expect(generateAIText({ role: "difficult_chapter", config: null, userId: "u", request: { user: "x" } }, deps)).rejects.toMatchObject({ code: "inactive_role" });
   });
 });
 
