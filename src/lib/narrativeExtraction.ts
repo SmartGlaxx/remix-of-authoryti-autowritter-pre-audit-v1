@@ -3,6 +3,7 @@
 // depend on the narrative-memory subsystem.
 import { supabase } from "@/integrations/supabase/client";
 import { reportError } from "@/lib/errorReporter";
+import { waitForSavedProse } from "@/lib/continuityCheck";
 
 export type ExtractionResult = { status: string; [k: string]: unknown };
 
@@ -23,7 +24,9 @@ async function callOnce(bookId: string, chapterIndex: number, subsectionIndex: n
 /** Runs extraction with retries (409 = section not saved yet, 5xx = transient). Safe to call repeatedly. */
 export async function runNarrativeExtraction(bookId: string, chapterIndex: number, subsectionIndex: number, opts: { timeoutMs?: number; attempts?: number } = {}): Promise<ExtractionResult> {
   const attempts = opts.attempts ?? 3;
-  const work = (async () => {
+  const work = (async (): Promise<ExtractionResult> => {
+    // Never request extraction for a section whose prose isn't saved (avoids 409 no_prose).
+    if (!(await waitForSavedProse(bookId, chapterIndex, subsectionIndex))) return { status: "no_prose" };
     let last: ExtractionResult = { status: "failed", error: "not attempted" };
     for (let i = 0; i < attempts; i++) {
       try {
