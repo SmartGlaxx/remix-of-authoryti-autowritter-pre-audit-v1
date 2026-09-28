@@ -65,6 +65,16 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
   useEffect(() => subscribeRevealed(() => setRevealTick((t) => t + 1)), []);
 
   const chapters = book.outline?.chapters || [];
+
+  // Auto-open the chapter currently being written so new text is visible.
+  const writingChapterIdx = book.status === "writing" ? book.currentChapterIndex : null;
+  useEffect(() => {
+    if (writingChapterIdx !== null && writingChapterIdx !== undefined && chapters[writingChapterIdx]) {
+      setExpandedChapter(writingChapterIdx);
+      setSelectedChapter(writingChapterIdx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [writingChapterIdx]);
   const hasCharacters = book.outline?.characters && book.outline.characters.length > 0;
   const isVisualBook = VISUAL_BOOK_TYPES.includes(book.bookType);
   const selectedTemplate = book.controls?.selectedTemplateId
@@ -176,49 +186,10 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
       subIdx <= book.currentSubsectionIndex - 1 &&
       !isRevealed(sub.id);
 
-    // Queue gate: a freshly-completed subsection must wait until every
-    // earlier completed subsection in this chapter has finished its reveal.
-    // This prevents section 2 from animating while section 1 is still
-    // typing itself out.
-    if (shouldAnimate) {
-      const chapterSubs = chapters[chapterIdx]?.subsections || [];
-        const previousStillAnimating = chapterSubs
-          .slice(0, subIdx)
-          .some(
-            (prev: any, prevIdx: number) =>
-              prev.status === "completed" &&
-              prevIdx <= book.currentSubsectionIndex - 1 &&
-              !isRevealed(prev.id),
-          );
-      if (previousStillAnimating) {
-        // Hold this subsection back — render an invisible placeholder so
-        // layout doesn't jump, but no text appears yet.
-        return <div className="min-h-[1.5rem]" aria-hidden />;
-      }
-    }
-
-    // While animating, render the WHOLE subsection as a single sequential
-    // reveal so words appear one-after-another across all paragraphs (not
-    // each paragraph fading in parallel). Once complete, swap to the
-    // editable per-paragraph view.
-    if (shouldAnimate) {
-      return (
-        <SequentialReveal
-          content={content}
-          intervalMs={60}
-          fadeMs={350}
-          onComplete={() => {
-            markRevealed(sub.id);
-            // Force a re-render so the next render path takes the
-            // editable ParagraphEditor branch.
-            setRevealTick((t) => t + 1);
-          }}
-        />
-      );
-    }
+    // Freshly written text simply fades in as a whole, once.
 
     return (
-      <div className="space-y-3">
+      <div className={`space-y-3 ${shouldAnimate ? "animate-[fade-in_1.2s_ease-out]" : ""}`}>
         {paragraphs.map((para, pIdx) => (
           <ParagraphEditor
             key={`${sub.id}-p${pIdx}`}
