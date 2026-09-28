@@ -23,7 +23,7 @@ export const USER_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "
 export const AUX_ROLES: Role[] = ["character_generator", "summarizer", "intro_writer"];
 export const ALL_ROLES: Role[] = [...USER_ROLES, ...AUX_ROLES];
 /** Roles with a real pipeline behind them today. Others are stored but never invoked. */
-export const ACTIVE_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "continuity_checker", "continuity_reviser", "editor", "character_generator", "summarizer", "intro_writer"];
+export const ACTIVE_ROLES: Role[] = ["planner", "writer", "narrative_extractor", "continuity_checker", "continuity_reviser", "editor", "manuscript_auditor", "character_generator", "summarizer", "intro_writer"];
 
 export const ROLE_LABELS: Record<Role, string> = {
   planner: "Planner (outlines)",

@@ -31,6 +31,6 @@ export function estimateOperationCosts(config: BookModelConfig | null | undefine
     mk("outline", "planner", 2500, 4000, "Estimate — actual usage is recorded after each call"),
     // each section sends the system prompt + story memory + prior text (capped ~25k tokens)
     mk("chapter", "writer", subsPerChapter * 20000, subsPerChapter * wordsPerSub * TOKENS_PER_WORD, "Estimate without cache discounts"),
-    mk("manuscript_audit", "manuscript_auditor", totalWords * TOKENS_PER_WORD, 6000, "Future feature (not active yet)"),
+    mk("manuscript_audit", "manuscript_auditor", totalWords * TOKENS_PER_WORD, 6000, "Whole-book audit (on demand)"),
   ];
 }
