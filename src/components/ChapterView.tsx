@@ -65,6 +65,16 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
   useEffect(() => subscribeRevealed(() => setRevealTick((t) => t + 1)), []);
 
   const chapters = book.outline?.chapters || [];
+
+  // Auto-open the chapter currently being written so new text is visible.
+  const writingChapterIdx = book.status === "writing" ? book.currentChapterIndex : null;
+  useEffect(() => {
+    if (writingChapterIdx !== null && writingChapterIdx !== undefined && chapters[writingChapterIdx]) {
+      setExpandedChapter(writingChapterIdx);
+      setSelectedChapter(writingChapterIdx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [writingChapterIdx]);
   const hasCharacters = book.outline?.characters && book.outline.characters.length > 0;
   const isVisualBook = VISUAL_BOOK_TYPES.includes(book.bookType);
   const selectedTemplate = book.controls?.selectedTemplateId
@@ -177,7 +187,6 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
       !isRevealed(sub.id);
 
     // Freshly written text simply fades in as a whole, once.
-    if (shouldAnimate) markRevealed(sub.id);
 
     return (
       <div className={`space-y-3 ${shouldAnimate ? "animate-[fade-in_1.2s_ease-out]" : ""}`}>
