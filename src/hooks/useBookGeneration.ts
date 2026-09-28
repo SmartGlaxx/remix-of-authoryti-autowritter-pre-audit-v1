@@ -128,6 +128,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
   });
   
   const abortRef = useRef(false);
+  const [autoNextChapter, setAutoNextChapter] = useState<number | null>(null);
   const pauseRef = useRef(false);
   const approvalRef = useRef<(() => void) | null>(null);
   const approvalResolveRef = useRef<(() => void) | null>(null);
@@ -896,8 +897,22 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       onUpdateBook(book.id, { outline, status: book.status });
       setState(s => ({ ...s, phase: "idle" }));
       toast.success(`Chapter "${chapter.title}" completed!`);
+      // Auto Draft: move straight on to the next chapter, no approval.
+      if (automationLevel === "auto-draft" && chapterIndex < outline.chapters.length - 1) {
+        setAutoNextChapter(chapterIndex + 1);
+      }
     }
   }, [book, automationLevel, streamContent, generateImage, summarizeContent, onUpdateBook, waitForApproval, onActivityRecorded]);
+
+  // Kick off the queued Auto Draft chapter once the finished one is saved into `book`.
+  useEffect(() => {
+    if (autoNextChapter === null || abortRef.current) return;
+    const prev = book.outline?.chapters?.[autoNextChapter - 1];
+    if (prev?.status !== "completed") return;
+    const next = autoNextChapter;
+    setAutoNextChapter(null);
+    generateChapter(next);
+  }, [autoNextChapter, book, generateChapter]);
 
   return {
     state,
