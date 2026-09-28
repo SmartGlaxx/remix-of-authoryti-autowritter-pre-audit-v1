@@ -415,7 +415,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       if (error) throw error;
       return data.summary || "";
     } catch (err) {
-      console.error("Summarization failed:", err);
+      // Summaries are optional context; a failure (e.g. AI limit reached) must not break the page.
+      console.warn("Summarization skipped:", err instanceof Error ? err.message : err);
       return "";
     }
   }, []);
