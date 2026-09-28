@@ -268,16 +268,28 @@ export function validateFinding(f: RawFinding, sections: ManuscriptSection[], id
 }
 
 /** Collapses duplicates across stages: keeps the highest severity, then highest confidence, merging related ids. */
+/** Cross-stage key: the same passage (and same counter-passage) flagged by several stages is one problem. */
+export function crossStageKey(f: ValidatedFinding): string {
+  if (!f.evidenceExcerpt) return f.dedupKey;
+  const loc = (l: EvidenceLocation | null) => (l ? `${l.chapterIndex}.${l.subsectionIndex}` : "-");
+  return `x|${loc(f.evidenceLocation)}|${quoteNorm(f.evidenceExcerpt).slice(0, 40)}|${loc(f.contradictingLocation)}`;
+}
+
 export function deduplicateFindings(list: ValidatedFinding[]): ValidatedFinding[] {
+  return mergeBy(mergeBy(list, (f) => f.dedupKey), crossStageKey);
+}
+
+function mergeBy(list: ValidatedFinding[], keyOf: (f: ValidatedFinding) => string): ValidatedFinding[] {
   const map = new Map<string, ValidatedFinding>();
   for (const f of list) {
-    const prev = map.get(f.dedupKey);
-    if (!prev) { map.set(f.dedupKey, f); continue; }
+    const k = keyOf(f);
+    const prev = map.get(k);
+    if (!prev) { map.set(k, f); continue; }
     const better = AUDIT_SEVERITY_RANK[f.severity] > AUDIT_SEVERITY_RANK[prev.severity] ||
       (f.severity === prev.severity && f.confidence > prev.confidence) ? f : prev;
     const other = better === f ? prev : f;
     const merge = (a: string[], b: string[]) => [...new Set([...a, ...b])];
-    map.set(f.dedupKey, {
+    map.set(k, {
       ...better,
       related: { facts: merge(better.related.facts, other.related.facts), events: merge(better.related.events, other.related.events), characters: merge(better.related.characters, other.related.characters), threads: merge(better.related.threads, other.related.threads), checks: merge(better.related.checks, other.related.checks) },
       userCanonProtected: better.userCanonProtected || other.userCanonProtected,

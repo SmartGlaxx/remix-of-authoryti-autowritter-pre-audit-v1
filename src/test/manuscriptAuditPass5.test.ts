@@ -150,3 +150,14 @@ describe("Pass 5 — parsing, dedup, persistence", () => {
     expect(summarizeFindings([], { fabricated_excerpt: 2 })).toMatchObject({ total: 0, rejected: { fabricated_excerpt: 2 } });
   });
 });
+
+describe("Pass 5 — cross-stage dedup", () => {
+  it("34. same passage flagged by several stages collapses to one", () => {
+    const idx = buildEvidenceIndex(rows());
+    const a = validateFinding(raw({ category: "character_arc", title: "Blind but sees", evidenceExcerpt: "Mara locked the brass key", severity: "HIGH" }), secs, idx);
+    const b = validateFinding(raw({ category: "timeline", title: "Other wording", evidenceExcerpt: "Mara locked the brass key in the drawer", severity: "CRITICAL" }), secs, idx);
+    const c = validateFinding(raw({ category: "timeline", title: "Different passage", evidenceExcerpt: "walked to the harbour at noon" }), secs, idx);
+    const out = deduplicateFindings([a, b, c].map((v) => (v as { finding: ValidatedFinding }).finding));
+    expect(out).toHaveLength(2); expect(out[0].severity).toBe("CRITICAL");
+  });
+});
