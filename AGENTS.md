@@ -4,3 +4,4 @@
 - User provider keys are AES-GCM encrypted server-side (`BYOK_ENCRYPTION_KEY`, per-user HKDF) in `user_provider_keys`, which has no client access — keys are write-only from the browser.
 - Books without a `book_model_configs` row use the `legacy` role map, reproducing pre-Pass-3 models exactly — backward compatibility without migration.
 - Continuity (Pass 4) runs server-side in `check-continuity` via pure logic in `_shared/narrative/continuity.ts`, before extraction; history is append-only in `continuity_checks` — only the accepted final text ever reaches story memory.
+- Manuscript audit (Pass 5) is audit-only: `run-manuscript-audit` runs staged checks in the background via pure logic in `_shared/narrative/audit.ts`, caches on manuscript+outline+story-memory hashes, and writes only `manuscript_audits`/`manuscript_audit_findings` (authors may change only finding status/notes) — whole-book diagnosis never mutates prose or canon.
