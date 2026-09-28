@@ -403,6 +403,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     content: string,
     type: "subsection" | "chapter"
   ): Promise<string> => {
+    // Nothing to summarize (e.g. empty chapter) — skip instead of sending an invalid request.
+    if (!content || !content.trim()) return "";
     setState(s => ({ ...s, phase: "summarizing" }));
 
     try {
