@@ -19,6 +19,7 @@ import { ApprovalGate } from "@/components/ApprovalGate";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TestimonialModal } from "@/components/TestimonialModal";
 import { BookSearchPanel } from "@/components/BookSearchPanel";
+import { ManuscriptAuditPanel } from "@/components/ManuscriptAuditPanel";
 import { exportBookToPdf } from "@/lib/exportPdf";
 import { exportBookToEpub } from "@/lib/exportEpub";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -490,6 +491,8 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
             />
           </motion.div>
         )}
+
+        {hasOutline && <ManuscriptAuditPanel bookId={book.id} onNavigateToChapter={(idx) => setSearchNavigateChapter(idx)} />}
 
         <div className="flex-1 min-h-0">
           <ChapterView
