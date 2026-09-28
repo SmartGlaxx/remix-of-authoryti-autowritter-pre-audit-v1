@@ -2,6 +2,7 @@
 // section is kept as written and marked CHECK_FAILED (never reported as clean).
 import { supabase } from "@/integrations/supabase/client";
 import { reportError } from "@/lib/errorReporter";
+import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 
 export type ContinuityStatus = "PASSED" | "PASSED_WITH_WARNINGS" | "REVISED" | "NEEDS_REVIEW" | "CHECK_FAILED";
 export interface ContinuityResult {
@@ -31,6 +32,7 @@ export async function waitForSavedProse(bookId: string, ch: number, sub: number,
 }
 
 export async function runContinuityCheck(bookId: string, chapterIndex: number, subsectionIndex: number, opts: { timeoutMs?: number } = {}): Promise<ContinuityResult> {
+  if (isAiBlocked()) return { status: "CHECK_FAILED", error: "ai_blocked" };
   const work = (async (): Promise<ContinuityResult> => {
     // Never ask the server to check a section whose prose isn't saved (or is empty).
     if (!(await waitForSavedProse(bookId, chapterIndex, subsectionIndex))) {
@@ -49,6 +51,7 @@ export async function runContinuityCheck(bookId: string, chapterIndex: number, s
         const body = await res.json().catch(() => ({ status: "CHECK_FAILED", error: `HTTP ${res.status}` }));
         if (res.ok) return body as ContinuityResult;
         last = { status: "CHECK_FAILED", error: body?.error ?? `HTTP ${res.status}` };
+        if (detectAiBlock(body?.error)) return { status: "CHECK_FAILED", error: "ai_blocked" };
         if (res.status !== 409 && res.status < 500) break;
       } catch (e) {
         last = { status: "CHECK_FAILED", error: e instanceof Error ? e.message : String(e) };

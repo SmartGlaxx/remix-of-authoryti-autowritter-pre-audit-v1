@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
+import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
@@ -405,7 +406,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     type: "subsection" | "chapter"
   ): Promise<string> => {
     // Nothing to summarize (e.g. empty chapter) — skip instead of sending an invalid request.
-    if (!content || !content.trim()) return "";
+    if (!content || !content.trim() || isAiBlocked()) return "";
     setState(s => ({ ...s, phase: "summarizing" }));
 
     try {
@@ -416,6 +417,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       return data.summary || "";
     } catch (err) {
       // Summaries are optional context; a failure (e.g. AI limit reached) must not break the page.
+      detectAiBlock((err as any)?.context ? await (err as any).context.text?.().catch(() => "") : String(err));
       console.warn("Summarization skipped:", err instanceof Error ? err.message : err);
       return "";
     }

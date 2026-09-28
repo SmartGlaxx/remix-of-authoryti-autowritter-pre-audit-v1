@@ -4,6 +4,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reportError } from "@/lib/errorReporter";
 import { waitForSavedProse } from "@/lib/continuityCheck";
+import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 
 export type ExtractionResult = { status: string; [k: string]: unknown };
 
@@ -24,6 +25,7 @@ async function callOnce(bookId: string, chapterIndex: number, subsectionIndex: n
 /** Runs extraction with retries (409 = section not saved yet, 5xx = transient). Safe to call repeatedly. */
 export async function runNarrativeExtraction(bookId: string, chapterIndex: number, subsectionIndex: number, opts: { timeoutMs?: number; attempts?: number } = {}): Promise<ExtractionResult> {
   const attempts = opts.attempts ?? 3;
+  if (isAiBlocked()) return { status: "skipped", error: "ai_blocked" };
   const work = (async (): Promise<ExtractionResult> => {
     // Never request extraction for a section whose prose isn't saved (avoids 409 no_prose).
     if (!(await waitForSavedProse(bookId, chapterIndex, subsectionIndex))) return { status: "no_prose" };
@@ -33,6 +35,7 @@ export async function runNarrativeExtraction(bookId: string, chapterIndex: numbe
         const { http, body } = await callOnce(bookId, chapterIndex, subsectionIndex);
         last = body;
         if (http === 200) return body;
+        if (detectAiBlock(body?.error)) return { status: "skipped", error: "ai_blocked" };
         if (http !== 409 && http < 500) break; // auth/validation — retrying won't help
       } catch (e) {
         last = { status: "failed", error: e instanceof Error ? e.message : String(e) };
