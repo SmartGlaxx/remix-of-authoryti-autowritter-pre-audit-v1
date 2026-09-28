@@ -16,8 +16,26 @@ export interface ContinuityResult {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** The section save is fire-and-forget; wait until the completed prose is actually in the database. */
+async function waitForSavedProse(bookId: string, ch: number, sub: number, maxMs = 20_000): Promise<boolean> {
+  const start = Date.now();
+  let delay = 300;
+  while (Date.now() - start < maxMs) {
+    const { data } = await supabase.from("books").select("outline").eq("id", bookId).maybeSingle();
+    const s = (data?.outline as any)?.chapters?.[ch]?.subsections?.[sub];
+    if (s?.status === "completed" && typeof s.content === "string" && s.content.trim()) return true;
+    await sleep(delay);
+    delay = Math.min(delay * 2, 2000);
+  }
+  return false;
+}
+
 export async function runContinuityCheck(bookId: string, chapterIndex: number, subsectionIndex: number, opts: { timeoutMs?: number } = {}): Promise<ContinuityResult> {
   const work = (async (): Promise<ContinuityResult> => {
+    // Never ask the server to check a section whose prose isn't saved (or is empty).
+    if (!(await waitForSavedProse(bookId, chapterIndex, subsectionIndex))) {
+      return { status: "CHECK_FAILED", error: "no_prose" };
+    }
     let last: ContinuityResult = { status: "CHECK_FAILED", error: "not attempted" };
     for (let i = 0; i < 3; i++) {
       try {
