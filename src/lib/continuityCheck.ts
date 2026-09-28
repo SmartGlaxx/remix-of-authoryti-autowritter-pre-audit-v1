@@ -17,7 +17,7 @@ export interface ContinuityResult {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The section save is fire-and-forget; wait until the completed prose is actually in the database. */
-async function waitForSavedProse(bookId: string, ch: number, sub: number, maxMs = 20_000): Promise<boolean> {
+export async function waitForSavedProse(bookId: string, ch: number, sub: number, maxMs = 20_000): Promise<boolean> {
   const start = Date.now();
   let delay = 300;
   while (Date.now() - start < maxMs) {
