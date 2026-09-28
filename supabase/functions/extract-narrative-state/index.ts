@@ -56,7 +56,8 @@ Deno.serve(async (req) => {
     const outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: chapterIndex as number, subsectionIndex: subsectionIndex as number });
     console.log("[extract-narrative-state]", JSON.stringify(outcome));
     // no_prose = section not saved yet → 409 so the client can retry shortly.
-    const status = outcome.status === "no_prose" ? 409 : outcome.status === "failed" ? 500 : 200;
+    const denied = outcome.status === "failed" && /credit_limit_reached|denied access/i.test(String((outcome as any).error ?? ""));
+    const status = outcome.status === "no_prose" ? 409 : denied ? 403 : outcome.status === "failed" ? 500 : 200;
     return json(outcome, status);
   } catch (e) {
     console.error("[extract-narrative-state] fatal", e);
