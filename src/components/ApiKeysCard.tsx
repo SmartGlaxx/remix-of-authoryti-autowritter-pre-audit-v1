@@ -44,10 +44,10 @@ export function ApiKeysCard() {
           const row = keys.find((k) => k.provider === p);
           return (
             <div key={p} className="rounded-md border border-border p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium">{PROVIDER_LABELS[p]}</p>
                 {row ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <code className="text-xs text-muted-foreground">{row.masked}</code>
                     <Badge variant={row.status === "valid" ? "default" : row.status === "invalid" ? "destructive" : "outline"} className="text-[10px]">
                       {row.status === "valid" ? "Working" : row.status === "invalid" ? "Not working" : "Not tested"}
@@ -62,7 +62,7 @@ export function ApiKeysCard() {
                   placeholder={row ? "Paste a new key to replace" : "Paste your key"}
                   value={drafts[p] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p]: e.target.value }))}
-                  className="h-8 text-xs flex-1 min-w-[200px]"
+                  className="h-8 min-w-0 basis-full flex-1 text-xs sm:basis-auto"
                 />
                 <Button size="sm" className="h-8" disabled={!drafts[p] || busy !== null} onClick={() => run(`save-${p}`, async () => {
                   await call({ action: "save", provider: p, key: drafts[p] });
