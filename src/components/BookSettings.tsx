@@ -4,11 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { useState } from "react";
-import { Cpu } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { ModelConfigCard } from "@/components/ModelConfigCard";
 import { ApiKeysCard } from "@/components/ApiKeysCard";
 
@@ -48,26 +44,25 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen flex flex-col bg-background"
+      className="min-h-screen min-w-0 bg-background"
     >
       {/* Header */}
       <header className="sticky top-0 z-40 glass border-b">
-        <div className="container mx-auto px-4 py-4" style={{ maxWidth: "calc(100vw - 16rem)" }}>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack}>
+        <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:py-4 lg:max-w-[calc(100vw-16rem)]">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to book" className="shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-xl font-serif font-semibold">Book Settings</h1>
-              <p className="text-sm text-muted-foreground">{book.title}</p>
+              <p className="truncate text-sm text-muted-foreground">{book.title}</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-6" style={{ maxWidth: "calc(100vw - 16rem)" }}>
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="space-y-6 pr-4">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-4 pb-8 sm:py-6 lg:max-w-[calc(100vw-16rem)]">
+          <div className="min-w-0 space-y-4 sm:space-y-6">
             <ModelConfigCard bookId={book.id} />
             <ApiKeysCard />
             {/* Book Type Section */}
@@ -86,7 +81,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                     <p className="text-sm text-muted-foreground">{typeInfo.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                   <InfoRow label="Category" value={typeInfo.category.replace("-", " ")} />
                   {book.genre && <InfoRow label="Genre" value={book.genre} />}
                 </div>
@@ -119,7 +114,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                     <p className="mt-1 p-3 bg-muted/50 rounded-lg text-sm">{book.theme}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                   <InfoRow 
                     label="Target Audience" 
                     value={audienceOption?.label || book.audience} 
@@ -145,7 +140,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Point of View</p>
                     <Badge variant="secondary" className="text-sm">
@@ -174,7 +169,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                   </div>
                 )}
                 <Separator />
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                   <ToneSlider label="Intensity" value={book.toneProfile.intensity} />
                   <ToneSlider label="Formality" value={book.toneProfile.formality} />
                   <ToneSlider label="Emotional Depth" value={book.toneProfile.emotionalIntensity} />
@@ -193,14 +188,14 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                   <ControlSlider label="Velocity" value={book.controls.velocity} description="Narrative pace" />
                   <ControlSlider label="Scope" value={book.controls.scope} description="Detail depth" />
                   <ControlSlider label="Creativity" value={book.controls.creativity} description="Creative license" />
                   <ControlSlider label="Entity Complexity" value={book.controls.entityComplexity} description="Character depth" />
                   <ControlSlider label="Hook Frequency" value={book.controls.hookFrequency ?? 5} description="Scene change rate" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ControlSlider 
                     label="Perspective Multiplexing" 
                     value={book.controls.perspectiveMultiplexing} 
@@ -225,7 +220,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                   <InfoRow label="Era" value={eraOption?.label || book.controls.temporalContext.era} />
                   <InfoRow label="Timeline Structure" value={timelineOption?.label || book.controls.temporalContext.timelineStructure} />
                   {book.controls.temporalContext.specificPeriod && (
@@ -233,7 +228,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                   )}
                 </div>
                 <Separator />
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Spatial Scope</p>
                     <div className="flex items-center gap-2">
@@ -257,7 +252,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 md:grid-cols-3">
                   <InfoRow 
                     label="Chapter Count" 
                     value={book.controls.structureControls.chapterCount === "fixed" 
@@ -282,7 +277,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                   )}
                 </div>
                 <Separator />
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <ToggleBadge label="Image Generation" enabled={book.controls.imageGeneration} />
                   <ToggleBadge label="Auto Resume" enabled={book.controls.autoResume} />
                   <ToggleBadge label="Divergence" enabled={book.controls.divergenceAllowed} />
@@ -305,7 +300,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Tonal Anchors</p>
                       <div className="flex flex-wrap gap-1">
                         {book.tonalAnchors.map((anchor, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{anchor}</Badge>
+                          <Badge key={i} variant="outline" className="max-w-full break-words whitespace-normal text-xs">{anchor}</Badge>
                         ))}
                       </div>
                     </div>
@@ -315,7 +310,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Entities</p>
                       <div className="flex flex-wrap gap-1">
                         {book.entities.map((entity, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">{entity}</Badge>
+                          <Badge key={i} variant="secondary" className="max-w-full break-words whitespace-normal text-xs">{entity}</Badge>
                         ))}
                       </div>
                     </div>
@@ -325,7 +320,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Concepts</p>
                       <div className="flex flex-wrap gap-1">
                         {book.concepts.map((concept, i) => (
-                          <Badge key={i} variant="default" className="text-xs">{concept}</Badge>
+                          <Badge key={i} variant="default" className="max-w-full break-words whitespace-normal text-xs">{concept}</Badge>
                         ))}
                       </div>
                     </div>
@@ -334,7 +329,6 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
               </Card>
             )}
           </div>
-        </ScrollArea>
       </main>
     </motion.div>
   );
@@ -342,9 +336,9 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
 
 // Helper components
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
-  <div>
+  <div className="min-w-0">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="font-medium capitalize">{value}</p>
+    <p className="break-words font-medium capitalize">{value}</p>
   </div>
 );
 

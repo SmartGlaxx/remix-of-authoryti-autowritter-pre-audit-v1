@@ -75,7 +75,7 @@ export function ModelConfigCard({ bookId }: { bookId: string }) {
           AI Models
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-w-0 space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
         ) : (
@@ -96,7 +96,7 @@ export function ModelConfigCard({ bookId }: { bookId: string }) {
 
             {config.mode === "single" && (
               <Select value={config.singleModel ?? undefined} onValueChange={(v) => setConfig((c) => ({ ...c, singleModel: v }))}>
-                <SelectTrigger><SelectValue placeholder="Choose a model" /></SelectTrigger>
+                <SelectTrigger className="min-w-0"><SelectValue placeholder="Choose a model" /></SelectTrigger>
                 <SelectContent>{selectable.map((m) => <SelectItem key={m.key} value={m.key}>{modelLabel(m.key)}</SelectItem>)}</SelectContent>
               </Select>
             )}
@@ -107,23 +107,23 @@ export function ModelConfigCard({ bookId }: { bookId: string }) {
                 const active = ACTIVE_ROLES.includes(role);
                 const provider = MODEL_REGISTRY.find((m) => m.key === r.model)?.provider;
                 return (
-                  <div key={role} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_1.2fr] items-center rounded-md border border-border p-2">
-                    <div className="flex items-center gap-2 text-sm">
+                  <div key={role} className="grid min-w-0 grid-cols-1 items-center gap-2 rounded-md border border-border p-2 lg:grid-cols-[1fr_1.4fr_1.2fr]">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                       {ROLE_LABELS[role]}
                       {!active && <Badge variant="outline" className="text-[10px]">Not active yet</Badge>}
                     </div>
                     <Select value={r.model} onValueChange={(v) => setRole(role, v)} disabled={config.mode === "legacy"}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 min-w-0 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>{selectable.map((m) => <SelectItem key={m.key} value={m.key}>{modelLabel(m.key)}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={config.fallbacks?.[role] ?? NONE} onValueChange={(v) => setFallback(role, v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No fallback" /></SelectTrigger>
+                      <SelectTrigger className="h-8 min-w-0 text-xs"><SelectValue placeholder="No fallback" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NONE}>{config.mode === "legacy" && r.fallback ? `Default fallback: ${modelLabel(r.fallback)}` : "No fallback (stop on failure)"}</SelectItem>
                         {selectable.map((m) => <SelectItem key={m.key} value={m.key}>Fallback: {modelLabel(m.key)}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {provider && userKeys.includes(provider) && <p className="text-[11px] text-muted-foreground sm:col-span-3">Uses your own {provider} key</p>}
+                    {provider && userKeys.includes(provider) && <p className="text-[11px] text-muted-foreground lg:col-span-3">Uses your own {provider} key</p>}
                   </div>
                 );
               })}
@@ -140,7 +140,7 @@ export function ModelConfigCard({ bookId }: { bookId: string }) {
               </div>
             )}
 
-            <div className="flex gap-2">
+             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={save} disabled={saving} className="gap-1.5"><Save className="w-3.5 h-3.5" /> Save</Button>
               <Button size="sm" variant="outline" onClick={reset} disabled={saving} className="gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Restore defaults</Button>
             </div>
