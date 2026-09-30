@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, User, Flame, PenTool, MessageSquare, Coins } from "lucide-react";
+import { LogOut, User, Flame, PenTool, MessageSquare, Coins, KeyRound } from "lucide-react";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -168,6 +168,14 @@ export function AppSidebar({ className, children }: AppSidebarProps) {
 
             {/* Menu items — SiteLayout style */}
             <div className="px-6">
+              <button
+                onClick={() => { navigate("/settings"); setOpen(false); }}
+                className="w-full flex items-center gap-3 text-left text-sm text-foreground font-medium transition-colors"
+                style={{ padding: "14px 0", borderBottom: "1px solid hsl(var(--border))" }}
+              >
+                <KeyRound className="w-4 h-4" />
+                Settings & API Keys
+              </button>
               <button
                 onClick={handleManageBilling}
                 className="w-full flex items-center gap-3 text-left text-sm text-foreground font-medium transition-colors"
