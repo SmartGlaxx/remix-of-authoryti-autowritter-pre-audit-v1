@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ModelConfigCard } from "@/components/ModelConfigCard";
-import { ApiKeysCard } from "@/components/ApiKeysCard";
+import { Link } from "react-router-dom";
 
 import {
   Book,
@@ -64,7 +64,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
       <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-4 pb-8 sm:py-6 lg:max-w-[calc(100vw-16rem)]">
           <div className="min-w-0 space-y-4 sm:space-y-6">
             <ModelConfigCard bookId={book.id} />
-            <ApiKeysCard />
+            <p className="text-xs text-muted-foreground">Your API keys apply to all books — manage them in <Link to="/settings" className="text-primary underline">Settings</Link>.</p>
             {/* Book Type Section */}
             <Card>
               <CardHeader className="pb-3">

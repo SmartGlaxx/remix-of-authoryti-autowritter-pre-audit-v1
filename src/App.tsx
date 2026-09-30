@@ -21,6 +21,7 @@ import CheckEmail from "./pages/CheckEmail";
 import Waitlist from "./pages/Waitlist";
 import Onboarding from "./pages/Onboarding";
 import BookDetail from "./pages/BookDetail";
+import AccountSettings from "./pages/AccountSettings";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BookOpen } from "lucide-react";
 import { BOOK_TYPE_INFO } from "@/types/book";
@@ -141,6 +142,7 @@ const App = () => (
               path="/manage-subscription"
               element={<ProtectedRoute><ManageSubscription /></ProtectedRoute>}
             />
+            <Route path="/settings" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
             <Route path="/dev-docs" element={<DevDocs />} />
             <Route
               path="/admin/feedback"
