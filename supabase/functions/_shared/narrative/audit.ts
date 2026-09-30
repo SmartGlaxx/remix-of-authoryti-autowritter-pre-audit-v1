@@ -275,8 +275,62 @@ export function crossStageKey(f: ValidatedFinding): string {
   return `x|${loc(f.evidenceLocation)}|${quoteNorm(f.evidenceExcerpt).split(" ").slice(0, 5).join(" ")}|${loc(f.contradictingLocation)}`;
 }
 
+/** Same pair of passages (in either order) flagged with different quotes is still one problem. */
+export function locationPairKey(f: ValidatedFinding): string {
+  const a = f.evidenceLocation, b = f.contradictingLocation;
+  if (!a || !b) return crossStageKey(f);
+  const pair = [`${a.chapterIndex}.${a.subsectionIndex}`, `${b.chapterIndex}.${b.subsectionIndex}`].sort().join("~");
+  const nums = (f.title + " " + (f.evidenceExcerpt ?? "")).match(/\d+(?:\.\d+)?%?/g)?.sort().join(",") ?? "";
+  return `p|${pair}|${nums}`;
+}
+
+/**
+ * Severity calibration (applied after validation, before dedup). Never inflates:
+ *  - CRITICAL needs confidence ≥ 0.8 AND concrete two-sided proof (counter-passage or verified records), else → HIGH;
+ *  - HIGH below 0.6 confidence → MEDIUM;
+ *  - UNCERTAIN verification caps at MEDIUM.
+ */
+export function calibrateSeverity(f: ValidatedFinding): ValidatedFinding {
+  let sev = f.severity;
+  const twoSided = !!f.contradictingLocation || Object.values(f.related).some((l) => l.length > 0);
+  if (sev === "CRITICAL" && (f.confidence < 0.8 || !twoSided)) sev = "HIGH";
+  if (sev === "HIGH" && f.confidence < 0.6) sev = "MEDIUM";
+  if (f.verification === "UNCERTAIN" && AUDIT_SEVERITY_RANK[sev] > AUDIT_SEVERITY_RANK.MEDIUM) sev = "MEDIUM";
+  return sev === f.severity ? f : { ...f, severity: sev };
+}
+
 export function deduplicateFindings(list: ValidatedFinding[]): ValidatedFinding[] {
-  return mergeBy(mergeBy(list, (f) => f.dedupKey), crossStageKey);
+  return mergeBy(mergeBy(mergeBy(list.map(calibrateSeverity), (f) => f.dedupKey), crossStageKey), locationPairKey);
+}
+
+/** Prompt for the semantic consolidation pass: the model may only GROUP existing findings, never add or edit them. */
+export function buildConsolidationPrompt(list: ValidatedFinding[]): { system: string; user: string } {
+  return {
+    system: `You group audit findings that describe the SAME underlying problem (e.g. one recurring name-reuse issue reported for several names, or one statistic clash reported by several checks). Never merge different problems. Return ONLY JSON: {"groups":[[indexes],...]} listing only groups of 2+ findings.`,
+    user: list.map((f, i) => `${i}. [${f.category}] ${f.title} — ${f.description.slice(0, 200)}`).join("\n"),
+  };
+}
+
+/** Applies model-proposed groups deterministically; invalid/overlapping indexes are ignored. Keeps the strongest finding, merges ids, notes the others. */
+export function applyConsolidation(list: ValidatedFinding[], raw: string): ValidatedFinding[] {
+  let groups: unknown;
+  try { groups = (parseJsonLoose(raw) as { groups?: unknown })?.groups; } catch { return list; }
+  if (!Array.isArray(groups)) return list;
+  const owner = new Map<number, number>();
+  groups.forEach((g, gi) => {
+    if (!Array.isArray(g)) return;
+    const ok = [...new Set(g.filter((i) => Number.isInteger(i) && i >= 0 && i < list.length && !owner.has(i)))] as number[];
+    if (ok.length >= 2) ok.forEach((i) => owner.set(i, gi));
+  });
+  const out: ValidatedFinding[] = [];
+  const byGroup = new Map<number, ValidatedFinding[]>();
+  list.forEach((f, i) => { const g = owner.get(i); if (g === undefined) out.push(f); else byGroup.set(g, [...(byGroup.get(g) ?? []), f]); });
+  for (const members of byGroup.values()) {
+    const [top] = mergeBy(members, () => "g");
+    const others = members.filter((m) => m !== members.find((x) => x.dedupKey === top.dedupKey)).map((m) => m.title);
+    out.push({ ...top, explanation: [top.explanation, others.length ? `Also reported as: ${others.join("; ")}` : ""].filter(Boolean).join(" ").slice(0, 1500) });
+  }
+  return out.sort((a, b) => AUDIT_SEVERITY_RANK[b.severity] - AUDIT_SEVERITY_RANK[a.severity] || b.confidence - a.confidence);
 }
 
 function mergeBy(list: ValidatedFinding[], keyOf: (f: ValidatedFinding) => string): ValidatedFinding[] {
@@ -461,6 +515,8 @@ Rules:
 - Legitimate change (a character growing, a deliberate twist, a flashback) is not an error.
 - Severity reflects impact on the manuscript: CRITICAL breaks the central story/argument; HIGH a clear contradiction a reader will notice; MEDIUM a noticeable inconsistency; LOW a minor structural, continuity, terminology, information-flow, or redundancy issue with limited impact.
 - Who established a fact does not change severity.
+- Calibrate conservatively: CRITICAL is rare (the book's central plot or argument no longer works); when unsure between two levels, choose the lower one.
+- Report each underlying problem once, even if it shows up in several passages.
 - If nothing is wrong, return {"findings": []}.
 Return ONLY JSON: {"findings":[{"severity":"...","confidence":0-1,"title":"...","description":"...","evidenceExcerpt":"...","contradictingExcerpt":"...","contradictingEvidence":"...","related":{"facts":[],"events":[],"characters":[],"threads":[],"checks":[]},"explanation":"...","suggestedAction":"..."}]}`;
   const user = `BOOK TYPE: ${opts.nonfiction ? "nonfiction" : "fiction"}

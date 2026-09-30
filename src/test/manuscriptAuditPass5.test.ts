@@ -158,6 +158,6 @@ describe("Pass 5 — cross-stage dedup", () => {
     const b = validateFinding(raw({ category: "timeline", title: "Other wording", evidenceExcerpt: "Mara locked the brass key in the drawer", severity: "CRITICAL" }), secs, idx);
     const c = validateFinding(raw({ category: "timeline", title: "Different passage", evidenceExcerpt: "walked to the harbour at noon" }), secs, idx);
     const out = deduplicateFindings([a, b, c].map((v) => (v as { finding: ValidatedFinding }).finding));
-    expect(out).toHaveLength(2); expect(out[0].severity).toBe("CRITICAL");
+    expect(out).toHaveLength(2); expect(out[0].severity).toBe("HIGH") // one-sided CRITICAL is calibrated down;
   });
 });
