@@ -8,7 +8,7 @@ import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrative/context.ts";
 import {
-  buildAuditPrompt, buildEvidenceIndex, buildManuscriptSections, canonicalFactFindings, computeAuditInputs, continuityHistoryFindings,
+  applyConsolidation, buildAuditPrompt, buildConsolidationPrompt, buildEvidenceIndex, buildManuscriptSections, canonicalFactFindings, computeAuditInputs, continuityHistoryFindings,
   deduplicateFindings, initialStageProgress, isNonfiction, LLM_STAGES, manuscriptText, parseStageOutput, plotThreadFindings,
   redundancyFindings, renderIdCatalog, renderManuscriptDigest, renderOutlineText, STAGE_CATEGORY, structuralGapFindings,
   summarizeFindings, toFindingRow, validateFinding, type AuditStage, type RawFinding, type StageProgress, type ValidatedFinding,
@@ -149,7 +149,15 @@ async function runAudit(ctx: { db: any; auditId: string; bookId: string; userId:
     await done("evidence_validation", valid.length);
 
     await start("deduplication");
-    const findings = deduplicateFindings(valid);
+    let findings = deduplicateFindings(valid);
+    if (findings.length >= 3) {
+      try {
+        const cp = buildConsolidationPrompt(findings);
+        const { text, meta } = await generateAIText({ role: "manuscript_auditor", config, userId, bookId, request: { ...cp, json: true, temperature: 0, reasoning: "low" } }, deps);
+        models.add(meta.model);
+        findings = applyConsolidation(findings, text);
+      } catch (e) { console.warn("[run-manuscript-audit] consolidation skipped", e instanceof Error ? e.message : e); }
+    }
     if (findings.length) {
       const { error } = await db.from("manuscript_audit_findings").insert(findings.map((f) => toFindingRow(f, { auditId, bookId, userId })));
       if (error) throw new Error(error.message);
