@@ -23,7 +23,7 @@ export const LEGACY_ROLE_MODELS: Record<Role, string> = {
   difficult_chapter: "deepseek/deepseek-reasoner",
   manuscript_auditor: "google/gemini-2.5-pro",
   character_generator: "google/gemini-2.5-flash",
-  summarizer: "google/gemini-2.5-flash-lite",
+  summarizer: "google/gemini-3.5-flash-lite",
   intro_writer: "deepseek/deepseek-chat",
 };
 /** Pre-Pass-3 behaviour: DeepSeek calls fell back to Gemini when DeepSeek was not configured. */
