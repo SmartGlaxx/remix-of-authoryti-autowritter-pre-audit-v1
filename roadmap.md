@@ -7,4 +7,5 @@
 
 # Next
 - [x] API keys moved to app-level Settings (user menu → Settings & API Keys)
-- [ ] Writer Personas (10 built-in + custom writer, permanent portraits, Writer → Book → Model) — awaiting user answers
+- [x] Writer Personas (12 built-in writers, portraits, pick at creation, change in Book Settings)
+- [ ] Custom writer creator — deferred by user (later)

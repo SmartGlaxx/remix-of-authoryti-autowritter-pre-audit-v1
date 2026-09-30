@@ -253,6 +253,7 @@ export interface BookControls {
 
   // Words the user does not want to appear in the generated text
   bannedWords?: string[];
+  writerId?: string; // Writer Persona id; missing = best fit for the book type
 }
 
 export interface Subsection {
