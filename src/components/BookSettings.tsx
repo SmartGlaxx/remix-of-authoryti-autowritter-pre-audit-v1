@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { WriterPicker } from "@/components/WriterPicker";
 import { motion } from "framer-motion";
 import { ArrowLeft, BookOpen, Palette, Sliders, Settings2, Sparkles, Globe, Clock, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,15 @@ interface BookSettingsProps {
 }
 
 const BookSettings = ({ book, onBack }: BookSettingsProps) => {
+  const [writerId, setWriterId] = useState<string | undefined>(book.controls.writerId);
+  const saveWriter = async (id: string) => {
+    const prev = writerId;
+    setWriterId(id);
+    const { error } = await supabase.from("books").update({ controls: { ...book.controls, writerId: id } as never }).eq("id", book.id);
+    if (error) { setWriterId(prev); toast.error("Couldn't change the writer."); return; }
+    book.controls.writerId = id;
+    toast.success("Writer updated");
+  };
   const typeInfo = BOOK_TYPE_INFO[book.bookType];
   const povOption = POV_OPTIONS.find((p) => p.value === book.pov);
   const primaryTone = TONE_OPTIONS.find((t) => t.value === book.toneProfile.primary);
@@ -64,6 +77,15 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
       <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-4 pb-8 sm:py-6 lg:max-w-[calc(100vw-16rem)]">
           <div className="min-w-0 space-y-4 sm:space-y-6">
             <ModelConfigCard bookId={book.id} />
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Writer</CardTitle>
+                <p className="text-xs text-muted-foreground">The virtual author whose voice shapes this book. Applies to sections written from now on.</p>
+              </CardHeader>
+              <CardContent>
+                <WriterPicker bookType={book.bookType} value={writerId} onChange={saveWriter} />
+              </CardContent>
+            </Card>
             <p className="text-xs text-muted-foreground">Your API keys apply to all books — manage them in <Link to="/settings" className="text-primary underline">Settings</Link>.</p>
             {/* Book Type Section */}
             <Card>

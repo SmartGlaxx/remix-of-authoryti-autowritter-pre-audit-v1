@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -279,7 +280,10 @@ META RULE: Show > tell. Panels > paragraphs.
     ? `\n- The following words and their close variants MUST NEVER appear in the output: ${userBannedWords.join(", ")}.`
     : "";
 
+  const writerBlock = renderWriterPrompt(resolveWriter(controls, book.bookType), book.bookType);
   return `You are a master writer creating content for a ${book.bookType} book.
+
+${writerBlock}
 ${isScreenplay ? "You are writing in SCREENPLAY FORMAT. Every line of output must follow screenplay conventions." : ""}
 ${isChildren ? "You are writing a CHILDREN'S BOOK for ages 1–9. Every line must obey the Children's Book Engine rules below." : ""}
 ${isComic ? "You are writing a COMIC / GRAPHIC NOVEL. Every subsection must be delivered as panel-based output following the Comic Engine rules below." : ""}

@@ -5,3 +5,5 @@
 - Books without a `book_model_configs` row use the `legacy` role map, reproducing pre-Pass-3 models exactly — backward compatibility without migration.
 - Continuity (Pass 4) runs server-side in `check-continuity` via pure logic in `_shared/narrative/continuity.ts`, before extraction; history is append-only in `continuity_checks` — only the accepted final text ever reaches story memory.
 - Manuscript audit (Pass 5) is audit-only: `run-manuscript-audit` runs staged checks in the background via pure logic in `_shared/narrative/audit.ts`, caches on manuscript+outline+story-memory hashes, and writes only `manuscript_audits`/`manuscript_audit_findings` (authors may change only finding status/notes) — whole-book diagnosis never mutates prose or canon.
+- Writer Personas live in `supabase/functions/_shared/writers/personas.ts` (pure data + renderer shared by browser and backend); the book stores only `controls.writerId` (missing = best fit) and the rendered block sits in the static system prompt — voice survives model changes and stays prompt-cache safe.
+- Provider API keys are managed at app level (`/settings`), not per book — keys are per user.

@@ -1,4 +1,6 @@
+import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { useState, useMemo, useRef, useEffect } from "react";
+import { WriterPicker } from "@/components/WriterPicker";
 import { sanitizeText } from "@/lib/sanitize";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, ChevronLeft, Sparkles, HelpCircle, Settings2, Palette, BookOpen, Sliders, Check } from "lucide-react";
@@ -65,7 +67,7 @@ type Step = 1 | 2 | 3 | 4 | 5;
 const STEP_META = [
   { title: "Type", icon: BookOpen, color: "from-primary/80 to-primary" },
   { title: "Details", icon: Sparkles, color: "from-amber-glow/80 to-primary" },
-  { title: "Voice", icon: Palette, color: "from-primary to-accent" },
+  { title: "Writer & Voice", icon: Palette, color: "from-primary to-accent" },
   { title: "Controls", icon: Sliders, color: "from-accent to-primary" },
   { title: "Advanced", icon: Settings2, color: "from-primary/80 to-primary" },
 ];
@@ -177,6 +179,7 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
     // Sanitize user-entered text fields before submission
     const sanitized = {
       ...formData,
+      controls: { ...formData.controls!, writerId: formData.controls?.writerId ?? bestWriterFor(formData.bookType).id },
       title: sanitizeText((formData.title || "").trim()).substring(0, 200),
       theme: sanitizeText((formData.theme || "").trim()).substring(0, 1000),
       subtitle: formData.subtitle ? sanitizeText(formData.subtitle.trim()).substring(0, 300) : undefined,
@@ -458,6 +461,10 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
               {/* ───── Step 3: Voice & Tone ───── */}
               {step === 3 && (
                 <motion.div key="step3" {...stepAnim} className="space-y-5">
+                  <div className="space-y-2.5">
+                    <SectionLabel label="Your Writer" tooltip="A virtual author whose personality and style shape every line. Change it anytime before the book is created." />
+                    <WriterPicker bookType={formData.bookType as string} value={formData.controls?.writerId} onChange={(id) => updateControls("writerId", id)} />
+                  </div>
                   <div className="space-y-2.5">
                     <SectionLabel label="Point of View" tooltip="Controls narrative distance and reader immersion" />
                     <div className="grid grid-cols-2 gap-2">

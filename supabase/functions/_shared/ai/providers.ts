@@ -95,7 +95,7 @@ async function failFromResponse(res: Response, apiKey: string, provider: string)
   if (s === 401) throw new AIProviderError("auth", `${label} rejected the API key`, s);
   if (s === 402) throw new AIProviderError("payment", `${label}: insufficient credits`, s);
   if (s === 403) throw new AIProviderError("forbidden", `${label} denied access: ${body}`, s);
-  if (s === 404) throw new AIProviderError("unavailable", `${label}: model or endpoint not available`, s);
+  if (s === 404) throw new AIProviderError("unavailable", `${label}: model or endpoint not available${body ? ` — ${body.slice(0, 200)}` : ""}`, s);
   if (s === 429) throw new AIProviderError("rate_limit", `${label}: rate limited`, s, true);
   if (s >= 500) throw new AIProviderError("unavailable", `${label} error ${s}`, s, true);
   throw new AIProviderError("bad_request", `${label} rejected the request (${s}): ${body}`, s);
