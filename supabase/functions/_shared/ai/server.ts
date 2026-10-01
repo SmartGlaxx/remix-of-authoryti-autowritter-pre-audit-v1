@@ -38,7 +38,7 @@ export function createAIDeps(admin: any, userId: string): AIDeps {
 /** Loads a book's model config (owner-scoped). Missing row → legacy default. */
 export async function loadBookModelConfig(admin: any, bookId: string | null | undefined, userId: string): Promise<BookModelConfig> {
   if (!bookId) return normalizeConfig(null);
-  const { data } = await admin.from("book_model_configs").select("mode, single_model, role_models, fallbacks").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+  const { data } = await admin.from("book_model_configs").select("mode, single_model, role_models, fallbacks, profile_writer, profile_tier").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
   return normalizeConfig(data);
 }
 
