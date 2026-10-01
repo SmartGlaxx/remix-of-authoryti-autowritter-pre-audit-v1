@@ -9,3 +9,13 @@
 - [x] API keys moved to app-level Settings (user menu → Settings & API Keys)
 - [x] Writer Personas (12 built-in writers, portraits, pick at creation, change in Book Settings)
 - [ ] Custom writer creator — deferred by user (later)
+
+# Writer Persona Engine (corrected spec)
+- [x] 15-slider Expression Control Layer (shared module, creation UI, Book Settings, prompts)
+- [x] Story Divergence: Strict / Controlled / Open (separate from sliders; legacy boolean mapped)
+- [x] ±2 bound utility (boundToBaseline)
+- [ ] 15-slider baselines for 12 writers — waiting on user's matrix
+- [ ] 48 fixed model profiles (validate IDs against registry first) — waiting on matrix
+- [ ] Book Voice Manifest (all 15 baseline + effective values)
+- [ ] Custom writers (same 15 sliders, ±2, cap 20)
+- [ ] provider_pricing_cache — authenticated/service only, NO anon grant
