@@ -179,6 +179,9 @@ export interface ToneProfile {
   emotionalIntensity: number; // 1-10
   humorLevel: number; // 1-10
   authorityLevel: number; // 1-10
+  warmth?: number; // 1-10
+  directness?: number; // 1-10
+  readerIntimacy?: number; // 1-10
 }
 
 export type TeaserStyle = "none" | "mood-setter" | "cryptic-open-loop" | "character-voice-drop";
@@ -206,6 +209,9 @@ export interface DynamismControls {
   entityComplexity: number; // 1-10, characters/concepts depth
   perspectiveMultiplexing: number; // 1-10, parallel threads
   divergenceAllowed: boolean;
+  divergenceMode?: "strict" | "controlled" | "open";
+  sensoryDetail?: number; // 1-10
+  sentenceVariation?: number; // 1-10
 }
 
 export interface TemporalContext {
@@ -241,6 +247,9 @@ export interface BookControls {
   imageFrequency?: number; // 1-10, controls how often images appear
   autoResume: boolean;
   divergenceAllowed: boolean;
+  divergenceMode?: "strict" | "controlled" | "open";
+  sensoryDetail?: number; // 1-10
+  sentenceVariation?: number; // 1-10
   
   // Teaser
   teaserStyle: TeaserStyle;
