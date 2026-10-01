@@ -143,6 +143,8 @@ export type Database = {
           fallbacks: Json
           id: string
           mode: string
+          profile_tier: string | null
+          profile_writer: string | null
           role_models: Json
           single_model: string | null
           updated_at: string
@@ -154,6 +156,8 @@ export type Database = {
           fallbacks?: Json
           id?: string
           mode?: string
+          profile_tier?: string | null
+          profile_writer?: string | null
           role_models?: Json
           single_model?: string | null
           updated_at?: string
@@ -165,6 +169,8 @@ export type Database = {
           fallbacks?: Json
           id?: string
           mode?: string
+          profile_tier?: string | null
+          profile_writer?: string | null
           role_models?: Json
           single_model?: string | null
           updated_at?: string
@@ -205,6 +211,7 @@ export type Database = {
           total_char_count: number
           updated_at: string
           user_id: string
+          voice_manifest: Json | null
           word_count: number
         }
         Insert: {
@@ -231,6 +238,7 @@ export type Database = {
           total_char_count?: number
           updated_at?: string
           user_id: string
+          voice_manifest?: Json | null
           word_count?: number
         }
         Update: {
@@ -257,6 +265,7 @@ export type Database = {
           total_char_count?: number
           updated_at?: string
           user_id?: string
+          voice_manifest?: Json | null
           word_count?: number
         }
         Relationships: []
@@ -1287,6 +1296,39 @@ export type Database = {
           turbo_words_capacity?: number
           turbo_words_remaining?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      provider_pricing_cache: {
+        Row: {
+          cache_write_price_per_m: number | null
+          cached_input_price_per_m: number | null
+          fetched_at: string
+          input_price_per_m: number | null
+          model_key: string
+          output_price_per_m: number | null
+          provider: string
+          source: string
+        }
+        Insert: {
+          cache_write_price_per_m?: number | null
+          cached_input_price_per_m?: number | null
+          fetched_at?: string
+          input_price_per_m?: number | null
+          model_key: string
+          output_price_per_m?: number | null
+          provider: string
+          source: string
+        }
+        Update: {
+          cache_write_price_per_m?: number | null
+          cached_input_price_per_m?: number | null
+          fetched_at?: string
+          input_price_per_m?: number | null
+          model_key?: string
+          output_price_per_m?: number | null
+          provider?: string
+          source?: string
         }
         Relationships: []
       }
