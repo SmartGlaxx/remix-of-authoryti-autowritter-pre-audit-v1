@@ -15,7 +15,9 @@
 - [x] Story Divergence: Strict / Controlled / Open (separate from sliders; legacy boolean mapped)
 - [x] ±2 bound utility (boundToBaseline)
 - [ ] 15-slider baselines for 12 writers — waiting on user's matrix
-- [ ] 48 fixed model profiles (validate IDs against registry first) — waiting on matrix
-- [ ] Book Voice Manifest (all 15 baseline + effective values)
+- [x] 48 fixed model profiles (IDs validated vs live catalogs; Sonnet 5.5→claude-sonnet-5, Haiku→claude-haiku-4-5, Gemini 3.1 Pro→gemini-3.1-pro-preview)
+- [x] Book Voice Manifest (all 15 values; baselines filled when matrix arrives)
 - [ ] Custom writers (same 15 sliders, ±2, cap 20)
-- [ ] provider_pricing_cache — authenticated/service only, NO anon grant
+- [x] provider_pricing_cache — signed-in read only, 24h refresh from gateway catalog
+- [ ] DeepSeek prices (no price API) — need official numbers
+- [ ] Thinking/non-thinking modes for DeepSeek/Gemini/Claude adapters (OpenAI effort wired)

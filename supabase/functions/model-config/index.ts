@@ -2,6 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { normalizeConfig, resolveAllRoles } from "../_shared/ai/roles.ts";
 import { estimateOperationCosts } from "../_shared/ai/estimate.ts";
+import { loadPrices } from "../_shared/ai/pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,20 +34,22 @@ Deno.serve(async (req) => {
 
     if (body.action === "save") {
       const c = normalizeConfig(body.config);
-      await db.from("book_model_configs").upsert({ book_id: bookId, user_id: userId, mode: c.mode, single_model: c.singleModel ?? null, role_models: c.roleModels ?? {}, fallbacks: c.fallbacks ?? {} }, { onConflict: "book_id" });
+      await db.from("book_model_configs").upsert({ book_id: bookId, user_id: userId, mode: c.mode, single_model: c.singleModel ?? null, profile_writer: c.mode === "profile" ? c.profileWriter : null, profile_tier: c.mode === "profile" ? c.profileTier : null, role_models: c.roleModels ?? {}, fallbacks: c.fallbacks ?? {} }, { onConflict: "book_id" });
     } else if (body.action === "reset") {
       await db.from("book_model_configs").delete().eq("book_id", bookId).eq("user_id", userId);
     }
 
-    const { data: row } = await db.from("book_model_configs").select("mode, single_model, role_models, fallbacks").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+    const { data: row } = await db.from("book_model_configs").select("mode, single_model, role_models, fallbacks, profile_writer, profile_tier").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
     const config = normalizeConfig(row);
     const { data: keys } = await db.from("user_provider_keys").select("provider").eq("user_id", userId);
+    const { prices, fetchedAt } = await loadPrices(db, Deno.env.get("LOVABLE_API_KEY"), body.action === "refresh_prices");
     return json({
+      pricesFetchedAt: fetchedAt,
       config,
       saved: !!row,
       resolved: resolveAllRoles(config),
       userKeyProviders: (keys ?? []).map((k) => k.provider),
-      estimates: estimateOperationCosts(config, book.outline),
+      estimates: estimateOperationCosts(config, book.outline, prices),
     });
   } catch (e) {
     console.error("[model-config]", e instanceof Error ? e.message : e);

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildVoiceManifest } from "../_shared/writers/manifest.ts";
 import { readSliders, renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
@@ -557,6 +558,11 @@ serve(async (req) => {
 
     // ── Pass 3: provider-neutral AI call (role = writer) ──
     const bookModelConfig = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
+    // Freeze the Book Voice Manifest on first generation (never overwritten).
+    try {
+      const { data: vb } = await adminSupabase.from("books").select("book_type, tone_profile, controls, voice_manifest").eq("id", book.id).eq("user_id", auth.user.id).maybeSingle();
+      if (vb && !vb.voice_manifest) await adminSupabase.from("books").update({ voice_manifest: buildVoiceManifest(vb, bookModelConfig) }).eq("id", book.id).eq("user_id", auth.user.id).is("voice_manifest", null);
+    } catch (e) { console.warn("[voice-manifest]", e instanceof Error ? e.message : e); }
     const modelOverride = bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null;
     const aiMeta: Record<string, unknown> = {};
     const chunks = streamAI({

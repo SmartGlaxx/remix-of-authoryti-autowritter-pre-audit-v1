@@ -1,8 +1,9 @@
 // Central role → model resolution. Edge functions call resolveModelForRole and nothing else;
 // no role conditionals live in individual functions.
 import { ALL_ROLES, getModel, type Role } from "./registry.ts";
+import { getProfile, isTier, reasoningFor, slotForRole, type Tier } from "../writers/profiles.ts";
 
-export type ConfigMode = "legacy" | "optimized" | "single" | "custom";
+export type ConfigMode = "legacy" | "optimized" | "single" | "custom" | "profile";
 
 export interface BookModelConfig {
   mode: ConfigMode;
@@ -10,6 +11,9 @@ export interface BookModelConfig {
   roleModels?: Partial<Record<Role, string>>;
   /** Explicit, user-enabled fallbacks. Absent = stop safely on failure. */
   fallbacks?: Partial<Record<Role, string>>;
+  /** mode "profile": fixed Writer × Tier profile (models locked). */
+  profileWriter?: string | null;
+  profileTier?: Tier | null;
 }
 
 /** Exactly what the app used before Pass 3 — existing books keep this behaviour. */
@@ -23,7 +27,7 @@ export const LEGACY_ROLE_MODELS: Record<Role, string> = {
   difficult_chapter: "deepseek/deepseek-reasoner",
   manuscript_auditor: "google/gemini-2.5-pro",
   character_generator: "google/gemini-2.5-flash",
-  summarizer: "google/gemini-3.5-flash-lite",
+  summarizer: "google/gemini-2.5-flash-lite", // registry entry sends gemini-3.5-flash-lite on user Google keys
   intro_writer: "deepseek/deepseek-chat",
 };
 /** Pre-Pass-3 behaviour: DeepSeek calls fell back to Gemini when DeepSeek was not configured. */
@@ -64,6 +68,7 @@ export interface ResolvedModel {
   model: string;
   fallback: string | null;
   source: ConfigMode;
+  reasoning?: "low" | "medium" | "high";
 }
 
 function validKey(k: unknown): k is string {
@@ -73,20 +78,29 @@ function validKey(k: unknown): k is string {
 export function normalizeConfig(raw: unknown): BookModelConfig {
   if (!raw || typeof raw !== "object") return DEFAULT_CONFIG;
   const r = raw as Record<string, unknown>;
-  const mode = (["legacy", "optimized", "single", "custom"] as const).includes(r.mode as ConfigMode) ? (r.mode as ConfigMode) : "legacy";
+  const mode = (["legacy", "optimized", "single", "custom", "profile"] as const).includes(r.mode as ConfigMode) ? (r.mode as ConfigMode) : "legacy";
   const pick = (o: unknown) => {
     const out: Partial<Record<Role, string>> = {};
     if (o && typeof o === "object") for (const role of ALL_ROLES) { const v = (o as Record<string, unknown>)[role]; if (validKey(v)) out[role] = v; }
     return out;
   };
   const single = r.singleModel ?? r.single_model;
-  return { mode, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
+  const pw = r.profileWriter ?? r.profile_writer, pt = r.profileTier ?? r.profile_tier;
+  const profileWriter = typeof pw === "string" ? pw : null, profileTier = isTier(pt) ? pt : null;
+  const finalMode = mode === "profile" && !getProfile(profileWriter, profileTier) ? "legacy" : mode;
+  return { mode: finalMode, profileWriter, profileTier, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
 }
 
 export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role): ResolvedModel {
   const c = normalizeConfig(config ?? DEFAULT_CONFIG);
   const explicitFallback = c.fallbacks?.[role] ?? null;
   switch (c.mode) {
+    case "profile": {
+      const prof = getProfile(c.profileWriter, c.profileTier)!;
+      const slot = slotForRole(prof, role);
+      // Locked: per-role overrides are ignored; no silent fallback to another model.
+      return { role, model: slot.model, fallback: null, source: "profile", reasoning: reasoningFor(slot.mode) };
+    }
     case "optimized":
       return { role, model: c.roleModels?.[role] ?? OPTIMIZED_ROLE_MODELS[role], fallback: explicitFallback, source: "optimized" };
     case "single":

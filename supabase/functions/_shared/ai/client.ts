@@ -92,7 +92,8 @@ export async function* streamAI(opts: RunAIOptions, deps: AIDeps, meta: Partial<
       Object.assign(meta, { model: modelKey, provider: route.adapter, credentialSource: route.source, usedFallback: ci > 0, usage });
       for (let attempt = 0; ; attempt++) {
         try {
-          const gen = getAdapter(route.adapter).stream(opts.request, { model, apiKey: route.apiKey, fetch: deps.fetch ?? fetch, signal: opts.signal });
+          const req = resolved.reasoning && opts.request.reasoning == null ? { ...opts.request, reasoning: resolved.reasoning } : opts.request;
+          const gen = getAdapter(route.adapter).stream(req, { model, apiKey: route.apiKey, fetch: deps.fetch ?? fetch, signal: opts.signal });
           for await (const ev of gen) {
             if (ev.type === "text") { emitted = true; yield ev.text; }
             else for (const [k, v] of Object.entries(ev.usage)) if (v != null) (usage as any)[k] = v;

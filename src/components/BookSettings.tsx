@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { WriterPicker } from "@/components/WriterPicker";
+import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { motion } from "framer-motion";
 import { ArrowLeft, BookOpen, Palette, Sliders, Settings2, Sparkles, Globe, Clock, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
 
       <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-4 pb-8 sm:py-6 lg:max-w-[calc(100vw-16rem)]">
           <div className="min-w-0 space-y-4 sm:space-y-6">
-            <ModelConfigCard bookId={book.id} />
+            <ModelConfigCard bookId={book.id} writerId={writerId ?? bestWriterFor(book.bookType).id} />
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Writer</CardTitle>
