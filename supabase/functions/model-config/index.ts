@@ -53,8 +53,6 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("[model-config]", e instanceof Error ? e.message : e);
-    const { prices, fetchedAt } = await loadPrices(db, Deno.env.get("LOVABLE_API_KEY"), body.action === "refresh_prices");
-    return json({
-      pricesFetchedAt: fetchedAt, error: "Request failed" }, 500);
+    return json({ error: "Request failed" }, 500);
   }
 });
