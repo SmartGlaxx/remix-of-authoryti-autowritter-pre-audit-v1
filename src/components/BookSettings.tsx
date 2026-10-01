@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ModelConfigCard } from "@/components/ModelConfigCard";
 import { Link } from "react-router-dom";
+import { SLIDERS, readSliders, resolveDivergence, DIVERGENCE_OPTIONS } from "../../supabase/functions/_shared/writers/sliders";
 
 import {
   Book,
@@ -40,6 +41,8 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     book.controls.writerId = id;
     toast.success("Writer updated");
   };
+  const sliders = readSliders(book.toneProfile as never, book.controls as never);
+  const divergence = resolveDivergence(book.controls as never);
   const typeInfo = BOOK_TYPE_INFO[book.bookType];
   const povOption = POV_OPTIONS.find((p) => p.value === book.pov);
   const primaryTone = TONE_OPTIONS.find((t) => t.value === book.toneProfile.primary);
@@ -192,11 +195,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 )}
                 <Separator />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                  <ToneSlider label="Intensity" value={book.toneProfile.intensity} />
-                  <ToneSlider label="Formality" value={book.toneProfile.formality} />
-                  <ToneSlider label="Emotional Depth" value={book.toneProfile.emotionalIntensity} />
-                  <ToneSlider label="Humor Level" value={book.toneProfile.humorLevel} />
-                  <ToneSlider label="Authority" value={book.toneProfile.authorityLevel} />
+                  {SLIDERS.filter((x) => x.group === "tone").map((x) => <ToneSlider key={x.key} label={x.label} value={sliders[x.key]} />)}
                 </div>
               </CardContent>
             </Card>
@@ -211,24 +210,11 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                  <ControlSlider label="Velocity" value={book.controls.velocity} description="Narrative pace" />
-                  <ControlSlider label="Scope" value={book.controls.scope} description="Detail depth" />
-                  <ControlSlider label="Creativity" value={book.controls.creativity} description="Creative license" />
-                  <ControlSlider label="Entity Complexity" value={book.controls.entityComplexity} description="Character depth" />
-                  <ControlSlider label="Hook Frequency" value={book.controls.hookFrequency ?? 5} description="Scene change rate" />
+                  {SLIDERS.filter((x) => x.group === "dynamism").map((x) => <ControlSlider key={x.key} label={x.label} value={sliders[x.key]} description={x.hint} />)}
                 </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ControlSlider 
-                    label="Perspective Multiplexing" 
-                    value={book.controls.perspectiveMultiplexing} 
-                    description="Parallel viewpoints" 
-                  />
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Divergence</p>
-                    <Badge variant={book.controls.divergenceAllowed ? "success" : "secondary"}>
-                      {book.controls.divergenceAllowed ? "Allowed" : "Not Allowed"}
-                    </Badge>
-                  </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Story Divergence</p>
+                  <Badge variant={divergence === "strict" ? "secondary" : "success"}>{DIVERGENCE_OPTIONS.find((d) => d.value === divergence)?.label}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -302,7 +288,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <ToggleBadge label="Image Generation" enabled={book.controls.imageGeneration} />
                   <ToggleBadge label="Auto Resume" enabled={book.controls.autoResume} />
-                  <ToggleBadge label="Divergence" enabled={book.controls.divergenceAllowed} />
+                  
                 </div>
               </CardContent>
             </Card>

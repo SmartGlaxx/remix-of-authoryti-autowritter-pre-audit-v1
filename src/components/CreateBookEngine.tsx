@@ -1,3 +1,4 @@
+import { DIVERGENCE_OPTIONS, resolveDivergence } from "../../supabase/functions/_shared/writers/sliders";
 import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { WriterPicker } from "@/components/WriterPicker";
@@ -533,6 +534,9 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
                     <CompactSlider label="Emotion" tooltip="Level of emotional expression" value={formData.toneProfile?.emotionalIntensity || 5} onChange={(v) => updateToneProfile("emotionalIntensity", v)} left="Restrained" right="Intense" />
                     <CompactSlider label="Humor" tooltip="How much humor and wit" value={formData.toneProfile?.humorLevel || 3} onChange={(v) => updateToneProfile("humorLevel", v)} left="Serious" right="Playful" />
                     <CompactSlider label="Authority" tooltip="How authoritative the voice is" value={formData.toneProfile?.authorityLevel || 5} onChange={(v) => updateToneProfile("authorityLevel", v)} left="Humble" right="Expert" />
+                    <CompactSlider label="Warmth" tooltip="Compassion and personability (separate from emotion)" value={formData.toneProfile?.warmth || 5} onChange={(v) => updateToneProfile("warmth", v)} left="Cool" right="Warm" />
+                    <CompactSlider label="Directness" tooltip="Diplomatic vs. blunt communication" value={formData.toneProfile?.directness || 5} onChange={(v) => updateToneProfile("directness", v)} left="Indirect" right="Direct" />
+                    <CompactSlider label="Reader Intimacy" tooltip="How directly the writer relates to the reader" value={formData.toneProfile?.readerIntimacy || 5} onChange={(v) => updateToneProfile("readerIntimacy", v)} left="Distant" right="Close" />
                   </div>
                 </motion.div>
               )}
@@ -548,20 +552,27 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
                   </div>
 
                   <div className="space-y-4">
-                    <CompactSlider label="Velocity" tooltip="Pacing of plot/idea progression" value={formData.controls?.velocity || 5} onChange={(v) => updateControls("velocity", v)} left="Slow & Deep" right="Fast & Dynamic" />
-                    <CompactSlider label="Scope" tooltip="Controls the depth of detail" value={formData.controls?.scope || 5} onChange={(v) => updateControls("scope", v)} left="Concise" right="Expansive" />
-                    <CompactSlider label="Entity Complexity" tooltip="Depth of characters/concepts" value={formData.controls?.entityComplexity || 5} onChange={(v) => updateControls("entityComplexity", v)} left="Simple" right="Complex" />
-                    <CompactSlider label="Perspective" tooltip="Parallel threads that connect" value={formData.controls?.perspectiveMultiplexing || 3} onChange={(v) => updateControls("perspectiveMultiplexing", v)} left="Single Focus" right="Multi-Thread" />
+                    <CompactSlider label="Pacing / Velocity" tooltip="Pacing of plot/idea progression" value={formData.controls?.velocity || 5} onChange={(v) => updateControls("velocity", v)} left="Slow & Deep" right="Fast & Dynamic" />
+                    <CompactSlider label="Elaboration / Breadth" tooltip="Concise vs. expansive treatment" value={formData.controls?.scope || 5} onChange={(v) => updateControls("scope", v)} left="Concise" right="Expansive" />
+                    <CompactSlider label="Conceptual Complexity" tooltip="How sophisticated or layered the ideas are" value={formData.controls?.entityComplexity || 5} onChange={(v) => updateControls("entityComplexity", v)} left="Simple" right="Complex" />
+                    <CompactSlider label="Perspective / Thread Complexity" tooltip="Parallel threads that connect" value={formData.controls?.perspectiveMultiplexing || 3} onChange={(v) => updateControls("perspectiveMultiplexing", v)} left="Single Focus" right="Multi-Thread" />
                     <CompactSlider label="Creativity" tooltip="Creative license level" value={formData.controls?.creativity || 5} onChange={(v) => updateControls("creativity", v)} left="Conservative" right="Experimental" />
                     <CompactSlider label="Hook Frequency" tooltip="How often hooks and shifts appear" value={formData.controls?.hookFrequency || 5} onChange={(v) => updateControls("hookFrequency", v)} left="Contemplative" right="Rapid-Fire" />
+                    <CompactSlider label="Sensory Detail" tooltip="Sight, sound, taste, touch, smell" value={formData.controls?.sensoryDetail || 5} onChange={(v) => updateControls("sensoryDetail", v)} left="Sparse" right="Vivid" />
+                    <CompactSlider label="Sentence Variation" tooltip="Sentence length, rhythm and structure" value={formData.controls?.sentenceVariation || 5} onChange={(v) => updateControls("sentenceVariation", v)} left="Uniform" right="Varied" />
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                    <SectionLabel label="Divergence" tooltip="Allows story threads to diverge before converging" />
-                    <Switch
-                      checked={formData.controls?.divergenceAllowed}
-                      onCheckedChange={(v) => updateControls("divergenceAllowed", v)}
-                    />
+                    <SectionLabel label="Story Divergence" tooltip="How freely the story may depart from the outline. Canon is always protected." />
+                    <Select
+                      value={resolveDivergence(formData.controls as never)}
+                      onValueChange={(v) => setFormData((prev) => ({ ...prev, controls: { ...prev.controls!, divergenceMode: v as never, divergenceAllowed: v !== "strict" } }))}
+                    >
+                      <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DIVERGENCE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </motion.div>
               )}

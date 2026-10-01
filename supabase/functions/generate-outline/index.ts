@@ -1,3 +1,4 @@
+import { readSliders, renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
@@ -112,6 +113,8 @@ DYNAMISM CONTROLS:
 - Temporal Era: ${book.controls.temporalContext?.era || "contemporary"}
 - Timeline Structure: ${book.controls.temporalContext?.timelineStructure || "linear"}
 
+${renderExpressionBlock(readSliders(book.toneProfile, book.controls), resolveDivergence(book.controls))}
+
 TARGET WORD COUNT: ${book.controls.structureControls?.targetWordCount ? book.controls.structureControls.targetWordCount.toLocaleString() + " words" : "~50,000 words (default)"}
 - Plan chapters and subsections so that the total content will reach approximately this word count
 - Each subsection should produce roughly 400-800 words of prose
@@ -122,7 +125,7 @@ SECTIONS PER CHAPTER: Target ~${book.controls.structureControls?.sectionsPerChap
 STRUCTURE PREFERENCES:
 - Chapter Count: ${book.controls.structureControls?.chapterCount === "fixed" ? book.controls.structureControls.targetChapters + " chapters" : "flexible (scale to match target word count)"}
 - Titles Required: ${book.controls.structureControls?.titlesRequired ? "Yes" : "Optional"}
-- Divergence Allowed: ${book.controls.divergenceAllowed ? "Yes - parallel storylines permitted" : "No - keep focused"}
+- Story Divergence: ${resolveDivergence(book.controls)}
 
 ${isChildrensBook ? `
 CHILDREN'S BOOK SPECIAL REQUIREMENTS:
