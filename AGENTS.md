@@ -8,3 +8,6 @@
 - Writer Personas live in `supabase/functions/_shared/writers/personas.ts` (pure data + renderer shared by browser and backend); the book stores only `controls.writerId` (missing = best fit) and the rendered block sits in the static system prompt — voice survives model changes and stays prompt-cache safe.
 - Provider API keys are managed at app level (`/settings`), not per book — keys are per user.
 - 15 expression sliders + Story Divergence mode live in `supabase/functions/_shared/writers/sliders.ts` (pure, shared); legacy fields (velocity, scope, entityComplexity, perspectiveMultiplexing, emotionalIntensity, divergenceAllowed) are read through it — no data migration needed.
+- 48 Writer × Tier execution profiles live in `supabase/functions/_shared/writers/profiles.ts`; `book_model_configs.mode = "profile"` resolves roles from it with no per-role overrides or fallbacks — profiles are locked by design.
+- Live model prices are cached in `provider_pricing_cache` (signed-in read, service write) and refreshed from the gateway catalog when older than 24h via `_shared/ai/pricing.ts`; the registry prices are only a fallback.
+- `books.voice_manifest` is written once, server-side, on first section generation (`_shared/writers/manifest.ts`) and never overwritten.
