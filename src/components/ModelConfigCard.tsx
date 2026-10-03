@@ -10,6 +10,7 @@ import { ACTIVE_ROLES, MODEL_REGISTRY, ROLE_LABELS, USER_ROLES, modelLabel, type
 import { PROFILES, PROFILE_ROLE_LABELS, TIERS, type ProfileRole, type Tier } from "../../supabase/functions/_shared/writers/profiles";
 import { OPTIMIZED_LABEL, resolveModelForRole, type BookModelConfig, type ConfigMode } from "../../supabase/functions/_shared/ai/roles";
 
+type Pipeline = { totalWords: number; per1kWordsUsd: number | null; totalUsd: number | null; note: string; roles: { role: ProfileRole; model: string; thinking: boolean; costUsd: number | null; per1kWordsUsd: number | null }[] };
 type Estimate = { operation: string; model: string; estimatedCostUsd: number | null; note: string };
 
 const MODE_OPTIONS: { value: ConfigMode; label: string; desc: string }[] = [
@@ -27,6 +28,8 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
   const [pricesAt, setPricesAt] = useState<string | null>(null);
   const [config, setConfig] = useState<BookModelConfig>({ mode: "legacy" });
   const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
+  const [sources, setSources] = useState<string[]>([]);
   const [userKeys, setUserKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,6 +41,8 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
     setEstimates(data.estimates ?? []);
     setUserKeys(data.userKeyProviders ?? []);
     setPricesAt(data.pricesFetchedAt ?? null);
+    setPipeline(data.pipeline ?? null);
+    setSources(data.pricesSources ?? []);
     return data;
   };
 
@@ -160,7 +165,16 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
                     {e.operation.replace("_", " ")}: {e.estimatedCostUsd != null ? `~$${e.estimatedCostUsd.toFixed(4)}` : "unknown"} · {modelLabel(e.model)} · {e.note}
                   </p>
                 ))}
-                <p className="text-muted-foreground">Prices {pricesAt ? `last checked ${new Date(pricesAt).toLocaleString()}` : "not checked yet"}. Refreshed every 24 hours.</p>
+                {pipeline && (
+                  <div className="space-y-1 pt-2">
+                    <p className="font-medium">Whole book (~{pipeline.totalWords.toLocaleString()} words): {pipeline.totalUsd != null ? `~$${pipeline.totalUsd.toFixed(2)}` : "unknown"}{pipeline.per1kWordsUsd != null && ` · ~$${pipeline.per1kWordsUsd.toFixed(4)} per 1,000 words`}</p>
+                    {pipeline.roles.map((r) => (
+                      <p key={r.role} className="text-muted-foreground">{PROFILE_ROLE_LABELS[r.role]}: {r.costUsd != null ? `~$${r.costUsd.toFixed(2)}` : "unknown"} · {modelLabel(r.model)}{r.thinking ? " (thinking)" : ""}</p>
+                    ))}
+                    <p className="text-muted-foreground">{pipeline.note}</p>
+                  </div>
+                )}
+                <p className="text-muted-foreground">Prices {pricesAt ? `last checked ${new Date(pricesAt).toLocaleString()}` : "not checked yet"}{sources.length ? ` · from ${sources.join(", ")}` : ""}. Refreshed every 24 hours.</p>
               </div>
             )}
 
