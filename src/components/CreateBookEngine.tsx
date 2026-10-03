@@ -360,7 +360,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                     <Select value={formData.genre || ""} onValueChange={(v) => updateForm("genre", v)}>
                       <SelectTrigger><SelectValue placeholder="Choose a genre" /></SelectTrigger>
                       <SelectContent className="bg-popover z-50">
-                        {(formData.bookType ? BOOK_TYPE_GENRES[formData.bookType] : undefined ?? GENRE_PRESETS[currentCategory]).map((genre) => <SelectItem key={genre} value={genre}>{genre}</SelectItem>)}
+                        {((formData.bookType ? BOOK_TYPE_GENRES[formData.bookType] : undefined) ?? GENRE_PRESETS[currentCategory]).map((genre) => <SelectItem key={genre} value={genre}>{genre}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FieldGroup>
