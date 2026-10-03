@@ -1,4 +1,5 @@
-import { readSliders, renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
+import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
+import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
@@ -113,7 +114,7 @@ DYNAMISM CONTROLS:
 - Temporal Era: ${book.controls.temporalContext?.era || "contemporary"}
 - Timeline Structure: ${book.controls.temporalContext?.timelineStructure || "linear"}
 
-${renderExpressionBlock(readSliders(book.toneProfile, book.controls), resolveDivergence(book.controls))}
+${renderExpressionBlock(effectiveSlidersFor(book), resolveDivergence(book.controls))}
 
 TARGET WORD COUNT: ${book.controls.structureControls?.targetWordCount ? book.controls.structureControls.targetWordCount.toLocaleString() + " words" : "~50,000 words (default)"}
 - Plan chapters and subsections so that the total content will reach approximately this word count

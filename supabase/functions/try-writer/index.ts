@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
     try {
       const r = await generateAIText({ role: "writer", config: { mode: "profile", profileWriter: writer.id, profileTier: body.tier }, userId, bookId: null, request: { system, user, temperature: 0.8 } }, createAIDeps(admin, userId));
-      return json({ text: r.text.trim(), model: r.meta.model, effective });
+      return json({ text: r.text.trim(), model: r.meta.model, baseline_slider_values: base ?? null, effective_slider_values: effective });
     } catch (e) {
       if (e instanceof AIProviderError) return json({ error: e.message }, statusForAIError(e));
       throw e;

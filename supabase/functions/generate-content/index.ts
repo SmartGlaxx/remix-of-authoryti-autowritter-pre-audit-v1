@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildVoiceManifest } from "../_shared/writers/manifest.ts";
-import { readSliders, renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
+import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
+import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
@@ -297,7 +298,7 @@ BOOK CONTEXT:
 - POV: ${book.pov}
 - Tone: ${book.toneProfile.primary} (formality: ${book.toneProfile.formality}/10, emotion: ${book.toneProfile.emotionalIntensity}/10)
 
-${renderExpressionBlock(readSliders(book.toneProfile, book.controls), resolveDivergence(book.controls))}
+${renderExpressionBlock(effectiveSlidersFor(book), resolveDivergence(book.controls))}
 
 LANGUAGE & GRAMMAR LEVEL (IELTS Band ${band}):
 ${languageGuidelines}

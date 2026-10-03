@@ -30,7 +30,7 @@ describe("48 fixed writer profiles", () => {
   it("manifest stores all 15 effective values", () => {
     const m = buildVoiceManifest({ book_type: "novel", tone_profile: {}, controls: { writerId: "julian" } }, { mode: "profile", profileWriter: "julian", profileTier: "balanced" });
     expect(Object.keys(m.effective_slider_values)).toHaveLength(15);
-    expect(m.execution_tier).toBe("balanced"); expect(m.baselines_pending).toBe(true);
+    expect(m.execution_tier).toBe("balanced"); expect(m.baselines_pending).toBe(false); expect(m.baseline_slider_values?.creativity).toBe(10);
   });
 });
 
@@ -40,4 +40,16 @@ describe("DeepSeek thinking as a mode, not a model", () => {
   it("profile resolution carries thinking", () => {
     expect(resolveModelForRole({ mode: "profile", profileWriter: "maya", profileTier: "economy" }, "writer")).toMatchObject({ model: "deepseek/deepseek-flash", thinking: false });
   });
+});
+
+import { WRITER_BASELINES, effectiveSlidersFor } from "../../supabase/functions/_shared/writers/manifest";
+describe("canonical baselines", () => {
+  it("all 12 writers have 15 values in 1–10", () => {
+    for (const w of WRITER_PERSONAS) { const b = WRITER_BASELINES[w.id]!; expect(Object.keys(b)).toHaveLength(15); for (const v of Object.values(b)) expect(v >= 1 && v <= 10).toBe(true); }
+  });
+  it("book sliders are held to baseline ±2", () => {
+    const e = effectiveSlidersFor({ book_type: "novel", tone_profile: { formality: 1 }, controls: { writerId: "claire", creativity: 10 } });
+    expect(e.formality).toBe(7); expect(e.creativity).toBe(6);
+  });
+  it("adaptive → deep thinking", () => expect(resolveModelForRole({ mode: "profile", profileWriter: "sophia", profileTier: "maximum" }, "writer").thinking).toBe("deep"));
 });

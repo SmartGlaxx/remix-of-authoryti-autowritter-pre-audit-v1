@@ -69,7 +69,7 @@ export interface ResolvedModel {
   fallback: string | null;
   source: ConfigMode;
   reasoning?: "low" | "medium" | "high";
-  thinking?: boolean;
+  thinking?: boolean | "deep";
 }
 
 function validKey(k: unknown): k is string {
