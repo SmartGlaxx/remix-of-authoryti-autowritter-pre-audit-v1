@@ -12,7 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ModelConfigCard } from "@/components/ModelConfigCard";
 import { Link } from "react-router-dom";
-import { SLIDERS, readSliders, resolveDivergence, DIVERGENCE_OPTIONS } from "../../supabase/functions/_shared/writers/sliders";
+import { SLIDERS, resolveDivergence, DIVERGENCE_OPTIONS } from "../../supabase/functions/_shared/writers/sliders";
+import { effectiveSlidersFor } from "../../supabase/functions/_shared/writers/manifest";
 
 import {
   Book,
@@ -42,7 +43,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     book.controls.writerId = id;
     toast.success("Writer updated");
   };
-  const sliders = readSliders(book.toneProfile as never, book.controls as never);
+  const sliders = effectiveSlidersFor({ bookType: book.bookType, toneProfile: book.toneProfile, controls: book.controls });
   const divergence = resolveDivergence(book.controls as never);
   const typeInfo = BOOK_TYPE_INFO[book.bookType];
   const povOption = POV_OPTIONS.find((p) => p.value === book.pov);
