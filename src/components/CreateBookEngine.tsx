@@ -156,6 +156,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
 
   const handleBookTypeChange = (type: BookType) => {
     updateForm("bookType", type);
+    updateForm("genre", undefined);
     // Image Generation is temporarily disabled across the app for the test launch.
     updateForm("controls", { ...getDefaultControls(type), imageGeneration: false, automationLevel: "" as AutomationLevel, depthLevel: "" as DepthLevel, temporalContext: { era: "" as TemporalEra, timelineStructure: "" as TimelineStructure }, structureControls: { ...getDefaultControls(type).structureControls, chapterCount: "" as any, sectionsPerChapterMode: "" as any } });
     const allowed = BOOK_TYPE_AUDIENCES[type];
@@ -205,6 +206,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
       title: sanitizeText((formData.title || "").trim()).substring(0, 200),
       theme: sanitizeText((formData.theme || "").trim()).substring(0, 1000),
       subtitle: formData.subtitle ? sanitizeText(formData.subtitle.trim()).substring(0, 300) : undefined,
+      genre: formData.genre ? sanitizeText(formData.genre.trim()).substring(0, 100) : undefined,
     } as CreateBookInput;
     onCreate(sanitized);
   };
@@ -354,6 +356,15 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                     })}
                   </div>
 
+                  <FieldGroup label="Genre">
+                    <Select value={formData.genre || ""} onValueChange={(v) => updateForm("genre", v)}>
+                      <SelectTrigger><SelectValue placeholder="Choose a genre" /></SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {((formData.bookType ? BOOK_TYPE_GENRES[formData.bookType] : undefined) ?? GENRE_PRESETS[currentCategory]).map((genre) => <SelectItem key={genre} value={genre}>{genre}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FieldGroup>
+
                   {/* Template selection for visual book types */}
                   {isVisualBookType && formData.bookType && (
                     <div id="template-section">
@@ -395,21 +406,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                     />
                   </FieldGroup>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <FieldGroup label="Genre">
-                      <Select value={formData.genre || ""} onValueChange={(v) => updateForm("genre", v)}>
-                        <SelectTrigger className="text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent className="bg-popover z-50">
-                          {(formData.bookType && BOOK_TYPE_GENRES[formData.bookType]
-                            ? BOOK_TYPE_GENRES[formData.bookType]!
-                            : GENRE_PRESETS[currentCategory]
-                          ).map((genre) => (
-                            <SelectItem key={genre} value={genre}>{genre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FieldGroup>
-
+                  <div>
                     <FieldGroup label="Audience *">
                       <Select value={formData.audience || ""} onValueChange={(v) => updateForm("audience", v)}>
                         <SelectTrigger className="text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
