@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { ArrowLeft, Loader2, Lock, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Bookmark, Loader2, Lock, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -7,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from "@/integrations/supabase/client";
 import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
 import { WRITER_PORTRAITS } from "@/components/WriterPicker";
-import { WRITER_PERSONAS } from "../../supabase/functions/_shared/writers/personas";
+import { WRITER_PERSONAS, bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { SLIDERS, MAX_ADJUST, DIVERGENCE_OPTIONS, type SliderValues, type DivergenceMode } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
 import { AUDIENCE_OPTIONS, BOOK_TYPE_AUDIENCES, BOOK_TYPE_GENRES, BOOK_TYPE_INFO, ENABLED_BOOK_TYPES, type BookType, type CreateBookInput } from "@/types/book";
@@ -30,59 +32,139 @@ export function ideaToInput(i: BookIdea): Partial<CreateBookInput> {
   };
 }
 
+type LightIdea = Pick<BookIdea, "title" | "subtitle" | "description" | "bookType" | "genre" | "audience">;
+interface SavedRow { id: string; title: string; subtitle: string; description: string; book_type: string; genre: string; audience: string; details: Pick<BookIdea, "writerId" | "whyThisWriter" | "divergence" | "sliders"> | null }
+
+const invokeIdeas = async (body: Record<string, unknown>) => {
+  const { data, error } = await supabase.functions.invoke("book-ideas", { body: { ...body, catalog: catalog() } });
+  const msg = (data as { error?: string })?.error || (error ? (await (error as { context?: Response }).context?.json?.().catch(() => null))?.error ?? error.message : null);
+  if (msg) throw new Error(msg);
+  return data.ideas as BookIdea[];
+};
+const rowToIdea = (r: SavedRow): BookIdea => {
+  const bt = r.book_type as BookType;
+  const d = r.details ?? { writerId: bestWriterFor(bt).id, whyThisWriter: "", divergence: "strict" as DivergenceMode, sliders: null };
+  return { title: r.title, subtitle: r.subtitle, description: r.description, bookType: bt, genre: r.genre, audience: r.audience, ...d };
+};
+
 export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; onAccept: (input: Partial<CreateBookInput>) => void }) {
+  const [tab, setTab] = useState<"new" | "saved">("new");
   const [brief, setBrief] = useState("");
-  const [ideas, setIdeas] = useState<BookIdea[]>([]);
+  const [ideas, setIdeas] = useState<LightIdea[]>([]);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [open, setOpen] = useState<number | null>(null);
+  const [saved, setSaved] = useState<SavedRow[]>([]);
+  const [open, setOpen] = useState<SavedRow | null>(null);
+
+  const loadSaved = async () => {
+    const { data } = await supabase.from("saved_book_ideas").select("id,title,subtitle,description,book_type,genre,audience,details").order("created_at", { ascending: false });
+    setSaved((data ?? []) as unknown as SavedRow[]);
+  };
+  useEffect(() => { loadSaved(); }, []);
 
   const run = async () => {
     setLoading(true); setErr(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("book-ideas", { body: { brief, count: 4, catalog: catalog() } });
-      const msg = (data as { error?: string })?.error || (error ? (await (error as { context?: Response }).context?.json?.().catch(() => null))?.error ?? error.message : null);
-      if (msg) throw new Error(msg);
-      setIdeas(data.ideas);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+    try { setIdeas(await invokeIdeas({ brief, count: 6, mode: "light" })); setPicked(new Set()); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   };
+
+  // Full setup (writer, voice, divergence) is generated only for the ideas the author chose to save.
+  const savePicked = async () => {
+    setSaving(true); setErr(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+    let ok = 0;
+    for (const n of [...picked]) {
+      const base = ideas[n];
+      try {
+        const [full] = await invokeIdeas({ mode: "details", idea: base });
+        const { error } = await supabase.from("saved_book_ideas").insert({
+          user_id: user.id, title: full.title, subtitle: full.subtitle, description: full.description, book_type: full.bookType, genre: full.genre, audience: full.audience,
+          details: { writerId: full.writerId, whyThisWriter: full.whyThisWriter, divergence: full.divergence, sliders: full.sliders } as never,
+        });
+        if (error) throw error;
+        ok++;
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    }
+    setIdeas((p) => p.filter((_, k) => !picked.has(k))); setPicked(new Set());
+    await loadSaved(); setSaving(false);
+    if (ok) { toast.success(`Saved ${ok} idea${ok > 1 ? "s" : ""}`); setTab("saved"); }
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("saved_book_ideas").delete().eq("id", id);
+    setSaved((p) => p.filter((r) => r.id !== id));
+  };
+  const updateSaved = async (row: SavedRow, i: BookIdea) => {
+    const next: SavedRow = { ...row, title: i.title, subtitle: i.subtitle, description: i.description, audience: i.audience, details: { writerId: i.writerId, whyThisWriter: i.whyThisWriter, divergence: i.divergence, sliders: i.sliders } };
+    setOpen(next); setSaved((p) => p.map((r) => (r.id === row.id ? next : r)));
+    await supabase.from("saved_book_ideas").update({ title: next.title, subtitle: next.subtitle, description: next.description, audience: next.audience, details: next.details as never }).eq("id", row.id);
+  };
+
+  const Card = ({ i, children, onClick }: { i: LightIdea; children?: React.ReactNode; onClick?: () => void }) => (
+    <div onClick={onClick} className={`space-y-2 rounded-2xl border bg-card p-4 text-left transition-colors ${onClick ? "cursor-pointer hover:border-primary/50" : ""} border-border`}>
+      <div className="text-[11px] uppercase tracking-wide text-primary">{BOOK_TYPE_INFO[i.bookType]?.label}{i.genre && ` · ${i.genre}`} · {audienceLabel(i.audience)}</div>
+      <h3 className="font-serif text-lg font-semibold leading-tight">{i.title}</h3>
+      {i.subtitle && <p className="text-sm text-muted-foreground">{i.subtitle}</p>}
+      <p className="line-clamp-4 text-sm">{i.description}</p>
+      {children}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
           <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back"><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-serif text-xl font-semibold">Book Ideas</h1>
-            <p className="truncate text-sm text-muted-foreground">Complete book setups — title, description, audience, writer and voice.</p>
+            <p className="truncate text-sm text-muted-foreground">Browse ideas, save the ones you like, start a book from any saved idea.</p>
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant={tab === "new" ? "secondary" : "ghost"} className="rounded-full" onClick={() => setTab("new")}>New ideas</Button>
+            <Button size="sm" variant={tab === "saved" ? "secondary" : "ghost"} className="rounded-full" onClick={() => setTab("saved")}>Saved ({saved.length})</Button>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <div className="space-y-2">
-          <Textarea value={brief} maxLength={600} rows={3} onChange={(e) => setBrief(e.target.value)} placeholder="Optional: what are you in the mood for? e.g. a cozy mystery for adults, or a practical guide to starting a bakery…" />
-          <Button className="rounded-full" onClick={run} disabled={loading}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{ideas.length ? "Generate new ideas" : "Generate ideas"}</Button>
-          {err && <p className="text-sm text-destructive">{err}</p>}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {ideas.map((i, n) => {
-            const w = WRITER_PERSONAS.find((p) => p.id === i.writerId)!;
-            return (
-              <button key={n} type="button" onClick={() => setOpen(n)} className="space-y-2 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50">
-                <div className="text-[11px] uppercase tracking-wide text-primary">{BOOK_TYPE_INFO[i.bookType]?.label}{i.genre && ` · ${i.genre}`}</div>
-                <h3 className="font-serif text-lg font-semibold leading-tight">{i.title}</h3>
-                {i.subtitle && <p className="text-sm text-muted-foreground">{i.subtitle}</p>}
-                <p className="line-clamp-3 text-sm">{i.description}</p>
-                <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-                  <img src={WRITER_PORTRAITS[w.id]} alt={w.name} className="h-6 w-6 rounded-full object-cover" />{w.name} · {audienceLabel(i.audience)}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {tab === "new" ? (<>
+          <div className="space-y-2">
+            <Textarea value={brief} maxLength={600} rows={3} onChange={(e) => setBrief(e.target.value)} placeholder="Optional: what are you in the mood for? e.g. a cozy mystery for adults, or a practical guide to starting a bakery…" />
+            <div className="flex flex-wrap gap-2">
+              <Button className="rounded-full" onClick={run} disabled={loading || saving}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{ideas.length ? "Generate new ideas" : "Generate ideas"}</Button>
+              {ideas.length > 0 && <Button variant="secondary" className="rounded-full" onClick={savePicked} disabled={!picked.size || saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bookmark className="mr-2 h-4 w-4" />}{saving ? "Preparing full setups…" : `Save selected (${picked.size})`}</Button>}
+            </div>
+            {err && <p className="text-sm text-destructive">{err}</p>}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {ideas.map((i, n) => (
+              <Card key={n} i={i} onClick={() => setPicked((p) => { const s = new Set(p); s.has(n) ? s.delete(n) : s.add(n); return s; })}>
+                <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground"><Checkbox checked={picked.has(n)} />Select to save</label>
+              </Card>
+            ))}
+          </div>
+        </>) : (
+          saved.length ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {saved.map((r) => { const i = rowToIdea(r); const w = WRITER_PERSONAS.find((p) => p.id === i.writerId); return (
+                <Card key={r.id} i={i}>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    {w ? <span className="flex items-center gap-2 text-xs text-muted-foreground"><img src={WRITER_PORTRAITS[w.id]} alt={w.name} className="h-6 w-6 rounded-full object-cover" />{w.name}</span> : <span />}
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => remove(r.id)} aria-label="Remove"><Trash2 className="h-4 w-4" /></Button>
+                      <Button size="sm" className="rounded-full" onClick={() => setOpen(r)}>Open</Button>
+                    </div>
+                  </div>
+                </Card>
+              ); })}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">No saved ideas yet. Generate some and save the ones you like.</p>
+        )}
       </main>
-      {open != null && ideas[open] && (
-        <IdeaDialog idea={ideas[open]} onClose={() => setOpen(null)} onChange={(u) => setIdeas((p) => p.map((x, k) => (k === open ? u : x)))} onAccept={(u) => onAccept(ideaToInput(u))} />
+      {open && (
+        <IdeaDialog idea={rowToIdea(open)} onClose={() => setOpen(null)} onChange={(u) => updateSaved(open, u)} onAccept={(u) => onAccept(ideaToInput(u))} />
       )}
     </div>
   );
