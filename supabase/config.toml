@@ -1,3 +1,6 @@
 project_id = "xzouixkrflcexvxpqhrz"
 [functions.try-writer]
 verify_jwt = false
+
+[functions.book-ideas]
+verify_jwt = false

@@ -24,3 +24,5 @@
 - [x] Try a Writer page (/writers): writer, tier, locked models, 15 sliders, sample — saves nothing
 - [x] New-book sliders limited to writer baseline ±2 in the UI
 - [x] Whole-book cost by Draft/Revision/Continuity/Audit, per 1,000 words, with price source + date
+- [x] Book Ideas generator (+ → Get book ideas; OpenAI only; accept/adjust modal; sliders ±2, models locked)
+- [x] Fix: Claude rejects temperature (Test voice error)

@@ -195,7 +195,8 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
     // "deep" = adaptive thinking (Opus 5.x rejects fixed budgets); true = fixed-budget extended thinking.
     if (req.thinking === "deep") { body.thinking = { type: "adaptive" }; body.max_tokens = Math.max(Number(body.max_tokens), 32000); }
     else { body.max_tokens = Math.max(Number(body.max_tokens), 16000); body.thinking = { type: "enabled", budget_tokens: 8000 }; }
-  } else if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
+  }
+  // Newer Claude models reject `temperature` ("deprecated for this model"); Anthropic calls never send sampling params.
   const res = await post(ctx, url, { "anthropic-version": "2023-06-01", ...headers }, body, provider);
   let input: number | null = null, cached: number | null = null, requestId: string | null = null;
   for await (const { data } of sseEvents(res.body!)) {
