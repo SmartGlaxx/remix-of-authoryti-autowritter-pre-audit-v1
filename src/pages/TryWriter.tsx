@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
+import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { WRITER_PORTRAITS } from "@/components/WriterPicker";
@@ -17,7 +17,7 @@ const short = (id: string) => id.split("/")[1]?.replace(/-/g, " ") ?? id;
 export default function TryWriter() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [writerId, setWriterId] = useState(WRITER_PERSONAS[0].id);
+  const [writerId, setWriterId] = useState(() => { const w = new URLSearchParams(window.location.search).get("writer"); return WRITER_PERSONAS.some((p) => p.id === w) ? w! : WRITER_PERSONAS[0].id; });
   const [tier, setTier] = useState<Tier>("balanced");
   const [divergence, setDivergence] = useState<DivergenceMode>("strict");
   const baseline = WRITER_BASELINES[writerId] ?? null;
@@ -103,8 +103,8 @@ export default function TryWriter() {
               <div key={g} className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                 {groups[g].map((s) => { const [lo, hi] = range(s.key); return (
                   <div key={s.key} className="space-y-1.5">
-                    <div className="flex justify-between text-xs"><span>{s.label}</span><span className="text-muted-foreground">{values[s.key]}</span></div>
-                    <Slider min={lo} max={hi} step={1} value={[values[s.key]]} onValueChange={([v]) => setValues((p) => ({ ...p, [s.key]: v }))} />
+                    <div className="flex justify-between text-xs"><span>{s.label}</span><span className="text-muted-foreground">{values[s.key]}{offsetLabel(values[s.key], baseline?.[s.key])}</span></div>
+                    <BoundedSlider label={s.label} range={[lo, hi]} base={baseline?.[s.key]} value={values[s.key]} onChange={(v) => setValues((p) => ({ ...p, [s.key]: v }))} />
                     <div className="flex justify-between text-[10px] text-muted-foreground"><span>{s.low}</span><span>{s.high}</span></div>
                   </div>
                 ); })}
