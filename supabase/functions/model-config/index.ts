@@ -11,16 +11,17 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-Deno.// deno-lint-ignore no-explicit-any
+// deno-lint-ignore no-explicit-any
 function bookLengthWords(book: any): number {
   const target = Number(book.controls?.structureControls?.targetWordCount);
   if (Number.isFinite(target) && target > 0) return target;
   const ch = book.outline?.chapters ?? [];
+  // deno-lint-ignore no-explicit-any
   const subs = ch.reduce((n: number, c: any) => n + (c?.subsections?.length ?? 0), 0);
   return Math.max(subs * 600, book.word_count ?? 0, 30000);
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
