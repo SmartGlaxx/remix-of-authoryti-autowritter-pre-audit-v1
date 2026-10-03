@@ -192,9 +192,9 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
   if (req.system) body.system = req.system;
   if (req.thinking) {
     // Extended thinking: budget must be below max_tokens and sampling params must be unset.
-    const budget = req.thinking === "deep" ? 16000 : 8000;
-    body.max_tokens = Math.max(Number(body.max_tokens), budget + 8000);
-    body.thinking = { type: "enabled", budget_tokens: budget };
+    // "deep" = adaptive thinking (Opus 5.x rejects fixed budgets); true = fixed-budget extended thinking.
+    if (req.thinking === "deep") { body.thinking = { type: "adaptive" }; body.max_tokens = Math.max(Number(body.max_tokens), 32000); }
+    else { body.max_tokens = Math.max(Number(body.max_tokens), 16000); body.thinking = { type: "enabled", budget_tokens: 8000 }; }
   } else if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
   const res = await post(ctx, url, { "anthropic-version": "2023-06-01", ...headers }, body, provider);
   let input: number | null = null, cached: number | null = null, requestId: string | null = null;

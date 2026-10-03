@@ -12,3 +12,4 @@
 - Live model prices are cached in `provider_pricing_cache` (signed-in read, service write) and refreshed from the gateway catalog when older than 24h via `_shared/ai/pricing.ts`; the registry prices are only a fallback.
 - `books.voice_manifest` is written once, server-side, on first section generation (`_shared/writers/manifest.ts`) and never overwritten.
 - Try Writer (`try-writer` + /writers) is preview-only: it never writes books, manifests or story memory; DeepSeek thinking is a request parameter derived from the profile slot mode, never a separate model id.
+- DeepSeek prices come from parsing its official pricing page at peak rates (no price API); Claude "adaptive" profile slots send thinking type adaptive (Opus 5.x rejects fixed budgets), "extended" sends a fixed budget.

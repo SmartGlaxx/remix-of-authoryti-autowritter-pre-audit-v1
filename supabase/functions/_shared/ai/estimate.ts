@@ -40,3 +40,41 @@ export function estimateOperationCosts(config: BookModelConfig | null | undefine
     mk("manuscript_audit", "manuscript_auditor", totalWords * TOKENS_PER_WORD, 6000, "Whole-book audit (on demand)"),
   ];
 }
+
+// ── Pipeline estimate: Draft → Revision → Continuity → Auditor for the configured roles ──
+export interface PipelineRoleCost { role: "draft" | "revision" | "continuity" | "auditor"; model: string; thinking: boolean; costUsd: number | null; per1kWordsUsd: number | null }
+export interface PipelineEstimate { totalWords: number; roles: PipelineRoleCost[]; per1kWordsUsd: number | null; totalUsd: number | null; note: string }
+
+const SECTION_WORDS = 600;
+/** Thinking/reasoning tokens are billed as output by every provider we use; assume +50% output when on. */
+const THINKING_OUTPUT_FACTOR = 1.5;
+
+function priceOf(model: string, live?: PriceMap): { inputPerM: number; outputPerM: number } | null {
+  const lp = live?.[model];
+  if (lp?.inputPerM != null && lp?.outputPerM != null) return { inputPerM: lp.inputPerM, outputPerM: lp.outputPerM };
+  const p = getModel(model)?.pricing;
+  return p?.inputPerM != null && p?.outputPerM != null ? { inputPerM: p.inputPerM, outputPerM: p.outputPerM } : null;
+}
+
+export function estimatePipeline(config: BookModelConfig | null | undefined, totalWords: number, live?: PriceMap): PipelineEstimate {
+  const words = Math.max(SECTION_WORDS, Math.round(totalWords));
+  const sections = Math.ceil(words / SECTION_WORDS);
+  const outTok = words * TOKENS_PER_WORD;
+  // [pipeline role, executing role, input tokens, output tokens] — cache-free (conservative).
+  const plan: [PipelineRoleCost["role"], Parameters<typeof resolveModelForRole>[1], number, number][] = [
+    ["draft", "writer", sections * 20000, outTok],
+    ["revision", "editor", sections * 3000 + outTok, outTok],
+    ["continuity", "continuity_checker", sections * 8000 + outTok, sections * 800],
+    ["auditor", "manuscript_auditor", outTok + 4000, 6000],
+  ];
+  const roles = plan.map(([role, exec, inp, out]) => {
+    const r = resolveModelForRole(config, exec);
+    const thinking = !!(r.thinking || r.reasoning);
+    const pr = priceOf(r.model, live);
+    const cost = pr ? (inp * pr.inputPerM + out * (thinking ? THINKING_OUTPUT_FACTOR : 1) * pr.outputPerM) / 1e6 : null;
+    return { role, model: r.model, thinking, costUsd: cost == null ? null : Math.round(cost * 1e4) / 1e4, per1kWordsUsd: cost == null ? null : Math.round((cost / words) * 1000 * 1e4) / 1e4 };
+  });
+  const known = roles.every((r) => r.costUsd != null);
+  const total = known ? roles.reduce((n, r) => n + r.costUsd!, 0) : null;
+  return { totalWords: words, roles, totalUsd: total == null ? null : Math.round(total * 100) / 100, per1kWordsUsd: total == null ? null : Math.round((total / words) * 1000 * 1e4) / 1e4, note: "Estimate without cache discounts; thinking billed as extra output." };
+}

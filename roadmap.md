@@ -19,6 +19,8 @@
 - [x] Book Voice Manifest (all 15 values; baselines filled when matrix arrives)
 - [ ] Custom writers (same 15 sliders, ±2, cap 20)
 - [x] provider_pricing_cache — signed-in read only, 24h refresh from gateway catalog
-- [ ] DeepSeek prices (no price API) — need official numbers
-- [x] DeepSeek thinking on/off wired from profile mode + Gemini effort + Claude extended thinking applied
+- [x] DeepSeek prices read from the official pricing page (peak rate), refreshed every 24h + manual
+- [x] Thinking settings sent to all 4 providers — live-tested (OpenAI, Claude Opus adaptive + Haiku extended, Gemini, DeepSeek on/off)
 - [x] Try a Writer page (/writers): writer, tier, locked models, 15 sliders, sample — saves nothing
+- [x] New-book sliders limited to writer baseline ±2 in the UI
+- [x] Whole-book cost by Draft/Revision/Continuity/Audit, per 1,000 words, with price source + date

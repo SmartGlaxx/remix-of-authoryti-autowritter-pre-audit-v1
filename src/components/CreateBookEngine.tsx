@@ -2,6 +2,8 @@ import { DIVERGENCE_OPTIONS, resolveDivergence } from "../../supabase/functions/
 import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { WriterPicker } from "@/components/WriterPicker";
+import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
+import { MAX_ADJUST, type SliderKey } from "../../supabase/functions/_shared/writers/sliders";
 import { sanitizeText } from "@/lib/sanitize";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, ChevronLeft, Sparkles, HelpCircle, Settings2, Palette, BookOpen, Sliders, Check } from "lucide-react";
@@ -105,6 +107,19 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
       controls: { ...prev.controls!, [key]: value },
     }));
   };
+
+  // ±2 around the selected writer's canonical baseline (1–10); reset to baseline when the writer changes.
+  const activeWriterId = formData.controls?.writerId ?? bestWriterFor(formData.bookType).id;
+  const baseline = WRITER_BASELINES[activeWriterId];
+  const rangeFor = (k: SliderKey): [number, number] => baseline ? [Math.max(1, baseline[k] - MAX_ADJUST), Math.min(10, baseline[k] + MAX_ADJUST)] : [1, 10];
+  useEffect(() => {
+    if (!baseline) return;
+    setFormData((prev) => ({
+      ...prev,
+      toneProfile: { ...prev.toneProfile!, formality: baseline.formality, emotionalIntensity: baseline.emotion, warmth: baseline.warmth, humorLevel: baseline.humor, authorityLevel: baseline.authority, directness: baseline.directness, readerIntimacy: baseline.readerIntimacy },
+      controls: { ...prev.controls!, velocity: baseline.pacing, scope: baseline.elaboration, entityComplexity: baseline.conceptualComplexity, perspectiveMultiplexing: baseline.perspective, creativity: baseline.creativity, hookFrequency: baseline.hookFrequency, sensoryDetail: baseline.sensoryDetail, sentenceVariation: baseline.sentenceVariation },
+    }));
+  }, [activeWriterId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateToneProfile = (key: keyof CreateBookInput["toneProfile"], value: any) => {
     setFormData((prev) => ({
@@ -530,13 +545,13 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
                   </div>
 
                   <div className="pt-3 border-t border-border/50 space-y-4">
-                    <CompactSlider label="Formality" tooltip="How formal vs. casual" value={formData.toneProfile?.formality || 5} onChange={(v) => updateToneProfile("formality", v)} left="Casual" right="Formal" />
-                    <CompactSlider label="Emotion" tooltip="Level of emotional expression" value={formData.toneProfile?.emotionalIntensity || 5} onChange={(v) => updateToneProfile("emotionalIntensity", v)} left="Restrained" right="Intense" />
-                    <CompactSlider label="Humor" tooltip="How much humor and wit" value={formData.toneProfile?.humorLevel || 3} onChange={(v) => updateToneProfile("humorLevel", v)} left="Serious" right="Playful" />
-                    <CompactSlider label="Authority" tooltip="How authoritative the voice is" value={formData.toneProfile?.authorityLevel || 5} onChange={(v) => updateToneProfile("authorityLevel", v)} left="Humble" right="Expert" />
-                    <CompactSlider label="Warmth" tooltip="Compassion and personability (separate from emotion)" value={formData.toneProfile?.warmth || 5} onChange={(v) => updateToneProfile("warmth", v)} left="Cool" right="Warm" />
-                    <CompactSlider label="Directness" tooltip="Diplomatic vs. blunt communication" value={formData.toneProfile?.directness || 5} onChange={(v) => updateToneProfile("directness", v)} left="Indirect" right="Direct" />
-                    <CompactSlider label="Reader Intimacy" tooltip="How directly the writer relates to the reader" value={formData.toneProfile?.readerIntimacy || 5} onChange={(v) => updateToneProfile("readerIntimacy", v)} left="Distant" right="Close" />
+                    <CompactSlider range={rangeFor("formality")} label="Formality" tooltip="How formal vs. casual" value={formData.toneProfile?.formality || 5} onChange={(v) => updateToneProfile("formality", v)} left="Casual" right="Formal" />
+                    <CompactSlider range={rangeFor("emotion")} label="Emotion" tooltip="Level of emotional expression" value={formData.toneProfile?.emotionalIntensity || 5} onChange={(v) => updateToneProfile("emotionalIntensity", v)} left="Restrained" right="Intense" />
+                    <CompactSlider range={rangeFor("humor")} label="Humor" tooltip="How much humor and wit" value={formData.toneProfile?.humorLevel || 3} onChange={(v) => updateToneProfile("humorLevel", v)} left="Serious" right="Playful" />
+                    <CompactSlider range={rangeFor("authority")} label="Authority" tooltip="How authoritative the voice is" value={formData.toneProfile?.authorityLevel || 5} onChange={(v) => updateToneProfile("authorityLevel", v)} left="Humble" right="Expert" />
+                    <CompactSlider range={rangeFor("warmth")} label="Warmth" tooltip="Compassion and personability (separate from emotion)" value={formData.toneProfile?.warmth || 5} onChange={(v) => updateToneProfile("warmth", v)} left="Cool" right="Warm" />
+                    <CompactSlider range={rangeFor("directness")} label="Directness" tooltip="Diplomatic vs. blunt communication" value={formData.toneProfile?.directness || 5} onChange={(v) => updateToneProfile("directness", v)} left="Indirect" right="Direct" />
+                    <CompactSlider range={rangeFor("readerIntimacy")} label="Reader Intimacy" tooltip="How directly the writer relates to the reader" value={formData.toneProfile?.readerIntimacy || 5} onChange={(v) => updateToneProfile("readerIntimacy", v)} left="Distant" right="Close" />
                   </div>
                 </motion.div>
               )}
@@ -552,14 +567,14 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
                   </div>
 
                   <div className="space-y-4">
-                    <CompactSlider label="Pacing / Velocity" tooltip="Pacing of plot/idea progression" value={formData.controls?.velocity || 5} onChange={(v) => updateControls("velocity", v)} left="Slow & Deep" right="Fast & Dynamic" />
-                    <CompactSlider label="Elaboration / Breadth" tooltip="Concise vs. expansive treatment" value={formData.controls?.scope || 5} onChange={(v) => updateControls("scope", v)} left="Concise" right="Expansive" />
-                    <CompactSlider label="Conceptual Complexity" tooltip="How sophisticated or layered the ideas are" value={formData.controls?.entityComplexity || 5} onChange={(v) => updateControls("entityComplexity", v)} left="Simple" right="Complex" />
-                    <CompactSlider label="Perspective / Thread Complexity" tooltip="Parallel threads that connect" value={formData.controls?.perspectiveMultiplexing || 3} onChange={(v) => updateControls("perspectiveMultiplexing", v)} left="Single Focus" right="Multi-Thread" />
-                    <CompactSlider label="Creativity" tooltip="Creative license level" value={formData.controls?.creativity || 5} onChange={(v) => updateControls("creativity", v)} left="Conservative" right="Experimental" />
-                    <CompactSlider label="Hook Frequency" tooltip="How often hooks and shifts appear" value={formData.controls?.hookFrequency || 5} onChange={(v) => updateControls("hookFrequency", v)} left="Contemplative" right="Rapid-Fire" />
-                    <CompactSlider label="Sensory Detail" tooltip="Sight, sound, taste, touch, smell" value={formData.controls?.sensoryDetail || 5} onChange={(v) => updateControls("sensoryDetail", v)} left="Sparse" right="Vivid" />
-                    <CompactSlider label="Sentence Variation" tooltip="Sentence length, rhythm and structure" value={formData.controls?.sentenceVariation || 5} onChange={(v) => updateControls("sentenceVariation", v)} left="Uniform" right="Varied" />
+                    <CompactSlider range={rangeFor("pacing")} label="Pacing / Velocity" tooltip="Pacing of plot/idea progression" value={formData.controls?.velocity || 5} onChange={(v) => updateControls("velocity", v)} left="Slow & Deep" right="Fast & Dynamic" />
+                    <CompactSlider range={rangeFor("elaboration")} label="Elaboration / Breadth" tooltip="Concise vs. expansive treatment" value={formData.controls?.scope || 5} onChange={(v) => updateControls("scope", v)} left="Concise" right="Expansive" />
+                    <CompactSlider range={rangeFor("conceptualComplexity")} label="Conceptual Complexity" tooltip="How sophisticated or layered the ideas are" value={formData.controls?.entityComplexity || 5} onChange={(v) => updateControls("entityComplexity", v)} left="Simple" right="Complex" />
+                    <CompactSlider range={rangeFor("perspective")} label="Perspective / Thread Complexity" tooltip="Parallel threads that connect" value={formData.controls?.perspectiveMultiplexing || 3} onChange={(v) => updateControls("perspectiveMultiplexing", v)} left="Single Focus" right="Multi-Thread" />
+                    <CompactSlider range={rangeFor("creativity")} label="Creativity" tooltip="Creative license level" value={formData.controls?.creativity || 5} onChange={(v) => updateControls("creativity", v)} left="Conservative" right="Experimental" />
+                    <CompactSlider range={rangeFor("hookFrequency")} label="Hook Frequency" tooltip="How often hooks and shifts appear" value={formData.controls?.hookFrequency || 5} onChange={(v) => updateControls("hookFrequency", v)} left="Contemplative" right="Rapid-Fire" />
+                    <CompactSlider range={rangeFor("sensoryDetail")} label="Sensory Detail" tooltip="Sight, sound, taste, touch, smell" value={formData.controls?.sensoryDetail || 5} onChange={(v) => updateControls("sensoryDetail", v)} left="Sparse" right="Vivid" />
+                    <CompactSlider range={rangeFor("sentenceVariation")} label="Sentence Variation" tooltip="Sentence length, rhythm and structure" value={formData.controls?.sentenceVariation || 5} onChange={(v) => updateControls("sentenceVariation", v)} left="Uniform" right="Varied" />
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-border/50">
@@ -892,6 +907,7 @@ const ToggleRow = ({
 );
 
 const CompactSlider = ({
+  range,
   label,
   tooltip,
   value,
@@ -905,13 +921,14 @@ const CompactSlider = ({
   onChange: (v: number) => void;
   left: string;
   right: string;
+  range: [number, number];
 }) => (
   <div className="space-y-1.5">
     <div className="flex items-center justify-between">
       <SectionLabel label={label} tooltip={tooltip} />
       <span className="text-[11px] font-medium text-primary tabular-nums">{value}/10</span>
     </div>
-    <Slider value={[value]} onValueChange={([v]) => onChange(v)} max={10} min={1} step={1} className="py-1" />
+    <Slider value={[Math.min(range[1], Math.max(range[0], value))]} onValueChange={([v]) => onChange(v)} max={range[1]} min={range[0]} step={1} className="py-1" />
     <div className="flex justify-between text-[10px] text-muted-foreground">
       <span>{left}</span>
       <span>{right}</span>
