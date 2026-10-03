@@ -81,7 +81,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
   const [step, setStep] = useState<Step>(initial ? 2 : 1);
   const skipBaselineReset = useRef(!!initial);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [selectedCategory, setSelectedCategory] = useState<BookCategory>("fiction");
+  const [selectedCategory, setSelectedCategory] = useState<BookCategory>(initial?.bookType ? BOOK_TYPE_INFO[initial.bookType].category : "fiction");
   const [formData, setFormData] = useState<Partial<CreateBookInput>>({
     bookType: "novel",
     pov: "third-person-limited",
