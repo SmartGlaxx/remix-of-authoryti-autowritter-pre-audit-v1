@@ -619,7 +619,6 @@ const Index = () => {
         </DialogContent>
       </Dialog>
       {showIdeas && <BookIdeasGenerator onBack={() => setShowIdeas(false)} onAccept={(input) => { setShowIdeas(false); setEngineInitial(input); setShowEngine(true); }} />}
-      </AnimatePresence>
     </div>
   );
 };
