@@ -20,8 +20,12 @@ describe("provider request mapping carries the profile's model + thinking", () =
   it("Claude (sophia maximum, adaptive) → extended thinking, no temperature", async () => {
     for (const a of ["anthropic", "lovable_gateway"]) {
       const { body } = await capture(a, "anthropic/claude-opus-5-5", profileReq("sophia", "maximum"));
-      expect(body.thinking).toEqual({ type: "enabled", budget_tokens: 16000 }); expect(body.temperature).toBeUndefined(); expect(body.max_tokens).toBeGreaterThan(16000);
+      expect(body.thinking).toEqual({ type: "adaptive" }); expect(body.temperature).toBeUndefined();
     }
+  });
+  it("Claude Haiku extended (nora balanced) → fixed budget", async () => {
+    const { body } = await capture("anthropic", "anthropic/claude-haiku-4-5", profileReq("nora", "balanced"));
+    expect(body.thinking).toEqual({ type: "enabled", budget_tokens: 8000 }); expect(body.max_tokens).toBeGreaterThan(8000);
   });
   it("Gemini Flash non-thinking (claire economy revision) → reasoning_effort none", async () => {
     const { body } = await capture("gemini", "google/gemini-3.8-flash", profileReq("claire", "economy", "editor"));
