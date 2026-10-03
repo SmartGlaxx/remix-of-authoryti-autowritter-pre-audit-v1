@@ -13,3 +13,5 @@
 - `books.voice_manifest` is written once, server-side, on first section generation (`_shared/writers/manifest.ts`) and never overwritten.
 - Try Writer (`try-writer` + /writers) is preview-only: it never writes books, manifests or story memory; DeepSeek thinking is a request parameter derived from the profile slot mode, never a separate model id.
 - DeepSeek prices come from parsing its official pricing page at peak rates (no price API); Claude "adaptive" profile slots send thinking type adaptive (Opus 5.x rejects fixed budgets), "extended" sends a fixed budget.
+- Book Ideas (`book-ideas`) always uses one OpenAI model and only suggests setups: it validates book type/audience/genre against the app catalog sent by the client and bounds sliders to the writer baseline ±2 server-side; it never writes books.
+- Anthropic requests never send sampling params (temperature) — newer Claude models reject them.
