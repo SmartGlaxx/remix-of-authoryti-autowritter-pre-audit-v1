@@ -1,7 +1,7 @@
 // Per-book model configuration: get / save / reset, plus resolved role map and cost estimates.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { normalizeConfig, resolveAllRoles } from "../_shared/ai/roles.ts";
-import { estimateOperationCosts } from "../_shared/ai/estimate.ts";
+import { estimateOperationCosts, estimatePipeline } from "../_shared/ai/estimate.ts";
 import { loadPrices } from "../_shared/ai/pricing.ts";
 
 const corsHeaders = {
@@ -11,7 +11,16 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-Deno.serve(async (req) => {
+Deno.// deno-lint-ignore no-explicit-any
+function bookLengthWords(book: any): number {
+  const target = Number(book.controls?.structureControls?.targetWordCount);
+  if (Number.isFinite(target) && target > 0) return target;
+  const ch = book.outline?.chapters ?? [];
+  const subs = ch.reduce((n: number, c: any) => n + (c?.subsections?.length ?? 0), 0);
+  return Math.max(subs * 600, book.word_count ?? 0, 30000);
+}
+
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
@@ -29,7 +38,7 @@ Deno.serve(async (req) => {
     if (typeof bookId !== "string" || !UUID.test(bookId)) return json({ error: "Invalid bookId" }, 400);
 
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: book } = await db.from("books").select("id, outline").eq("id", bookId).eq("user_id", userId).maybeSingle();
+    const { data: book } = await db.from("books").select("id, outline, controls, word_count").eq("id", bookId).eq("user_id", userId).maybeSingle();
     if (!book) return json({ error: "Book not found" }, 404);
 
     if (body.action === "save") {
@@ -42,7 +51,7 @@ Deno.serve(async (req) => {
     const { data: row } = await db.from("book_model_configs").select("mode, single_model, role_models, fallbacks, profile_writer, profile_tier").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
     const config = normalizeConfig(row);
     const { data: keys } = await db.from("user_provider_keys").select("provider").eq("user_id", userId);
-    const { prices, fetchedAt } = await loadPrices(db, Deno.env.get("LOVABLE_API_KEY"), body.action === "refresh_prices");
+    const { prices, fetchedAt, sources } = await loadPrices(db, Deno.env.get("LOVABLE_API_KEY"), body.action === "refresh_prices");
     return json({
       pricesFetchedAt: fetchedAt,
       config,
@@ -50,6 +59,8 @@ Deno.serve(async (req) => {
       resolved: resolveAllRoles(config),
       userKeyProviders: (keys ?? []).map((k) => k.provider),
       estimates: estimateOperationCosts(config, book.outline, prices),
+      pricesSources: sources,
+      pipeline: estimatePipeline(config, bookLengthWords(book), prices),
     });
   } catch (e) {
     console.error("[model-config]", e instanceof Error ? e.message : e);
