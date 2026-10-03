@@ -1353,6 +1353,48 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_book_ideas: {
+        Row: {
+          audience: string
+          book_type: string
+          created_at: string
+          description: string
+          details: Json | null
+          genre: string
+          id: string
+          subtitle: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audience?: string
+          book_type: string
+          created_at?: string
+          description?: string
+          details?: Json | null
+          genre?: string
+          id?: string
+          subtitle?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audience?: string
+          book_type?: string
+          created_at?: string
+          description?: string
+          details?: Json | null
+          genre?: string
+          id?: string
+          subtitle?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       story_characters: {
         Row: {
           aliases: string[]

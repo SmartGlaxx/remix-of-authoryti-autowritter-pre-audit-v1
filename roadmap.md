@@ -26,3 +26,4 @@
 - [x] Whole-book cost by Draft/Revision/Continuity/Audit, per 1,000 words, with price source + date
 - [x] Book Ideas generator (+ → Get book ideas; OpenAI only; accept/adjust modal; sliders ±2, models locked)
 - [x] Fix: Claude rejects temperature (Test voice error)
+- [x] Saved book ideas: quick list, select & save (full setup made only on save), Saved tab, remove, open → start book

@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     if (error || !claims?.claims) return json({ error: "Unauthorized" }, 401);
     const userId = claims.claims.sub as string;
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: ok } = await admin.rpc("check_rate_limit", { _user_id: userId, _function_name: "book-ideas", _max_per_hour: 10, _max_per_day: 40 });
+    const { data: ok } = await admin.rpc("check_rate_limit", { _user_id: userId, _function_name: "book-ideas", _max_per_hour: 40, _max_per_day: 200 });
     if (ok === false) return json({ error: "You've generated a lot of ideas — please wait a bit." }, 429);
 
     const body = await req.json().catch(() => null);
@@ -43,36 +43,50 @@ Deno.serve(async (req) => {
 
     const writers = WRITER_PERSONAS.map((w) => `${w.id}: ${w.name} — ${w.tagline}; best for ${w.bookTypes.join(", ")}`).join("\n");
     const sliderList = SLIDERS.map((s) => `${s.key} (${s.low} → ${s.high})`).join(", ");
-    const system = `You are a book development editor. Propose complete, distinct book setups. Reply with JSON only: {"ideas":[...]}.
-Each idea: {"title","subtitle","description" (2–3 sentences, the book's theme/premise),"bookType","genre","audience","writerId","whyThisWriter" (1 sentence),"divergence" ("strict"|"controlled"|"open"),"sliders":{each of: ${SLIDERS.map((s) => s.key).join(", ")} as integers 1–10}}.
-Allowed bookType values and, for each, allowed audience and genre values (use them exactly; genre may be "" if none listed):
-${JSON.stringify(catalog)}
+    const catalogText = `Allowed bookType values and, for each, allowed audience and genre values (use them exactly; genre may be "" if none listed):\n${JSON.stringify(catalog)}`;
+    // mode "light" (default): cheap list of title/subtitle/description/type/genre/audience.
+    // mode "details": full setup (writer, sliders, divergence) for ONE idea the author chose to save.
+    const mode = body?.mode === "details" ? "details" : "light";
+    const seed = body?.idea ?? {};
+    let system: string, user: string;
+    if (mode === "light") {
+      system = `You are a book development editor. Propose distinct book ideas. Reply with JSON only: {"ideas":[...]}.
+Each idea: {"title","subtitle","description" (2–3 sentences, the book's theme/premise),"bookType","genre","audience"}.
+${catalogText}
+No markdown. Never use the words "magic" or "magical".`;
+      user = `Give ${count} book ideas.${brief ? ` Author's direction: ${brief}` : " Vary book types and audiences."}`;
+    } else {
+      if (!str(seed?.title, 120)) return json({ error: "Missing idea" }, 400);
+      system = `You are a book development editor. Complete the setup for ONE book idea. Reply with JSON only: {"ideas":[ONE idea]}.
+The idea: {"title","subtitle","description","bookType","genre","audience","writerId","whyThisWriter" (1 sentence),"divergence" ("strict"|"controlled"|"open"),"sliders":{each of: ${SLIDERS.map((s) => s.key).join(", ")} as integers 1–10}}.
+Keep the given title, subtitle, description, bookType, genre and audience unless invalid.
+${catalogText}
 Writers (pick the best fit by id):
 ${writers}
 Slider meanings: ${sliderList}.
 No markdown. Never use the words "magic" or "magical".`;
-    const user = `Give ${count} book ideas.${brief ? ` Author's direction: ${brief}` : " Vary book types and audiences."}`;
+      user = `Idea: ${JSON.stringify({ title: str(seed.title, 120), subtitle: str(seed.subtitle, 160), description: str(seed.description, 1200), bookType: str(seed.bookType, 40), genre: str(seed.genre, 60), audience: str(seed.audience, 40) })}`;
+    }
 
     try {
       const r = await generateAIText({ role: "planner", config: { mode: "single", singleModel: OPENAI_MODEL }, userId, bookId: null, request: { system, user, json: true, reasoning: "low" } }, createAIDeps(admin, userId));
       let parsed: any;
       try { parsed = JSON.parse(r.text.replace(/^```(json)?|```$/g, "").trim()); } catch { return json({ error: "The idea generator returned an unreadable answer — please try again." }, 502); }
-      const ideas = (Array.isArray(parsed?.ideas) ? parsed.ideas : []).slice(0, count).flatMap((i: any) => {
-        const bookType = str(i?.bookType, 40);
+      const ideas = (Array.isArray(parsed?.ideas) ? parsed.ideas : []).slice(0, mode === "light" ? count : 1).flatMap((i: any) => {
+        const bookType = str(i?.bookType, 40) || str(seed?.bookType, 40);
         const opts = catalog[bookType];
         if (!opts) return [];
+        const audience = opts.audiences.includes(i?.audience) ? i.audience : opts.audiences[0] ?? "general-readers";
+        const genre = opts.genres.includes(i?.genre) ? i.genre : (opts.genres[0] ?? "");
+        const core = { title: str(i?.title, 120) || str(seed?.title, 120) || "Untitled", subtitle: str(i?.subtitle, 160), description: str(i?.description, 1200), bookType, genre, audience };
+        if (mode === "light") return [core];
         const writer = getWriter(i?.writerId) ?? WRITER_PERSONAS.find((w) => w.bookTypes.includes(bookType)) ?? WRITER_PERSONAS[0];
         const base = WRITER_BASELINES[writer.id];
         const requested: Partial<SliderValues> = {};
         for (const s of SLIDERS) { const v = i?.sliders?.[s.key]; if (typeof v === "number" && Number.isFinite(v)) requested[s.key] = v; }
-        const audience = opts.audiences.includes(i?.audience) ? i.audience : opts.audiences[0] ?? "general-readers";
-        const genre = opts.genres.includes(i?.genre) ? i.genre : (opts.genres[0] ?? "");
-        return [{
-          title: str(i?.title, 120) || "Untitled", subtitle: str(i?.subtitle, 160), description: str(i?.description, 800),
-          bookType, genre, audience, writerId: writer.id, whyThisWriter: str(i?.whyThisWriter, 300),
+        return [{ ...core, writerId: writer.id, whyThisWriter: str(i?.whyThisWriter, 300),
           divergence: ["strict", "controlled", "open"].includes(i?.divergence) ? i.divergence : "strict",
-          sliders: base ? boundAll(base, requested) : null,
-        }];
+          sliders: base ? boundAll(base, requested) : null }];
       });
       if (!ideas.length) return json({ error: "No usable ideas came back — please try again." }, 502);
       return json({ ideas, model: r.meta.model });
