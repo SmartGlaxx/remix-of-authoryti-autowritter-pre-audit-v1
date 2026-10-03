@@ -1,7 +1,7 @@
 // Central role → model resolution. Edge functions call resolveModelForRole and nothing else;
 // no role conditionals live in individual functions.
 import { ALL_ROLES, getModel, type Role } from "./registry.ts";
-import { getProfile, isTier, reasoningFor, slotForRole, type Tier } from "../writers/profiles.ts";
+import { getProfile, isTier, reasoningFor, thinkingFor, slotForRole, type Tier } from "../writers/profiles.ts";
 
 export type ConfigMode = "legacy" | "optimized" | "single" | "custom" | "profile";
 
@@ -69,6 +69,7 @@ export interface ResolvedModel {
   fallback: string | null;
   source: ConfigMode;
   reasoning?: "low" | "medium" | "high";
+  thinking?: boolean;
 }
 
 function validKey(k: unknown): k is string {
@@ -99,7 +100,7 @@ export function resolveModelForRole(config: BookModelConfig | null | undefined, 
       const prof = getProfile(c.profileWriter, c.profileTier)!;
       const slot = slotForRole(prof, role);
       // Locked: per-role overrides are ignored; no silent fallback to another model.
-      return { role, model: slot.model, fallback: null, source: "profile", reasoning: reasoningFor(slot.mode) };
+      return { role, model: slot.model, fallback: null, source: "profile", reasoning: reasoningFor(slot.mode), thinking: thinkingFor(slot.mode) };
     }
     case "optimized":
       return { role, model: c.roleModels?.[role] ?? OPTIMIZED_ROLE_MODELS[role], fallback: explicitFallback, source: "optimized" };

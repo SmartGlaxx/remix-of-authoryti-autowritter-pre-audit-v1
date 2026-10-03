@@ -118,3 +118,10 @@ export function slotForRole(profile: Profile, role: Role): Slot { return profile
 export function reasoningFor(mode: Mode): "low" | "medium" | "high" | undefined {
   return mode === "low" || mode === "medium" || mode === "high" ? mode : undefined;
 }
+
+/** Thinking on/off for providers with a thinking switch (DeepSeek V4). undefined = provider default. */
+export function thinkingFor(mode: Mode): boolean | undefined {
+  if (mode === "thinking" || mode === "extended" || mode === "adaptive") return true;
+  if (mode === "non-thinking") return false;
+  return undefined;
+}

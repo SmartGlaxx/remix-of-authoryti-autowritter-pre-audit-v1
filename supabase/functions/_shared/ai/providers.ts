@@ -9,6 +9,8 @@ export interface AIRequest {
   json?: boolean;
   temperature?: number;
   reasoning?: "low" | "medium" | "high";
+  /** DeepSeek V4 thinking mode (model parameter, not a separate model id). undefined = provider default. */
+  thinking?: boolean;
   maxOutputTokens?: number;
 }
 
@@ -231,7 +233,7 @@ export const anthropicAdapter: ProviderAdapter = {
 /** DeepSeek: automatic prefix caching — callers keep the static system prompt first. */
 export const deepseekAdapter: ProviderAdapter = {
   id: "deepseek",
-  stream: (req, ctx) => chatCompletions("https://api.deepseek.com/chat/completions", { Authorization: `Bearer ${ctx.apiKey}` }, ctx.model.directId, req, ctx, "DeepSeek"),
+  stream: (req, ctx) => chatCompletions("https://api.deepseek.com/chat/completions", { Authorization: `Bearer ${ctx.apiKey}` }, ctx.model.directId, req, ctx, "DeepSeek", req.thinking == null ? {} : { thinking: { type: req.thinking ? "enabled" : "disabled" } }),
 };
 
 export const geminiAdapter: ProviderAdapter = {
