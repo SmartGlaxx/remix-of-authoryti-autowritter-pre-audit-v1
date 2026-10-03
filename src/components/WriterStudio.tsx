@@ -8,11 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { WRITER_PERSONAS } from "../../supabase/functions/_shared/writers/personas";
 import { PROFILES, TIERS, PROFILE_ROLE_LABELS, type Tier, type ProfileRole } from "../../supabase/functions/_shared/writers/profiles";
-import { SLIDERS, MAX_ADJUST, DIVERGENCE_OPTIONS, type SliderValues, type DivergenceMode } from "../../supabase/functions/_shared/writers/sliders";
+import { SLIDERS, NEUTRAL, MAX_ADJUST, DIVERGENCE_OPTIONS, type SliderValues, type DivergenceMode } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
 
 const short = (id: string) => id.split("/")[1]?.replace(/-/g, " ") ?? id;
-const defaults = (id: string): SliderValues => ({ ...WRITER_BASELINES[id] });
+const defaults = (id: string): SliderValues => ({ ...(WRITER_BASELINES[id] ?? NEUTRAL) });
 
 export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWriterId?: string; bookType?: string; onUse?: (id: string, tier: Tier) => void }) {
   const { toast } = useToast();
