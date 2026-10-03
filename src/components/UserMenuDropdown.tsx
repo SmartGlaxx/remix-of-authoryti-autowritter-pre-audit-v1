@@ -138,6 +138,11 @@ export function UserMenuDropdown({ className }: UserMenuDropdownProps) {
           Settings & API Keys
         </DropdownMenuItem>
 
+        <DropdownMenuItem onClick={() => navigate("/writers")}>
+          <Sparkles className="w-4 h-4 mr-2" />
+          Try a Writer
+        </DropdownMenuItem>
+
         <DropdownMenuItem onClick={handleManageBilling}>
           <Coins className="w-4 h-4 mr-2" />
           Billing & Credits
