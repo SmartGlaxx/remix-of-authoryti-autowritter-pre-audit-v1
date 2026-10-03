@@ -162,14 +162,14 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
                 <p className="font-medium">Estimated cost (saved settings)</p>
                 {estimates.map((e) => (
                   <p key={e.operation} className="text-muted-foreground">
-                    {e.operation.replace("_", " ")}: {e.estimatedCostUsd != null ? `~$${e.estimatedCostUsd.toFixed(4)}` : "unknown"} · {modelLabel(e.model)} · {e.note}
+                    {e.operation.replace("_", " ")}: {e.estimatedCostUsd != null ? `~$${e.estimatedCostUsd.toFixed(4)}` : "Estimate not available"} · {modelLabel(e.model)}{e.estimatedCostUsd != null ? ` · ${e.note}` : ""}
                   </p>
                 ))}
                 {pipeline && (
                   <div className="space-y-1 pt-2">
-                    <p className="font-medium">Whole book (~{pipeline.totalWords.toLocaleString()} words): {pipeline.totalUsd != null ? `~$${pipeline.totalUsd.toFixed(2)}` : "unknown"}{pipeline.per1kWordsUsd != null && ` · ~$${pipeline.per1kWordsUsd.toFixed(4)} per 1,000 words`}</p>
+                    <p className="font-medium">Whole book (~{pipeline.totalWords.toLocaleString()} words): {pipeline.totalUsd != null ? `~$${pipeline.totalUsd.toFixed(2)}` : "Estimate not available"}{pipeline.per1kWordsUsd != null && ` · ~$${pipeline.per1kWordsUsd.toFixed(4)} per 1,000 words`}</p>
                     {pipeline.roles.map((r) => (
-                      <p key={r.role} className="text-muted-foreground">{PROFILE_ROLE_LABELS[r.role]}: {r.costUsd != null ? `~$${r.costUsd.toFixed(2)}` : "unknown"} · {modelLabel(r.model)}{r.thinking ? " (thinking)" : ""}</p>
+                      <p key={r.role} className="text-muted-foreground">{PROFILE_ROLE_LABELS[r.role]}: {r.costUsd != null ? `~$${r.costUsd.toFixed(2)}` : "Estimate not available"} · {modelLabel(r.model)}{r.thinking ? " (thinking)" : ""}</p>
                     ))}
                     <p className="text-muted-foreground">{pipeline.note}</p>
                   </div>
