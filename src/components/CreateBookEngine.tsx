@@ -62,6 +62,7 @@ import {
 import { TemplateSelector } from "@/components/TemplateSelector";
 
 interface CreateBookEngineProps {
+  initial?: Partial<CreateBookInput>;
   onClose: () => void;
   onCreate: (input: CreateBookInput) => void;
 }
@@ -76,8 +77,9 @@ const STEP_META = [
   { title: "Advanced", icon: Settings2, color: "from-primary/80 to-primary" },
 ];
 
-const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
-  const [step, setStep] = useState<Step>(1);
+const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps) => {
+  const [step, setStep] = useState<Step>(initial ? 2 : 1);
+  const skipBaselineReset = useRef(!!initial);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedCategory, setSelectedCategory] = useState<BookCategory>("fiction");
   const [formData, setFormData] = useState<Partial<CreateBookInput>>({
@@ -92,6 +94,8 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
       authorityLevel: 5,
     },
     controls: { ...getDefaultControls("novel"), automationLevel: "" as AutomationLevel, depthLevel: "" as DepthLevel, temporalContext: { era: "" as TemporalEra, timelineStructure: "" as TimelineStructure }, structureControls: { ...getDefaultControls("novel").structureControls, chapterCount: "" as any, sectionsPerChapterMode: "" as any } },
+    ...(initial ?? {}),
+    ...(initial ? { toneProfile: { primary: "conversational", intensity: 5, formality: 5, emotionalIntensity: 5, humorLevel: 3, authorityLevel: 5, ...initial.toneProfile } as any, controls: { ...getDefaultControls(initial.bookType ?? "novel"), automationLevel: "" as AutomationLevel, depthLevel: "" as DepthLevel, ...initial.controls } as any } : {}),
   });
 
   useEffect(() => {
@@ -114,6 +118,7 @@ const CreateBookEngine = ({ onClose, onCreate }: CreateBookEngineProps) => {
   const baseline = WRITER_BASELINES[activeWriterId];
   const rangeFor = (k: SliderKey): [number, number] => baseline ? [Math.max(1, baseline[k] - MAX_ADJUST), Math.min(10, baseline[k] + MAX_ADJUST)] : [1, 10];
   useEffect(() => {
+    if (skipBaselineReset.current) { skipBaselineReset.current = false; return; }
     if (!baseline) return;
     setFormData((prev) => ({
       ...prev,
