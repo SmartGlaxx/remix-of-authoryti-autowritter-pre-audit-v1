@@ -33,3 +33,11 @@ describe("48 fixed writer profiles", () => {
     expect(m.execution_tier).toBe("balanced"); expect(m.baselines_pending).toBe(true);
   });
 });
+
+import { thinkingFor } from "../../supabase/functions/_shared/writers/profiles";
+describe("DeepSeek thinking as a mode, not a model", () => {
+  it("maps modes", () => { expect(thinkingFor("thinking")).toBe(true); expect(thinkingFor("non-thinking")).toBe(false); expect(thinkingFor(null)).toBeUndefined(); });
+  it("profile resolution carries thinking", () => {
+    expect(resolveModelForRole({ mode: "profile", profileWriter: "maya", profileTier: "economy" }, "writer")).toMatchObject({ model: "deepseek/deepseek-flash", thinking: false });
+  });
+});

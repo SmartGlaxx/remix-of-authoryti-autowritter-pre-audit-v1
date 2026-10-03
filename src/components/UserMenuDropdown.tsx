@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, User, Flame, PenTool, MessageSquare, KeyRound } from "lucide-react";
+import { LogOut, User, Flame, PenTool, MessageSquare, KeyRound, Sparkles } from "lucide-react";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -136,6 +136,11 @@ export function UserMenuDropdown({ className }: UserMenuDropdownProps) {
         <DropdownMenuItem onClick={() => navigate("/settings")}>
           <KeyRound className="w-4 h-4 mr-2" />
           Settings & API Keys
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => navigate("/writers")}>
+          <Sparkles className="w-4 h-4 mr-2" />
+          Try a Writer
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={handleManageBilling}>
