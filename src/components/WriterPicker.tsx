@@ -1,24 +1,11 @@
 import { useState } from "react";
-import { Star, Mic, Loader2 } from "lucide-react";
+import { Star, Mic } from "lucide-react";
 import { WRITER_PERSONAS, bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import elena from "@/assets/writers/elena.jpg";
-import maya from "@/assets/writers/maya.jpg";
-import claire from "@/assets/writers/claire.jpg";
-import nora from "@/assets/writers/nora.jpg";
-import sophia from "@/assets/writers/sophia.jpg";
-import priya from "@/assets/writers/priya.jpg";
-import daniel from "@/assets/writers/daniel.jpg";
-import marcus from "@/assets/writers/marcus.jpg";
-import adrian from "@/assets/writers/adrian.jpg";
-import ethan from "@/assets/writers/ethan.jpg";
-import julian from "@/assets/writers/julian.jpg";
-import luca from "@/assets/writers/luca.jpg";
-
-export const WRITER_PORTRAITS: Record<string, string> = { elena, maya, claire, nora, sophia, priya, daniel, marcus, adrian, ethan, julian, luca };
+import { WriterStudio } from "@/components/WriterStudio";
+import { WRITER_PORTRAITS } from "@/components/WriterPortraits";
+export { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 
 const FAV_KEY = "favoriteWriters";
 const loadFavs = (): string[] => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; } };
@@ -66,40 +53,11 @@ export function WriterPicker({ bookType, value, onChange }: { bookType: string; 
 }
 
 function TestVoiceDialog({ writerId, bookType, onClose, onUse }: { writerId: string | null; bookType: string; onClose: () => void; onUse: (id: string) => void }) {
-  const w = WRITER_PERSONAS.find((p) => p.id === writerId);
-  const [premise, setPremise] = useState("");
-  const [text, setText] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const run = async () => {
-    if (!w) return;
-    setLoading(true); setText(null); setErr(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("try-writer", { body: { writerId: w.id, tier: "balanced", premise, bookType } });
-      const msg = (data as { error?: string })?.error || (error ? (await (error as { context?: Response }).context?.json?.().catch(() => null))?.error ?? error.message : null);
-      if (msg) throw new Error(msg);
-      setText(data.text);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
-  };
   return (
-    <Dialog open={!!w} onOpenChange={(o) => { if (!o) { onClose(); setText(null); setErr(null); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        {w && <>
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <img src={WRITER_PORTRAITS[w.id]} alt={w.name} className="h-12 w-12 rounded-full object-cover" />
-              <div className="text-left"><DialogTitle className="font-serif">{w.name}</DialogTitle><DialogDescription>{w.tagline}</DialogDescription></div>
-            </div>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground">Hear {w.name.split(" ")[0]}'s natural voice on a short opening. Nothing is saved to your book.</p>
-          <Textarea value={premise} maxLength={600} rows={3} onChange={(e) => setPremise(e.target.value)} placeholder="A retired lighthouse keeper finds a letter addressed to her, dated fifty years in the future…" />
-          <Button className="rounded-full" onClick={run} disabled={loading || !premise.trim()}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Write a sample</Button>
-          {err && <p className="text-sm text-destructive">{err}</p>}
-          {text && <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-            <p className="whitespace-pre-line font-serif text-sm leading-relaxed">{text}</p>
-            <Button variant="outline" className="rounded-full" onClick={() => onUse(w.id)}>Use {w.name.split(" ")[0]}</Button>
-          </div>}
-        </>}
+    <Dialog open={!!writerId} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] max-w-6xl overflow-y-auto p-4 sm:p-6">
+        <DialogHeader><DialogTitle className="font-serif">Try a Writer</DialogTitle><DialogDescription>Compare voices and choose a writer.</DialogDescription></DialogHeader>
+        {writerId && <WriterStudio key={writerId} initialWriterId={writerId} bookType={bookType} onUse={(id) => onUse(id)} />}
       </DialogContent>
     </Dialog>
   );

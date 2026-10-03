@@ -16,3 +16,4 @@
 - Book Ideas (`book-ideas`) always uses one OpenAI model and only suggests setups: it validates book type/audience/genre against the app catalog sent by the client and bounds sliders to the writer baseline ±2 server-side; it never writes books.
 - Anthropic requests never send sampling params (temperature) — newer Claude models reject them.
 - Book Ideas saves to `saved_book_ideas` (owner-only); `book-ideas` mode "light" returns only title/description/type/genre/audience, mode "details" builds the full setup for one idea at save time — AI credit is spent only on ideas the author keeps.
+- Both writer preview entry points share a single WriterStudio UI while `try-writer` remains preview-only — the page and creation dialog must show the same locked profile modes and bounded expression controls.

@@ -156,6 +156,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
 
   const handleBookTypeChange = (type: BookType) => {
     updateForm("bookType", type);
+    updateForm("genre", undefined);
     // Image Generation is temporarily disabled across the app for the test launch.
     updateForm("controls", { ...getDefaultControls(type), imageGeneration: false, automationLevel: "" as AutomationLevel, depthLevel: "" as DepthLevel, temporalContext: { era: "" as TemporalEra, timelineStructure: "" as TimelineStructure }, structureControls: { ...getDefaultControls(type).structureControls, chapterCount: "" as any, sectionsPerChapterMode: "" as any } });
     const allowed = BOOK_TYPE_AUDIENCES[type];
@@ -353,6 +354,15 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                       );
                     })}
                   </div>
+
+                  <FieldGroup label="Genre">
+                    <Select value={formData.genre || ""} onValueChange={(v) => updateForm("genre", v)}>
+                      <SelectTrigger><SelectValue placeholder="Choose a genre" /></SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {(BOOK_TYPE_GENRES[formData.bookType] ?? GENRE_PRESETS[currentCategory]).map((genre) => <SelectItem key={genre} value={genre}>{genre}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FieldGroup>
 
                   {/* Template selection for visual book types */}
                   {isVisualBookType && formData.bookType && (
