@@ -10,7 +10,8 @@ export interface AIRequest {
   temperature?: number;
   reasoning?: "low" | "medium" | "high";
   /** DeepSeek V4 thinking mode (model parameter, not a separate model id). undefined = provider default. */
-  thinking?: boolean;
+  /** Thinking switch: true/false, or "deep" for a larger budget (Claude adaptive). undefined = provider default. */
+  thinking?: boolean | "deep";
   maxOutputTokens?: number;
 }
 
@@ -125,6 +126,13 @@ async function* chatCompletions(url: string, headers: Record<string, string>, mo
   const body: Record<string, unknown> = { model: modelId, messages: messagesOf(req), stream: true, stream_options: { include_usage: true }, ...extra };
   if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
   if (req.json) body.response_format = { type: "json_object" };
+  // Gemini (direct or via gateway): thinking/effort → reasoning_effort. Pro models cannot fully disable thinking.
+  if (ctx.model.provider === "gemini" && body.reasoning_effort == null) {
+    const off = /flash/.test(modelId) ? "none" : "low";
+    const eff = req.reasoning ?? (req.thinking === false ? off : req.thinking ? "high" : undefined);
+    if (eff) body.reasoning_effort = eff;
+  }
+  if (ctx.model.provider === "deepseek" && req.thinking && req.reasoning) body.reasoning_effort = req.reasoning === "medium" ? "high" : req.reasoning;
   const res = await post(ctx, url, headers, body, provider);
   const requestId = res.headers.get("x-request-id");
   if (requestId) yield { type: "usage", usage: { requestId } };
@@ -182,7 +190,12 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
     stream: true,
   };
   if (req.system) body.system = req.system;
-  if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
+  if (req.thinking) {
+    // Extended thinking: budget must be below max_tokens and sampling params must be unset.
+    const budget = req.thinking === "deep" ? 16000 : 8000;
+    body.max_tokens = Math.max(Number(body.max_tokens), budget + 8000);
+    body.thinking = { type: "enabled", budget_tokens: budget };
+  } else if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
   const res = await post(ctx, url, { "anthropic-version": "2023-06-01", ...headers }, body, provider);
   let input: number | null = null, cached: number | null = null, requestId: string | null = null;
   for await (const { data } of sseEvents(res.body!)) {

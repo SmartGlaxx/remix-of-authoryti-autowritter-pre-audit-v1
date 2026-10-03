@@ -11,7 +11,7 @@ export const TIERS: { value: Tier; label: string }[] = [
 ];
 export type ProfileRole = "draft" | "revision" | "continuity" | "auditor";
 export const PROFILE_ROLE_LABELS: Record<ProfileRole, string> = { draft: "Draft", revision: "Revision", continuity: "Continuity", auditor: "Audit" };
-/** Mode is informational unless the adapter supports it (OpenAI reasoning effort today). */
+/** Mode = thinking/effort; applied by the adapters (OpenAI/Gemini effort, DeepSeek/Gemini/Claude thinking). */
 export type Mode = "thinking" | "non-thinking" | "low" | "medium" | "high" | "adaptive" | "extended" | null;
 export interface Slot { model: string; mode: Mode }
 export type Profile = Record<ProfileRole, Slot>;
@@ -119,9 +119,10 @@ export function reasoningFor(mode: Mode): "low" | "medium" | "high" | undefined 
   return mode === "low" || mode === "medium" || mode === "high" ? mode : undefined;
 }
 
-/** Thinking on/off for providers with a thinking switch (DeepSeek V4). undefined = provider default. */
-export function thinkingFor(mode: Mode): boolean | undefined {
-  if (mode === "thinking" || mode === "extended" || mode === "adaptive") return true;
+/** Thinking switch applied by every adapter (DeepSeek, Gemini, Claude). undefined = provider default. */
+export function thinkingFor(mode: Mode): boolean | "deep" | undefined {
+  if (mode === "adaptive") return "deep";
+  if (mode === "thinking" || mode === "extended") return true;
   if (mode === "non-thinking") return false;
   return undefined;
 }
