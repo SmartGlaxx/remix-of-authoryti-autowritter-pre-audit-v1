@@ -40,8 +40,9 @@ Deno.serve(async (req) => {
 
     const requested: Partial<SliderValues> = {};
     for (const s of SLIDERS) { const v = body?.sliders?.[s.key]; if (typeof v === "number" && Number.isFinite(v)) requested[s.key] = v; }
-    const baseline = WRITER_BASELINES[writer.id] ?? NEUTRAL;
-    const effective = WRITER_BASELINES[writer.id] ? boundAll(baseline, requested) : boundAll({ ...NEUTRAL }, {}) && { ...NEUTRAL, ...Object.fromEntries(Object.entries(requested).map(([k, v]) => [k, Math.min(10, Math.max(1, Math.round(v as number)))])) } as SliderValues;
+    const base = WRITER_BASELINES[writer.id];
+    // With a baseline: ±2 bound. Until baselines arrive: free 1–10 (boundAll on a neutral copy would wrongly cap at 3–7).
+    const effective: SliderValues = base ? boundAll(base, requested) : { ...NEUTRAL, ...Object.fromEntries(Object.entries(requested).map(([k, v]) => [k, Math.min(10, Math.max(1, Math.round(v as number)))])) };
 
     const system = `${renderWriterPrompt(writer, bookType)}\n\n${renderExpressionBlock(effective, resolveDivergence({ divergenceMode: body?.divergence }))}\n\nWrite plain prose only — no markdown, no headings, no labels. Never use the words "magic" or "magical".`;
     const user = `This is a short preview so the author can hear your voice. Write the opening of a ${bookType} piece (about 200–250 words) based on this premise:\n\n${premise}`;
