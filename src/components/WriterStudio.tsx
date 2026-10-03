@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Lock, Loader2, Sparkles } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
-import { WRITER_PORTRAITS } from "@/components/WriterPicker";
+import { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { WRITER_PERSONAS } from "../../supabase/functions/_shared/writers/personas";
