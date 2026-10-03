@@ -6,6 +6,8 @@
 - [ ] Pass 5 Final Acceptance Report (draft written; finalize after Step 4)
 
 # Next
+- [ ] Show genre when choosing a book type, with choices for that type
+- [ ] Rework Try Writer page and preview dialog: four modes/models on left, premise center, 15 values right, writer arrows
 - [x] API keys moved to app-level Settings (user menu → Settings & API Keys)
 - [x] Writer Personas (12 built-in writers, portraits, pick at creation, change in Book Settings)
 - [ ] Custom writer creator — deferred by user (later)
