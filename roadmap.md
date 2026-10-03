@@ -20,4 +20,5 @@
 - [ ] Custom writers (same 15 sliders, ±2, cap 20)
 - [x] provider_pricing_cache — signed-in read only, 24h refresh from gateway catalog
 - [ ] DeepSeek prices (no price API) — need official numbers
-- [ ] Thinking/non-thinking modes for DeepSeek/Gemini/Claude adapters (OpenAI effort wired)
+- [x] DeepSeek thinking on/off wired from profile mode (Gemini/Claude modes still informational)
+- [x] Try a Writer page (/writers): writer, tier, locked models, 15 sliders, sample — saves nothing

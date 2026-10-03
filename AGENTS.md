@@ -11,3 +11,4 @@
 - 48 Writer × Tier execution profiles live in `supabase/functions/_shared/writers/profiles.ts`; `book_model_configs.mode = "profile"` resolves roles from it with no per-role overrides or fallbacks — profiles are locked by design.
 - Live model prices are cached in `provider_pricing_cache` (signed-in read, service write) and refreshed from the gateway catalog when older than 24h via `_shared/ai/pricing.ts`; the registry prices are only a fallback.
 - `books.voice_manifest` is written once, server-side, on first section generation (`_shared/writers/manifest.ts`) and never overwritten.
+- Try Writer (`try-writer` + /writers) is preview-only: it never writes books, manifests or story memory; DeepSeek thinking is a request parameter derived from the profile slot mode, never a separate model id.
