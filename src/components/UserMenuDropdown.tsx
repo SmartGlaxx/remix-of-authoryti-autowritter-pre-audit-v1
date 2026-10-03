@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, User, Flame, PenTool, MessageSquare, KeyRound } from "lucide-react";
+import { LogOut, User, Flame, PenTool, MessageSquare, KeyRound, Sparkles } from "lucide-react";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
