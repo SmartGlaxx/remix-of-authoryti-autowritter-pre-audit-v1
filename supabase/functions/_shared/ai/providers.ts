@@ -20,6 +20,8 @@ export interface Usage {
   inputTokens: number | null;
   outputTokens: number | null;
   cachedInputTokens: number | null;
+  /** Anthropic only: tokens written to the prompt cache on this call (billed at 1.25× input). */
+  cacheWriteInputTokens?: number | null;
   requestId: string | null;
 }
 
