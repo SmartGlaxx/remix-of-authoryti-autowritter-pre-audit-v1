@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
+import { openingDirective } from "../_shared/writers/opening.ts";
 
 const MAX_PAYLOAD_BYTES = 200_000;
 
@@ -146,6 +147,7 @@ Your job: write a single short cliffhanger snippet (150–220 words) that will b
 
 CRITICAL RULES:
 - Lift the energy and voice from the supplied excerpt — this snippet must feel like it belongs to this exact book.
+${openingDirective(book.bookType)}
 - Write in plain prose. No markdown. No headers. No labels. No "Prologue:" or "Intro:" tag.
 - End on a true cliffhanger — a question, a sudden cut, an implied threat, an unresolved beat. The reader must NEED the next line.
 - Reveal nothing that spoils the ending; pick a moment of maximum tension or intrigue.

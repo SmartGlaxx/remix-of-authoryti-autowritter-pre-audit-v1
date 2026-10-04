@@ -5,6 +5,7 @@ import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { getWriter, renderWriterPrompt } from "../_shared/writers/personas.ts";
+import { openingDirective } from "../_shared/writers/opening.ts";
 import { isTier, getProfile } from "../_shared/writers/profiles.ts";
 import { SLIDERS, NEUTRAL, boundAll, renderExpressionBlock, resolveDivergence, type SliderValues } from "../_shared/writers/sliders.ts";
 import { WRITER_BASELINES } from "../_shared/writers/manifest.ts";
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
     // With a baseline: ±2 bound. Until baselines arrive: free 1–10 (boundAll on a neutral copy would wrongly cap at 3–7).
     const effective: SliderValues = base ? boundAll(base, requested) : { ...NEUTRAL, ...Object.fromEntries(Object.entries(requested).map(([k, v]) => [k, Math.min(10, Math.max(1, Math.round(v as number)))])) };
 
-    const system = `${renderWriterPrompt(writer, bookType)}\n\n${renderExpressionBlock(effective, resolveDivergence({ divergenceMode: body?.divergence }))}\n\nWrite plain prose only — no markdown, no headings, no labels. Never use the words "magic" or "magical".`;
+    const system = `${renderWriterPrompt(writer, bookType)}\n\n${renderExpressionBlock(effective, resolveDivergence({ divergenceMode: body?.divergence }))}\n\n${openingDirective(bookType)}\n\nWrite plain prose only — no markdown, no headings, no labels. Never use the words "magic" or "magical".`;
     const user = `This is a short preview so the author can hear your voice. Write the opening of a ${bookType} piece (about 200–250 words) based on this premise:\n\n${premise}`;
 
     try {
