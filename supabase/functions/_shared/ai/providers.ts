@@ -20,6 +20,8 @@ export interface Usage {
   inputTokens: number | null;
   outputTokens: number | null;
   cachedInputTokens: number | null;
+  /** Anthropic only: tokens written to the prompt cache on this call (billed at 1.25× input). */
+  cacheWriteInputTokens?: number | null;
   requestId: string | null;
 }
 
@@ -189,7 +191,10 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
     messages: [{ role: "user", content: req.user }],
     stream: true,
   };
-  if (req.system) body.system = req.system;
+  // Explicit prompt caching: the system prompt is the STATIC prefix (writer persona, style fingerprint,
+  // voice manifest, rules). Marking it ephemeral lets Anthropic cache it (90% read discount, 1.25× write
+  // cost, 5-min TTL). Below the model's minimum cacheable length Anthropic silently skips caching — no error.
+  if (req.system) body.system = [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }];
   if (req.thinking) {
     // Extended thinking: budget must be below max_tokens and sampling params must be unset.
     // "deep" = adaptive thinking (Opus 5.x rejects fixed budgets); true = fixed-budget extended thinking.
@@ -198,7 +203,7 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
   }
   // Newer Claude models reject `temperature` ("deprecated for this model"); Anthropic calls never send sampling params.
   const res = await post(ctx, url, { "anthropic-version": "2023-06-01", ...headers }, body, provider);
-  let input: number | null = null, cached: number | null = null, requestId: string | null = null;
+  let input: number | null = null, cached: number | null = null, cacheWrite: number | null = null, requestId: string | null = null;
   for await (const { data } of sseEvents(res.body!)) {
     if (!data) continue;
     let p: any;
@@ -206,12 +211,13 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
     if (p.type === "message_start") {
       const u = p.message?.usage ?? {};
       cached = u.cache_read_input_tokens ?? null;
+      cacheWrite = u.cache_creation_input_tokens ?? null;
       input = u.input_tokens != null ? u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) : null;
       requestId = p.message?.id ?? null;
     } else if (p.type === "content_block_delta" && p.delta?.type === "text_delta") {
       yield { type: "text", text: p.delta.text };
     } else if (p.type === "message_delta" && p.usage) {
-      yield { type: "usage", usage: { inputTokens: input, cachedInputTokens: cached, outputTokens: p.usage.output_tokens ?? null, requestId } };
+      yield { type: "usage", usage: { inputTokens: input, cachedInputTokens: cached, cacheWriteInputTokens: cacheWrite, outputTokens: p.usage.output_tokens ?? null, requestId } };
     } else if (p.type === "error") {
       throw new AIProviderError("unavailable", `${provider}: ${scrubSecrets(String(p.error?.message ?? "stream error"), ctx.apiKey)}`);
     }
@@ -241,7 +247,7 @@ export const openaiAdapter: ProviderAdapter = {
 
 export const anthropicAdapter: ProviderAdapter = {
   id: "anthropic",
-  stream: (req, ctx) => messages("https://api.anthropic.com/v1/messages", { "x-api-key": ctx.apiKey }, ctx.model.directId, req, ctx, "Anthropic"),
+  stream: (req, ctx) => messages("https://api.anthropic.com/v1/messages", { "x-api-key": ctx.apiKey, "anthropic-beta": "prompt-caching-2024-07-31" }, ctx.model.directId, req, ctx, "Anthropic"),
 };
 
 /** DeepSeek: automatic prefix caching — callers keep the static system prompt first. */
