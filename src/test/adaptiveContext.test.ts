@@ -32,7 +32,7 @@ describe("Phase 2A adaptive context", () => {
   });
 
   it("refuses future/current material, unknown provenance, and history without a specific need", () => {
-    const result = assemble("novel", [item("future", "canon", "SPOILER", 31), item("current", "canon", "OLD ATTEMPT", 30), { ...item("unsourced", "recent", "No position"), establishedAt: null }, { ...item("unknown", "canon", "No source"), source: "" }, { ...item("old", "historical", "Relevant but not requested"), needIds: ["other"] }]);
+    const result = assemble("novel", [item("future", "canon", "SPOILER", 31), { ...item("current", "canon", "OLD ATTEMPT", 30), establishedAt: position }, { ...item("unsourced", "recent", "No position"), establishedAt: null }, { ...item("unknown", "canon", "No source"), source: "" }, { ...item("old", "historical", "Relevant but not requested"), needIds: ["other"] }]);
     expect(result.text).not.toMatch(/SPOILER|OLD ATTEMPT|No position|No source|Relevant but not requested/);
     expect(result.omitted.map((x) => x.reason)).toEqual(["future_or_current", "future_or_current", "missing_provenance", "missing_provenance", "no_specific_need"]);
   });
@@ -72,4 +72,4 @@ describe("10,000-word context benchmark (synthetic; no AI or live book calls)", 
       console.info(`[2A benchmark] ${profile.id}: supplied=50000 output=${result.wordCount} omitted=${result.omitted.length} elapsed_ms=${elapsed.toFixed(1)}`);
     });
   }
-}
+});
