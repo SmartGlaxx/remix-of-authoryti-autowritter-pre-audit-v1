@@ -21,7 +21,7 @@ function buildStaticPrefix(): string {
   const sophia = getWriter("sophia")!;
   const base = [
     renderWriterPrompt(sophia, "fiction"),
-    renderExpressionBlock(WRITER_BASELINES["sophia"], "strict"),
+    renderExpressionBlock(WRITER_BASELINES["sophia"]!, "strict"),
     "STATIC RULES: No markdown in prose. Never use the words \"magic\" or \"magical\". Maintain tonal consistency with the established style anchors.",
   ].join("\n\n");
   const coda = "STYLE CODA: Every scene advances character or plot. Vary sentence length. Ground emotion in physical detail. Avoid rumination; one interior beat per page maximum. End sections on a hook. ";
