@@ -50,6 +50,15 @@ describe("Phase 2A adaptive context", () => {
     expect(() => assemble("finance", [], { hardLimitWords: HARD_CONTEXT_WORD_LIMIT + 1 })).toThrow();
     expect(() => assemble("finance", [], { hardLimitWords: 10, objective: "word ".repeat(15) })).toThrow();
   });
+
+  it("enforces the global ceiling even when a configured tier allows more", () => {
+    const custom = [{ ...CONTEXT_PROFILES[0], tierWords: { ...CONTEXT_PROFILES[0].tierWords, canon: 20_000 } }];
+    const candidates = Array.from({ length: 15 }, (_, n) => item(`canon-${n}`, "canon", `fact${n} `.repeat(1000)));
+    const result = assemble("novel", candidates, { profiles: custom });
+    expect(result.wordCount).toBeLessThanOrEqual(10_000);
+    expect(result.wordCount).toBeGreaterThan(9_000);
+    expect(result.omitted.some((x) => x.reason === "hard_limit")).toBe(true);
+  });
 });
 
 describe("10,000-word context benchmark (synthetic; no AI or live book calls)", () => {
