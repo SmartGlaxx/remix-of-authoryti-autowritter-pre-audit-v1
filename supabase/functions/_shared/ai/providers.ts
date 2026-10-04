@@ -203,7 +203,7 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
   }
   // Newer Claude models reject `temperature` ("deprecated for this model"); Anthropic calls never send sampling params.
   const res = await post(ctx, url, { "anthropic-version": "2023-06-01", ...headers }, body, provider);
-  let input: number | null = null, cached: number | null = null, requestId: string | null = null;
+  let input: number | null = null, cached: number | null = null, cacheWrite: number | null = null, requestId: string | null = null;
   for await (const { data } of sseEvents(res.body!)) {
     if (!data) continue;
     let p: any;
@@ -247,7 +247,7 @@ export const openaiAdapter: ProviderAdapter = {
 
 export const anthropicAdapter: ProviderAdapter = {
   id: "anthropic",
-  stream: (req, ctx) => messages("https://api.anthropic.com/v1/messages", { "x-api-key": ctx.apiKey }, ctx.model.directId, req, ctx, "Anthropic"),
+  stream: (req, ctx) => messages("https://api.anthropic.com/v1/messages", { "x-api-key": ctx.apiKey, "anthropic-beta": "prompt-caching-2024-07-31" }, ctx.model.directId, req, ctx, "Anthropic"),
 };
 
 /** DeepSeek: automatic prefix caching — callers keep the static system prompt first. */
