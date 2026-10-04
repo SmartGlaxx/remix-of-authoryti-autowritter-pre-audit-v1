@@ -3,6 +3,7 @@ import { buildVoiceManifest } from "../_shared/writers/manifest.ts";
 import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
 import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
+import { openingDirective } from "../_shared/writers/opening.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -308,6 +309,8 @@ ${childrensEngineRules}
 ${comicEngineRules}
 
 ${pacingRules}
+
+${openingDirective(book.bookType)}
 
 ANTI-REPETITION RULE (STRICTLY ENFORCED):
 - NEVER rewrite, paraphrase, or revisit scenes, dialogue, descriptions, or events that already appeared in the previous section.

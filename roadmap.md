@@ -1,4 +1,5 @@
 # Roadmap — Pass 5 final acceptance
+- [x] Share book-type-aware anti-throat-clearing opening guidance across writing, intro and Try Writer prompts.
 - [x] Phase 2A: pure adaptive context engine and five configurable book-type profiles; run 10,000-word synthetic benchmark. Not connected to live generation; 
 - [x] Phase 2B: pure identity & artifact integrity (evidence-based resolution, six-way classification, severity gate, versioned/reversible commits) + 15 acceptance scenarios. Not wired to live generation; 2C/2D await approval.
 - [x] Step 1 UI walkthrough (browser)
