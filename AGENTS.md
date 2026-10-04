@@ -18,5 +18,6 @@
 - Anthropic requests never send sampling params (temperature) — newer Claude models reject them.
 - Book Ideas saves to `saved_book_ideas` (owner-only); `book-ideas` mode "light" returns only title/description/type/genre/audience, mode "details" builds the full setup for one idea at save time — AI credit is spent only on ideas the author keeps.
 - Both writer preview entry points share a single WriterStudio UI while `try-writer` remains preview-only — the page and creation dialog must show the same locked profile modes and bounded expression controls.
-- Anthropic adapter marks the static system prompt with `cache_control: {type:"ephemeral"}` (90% read discount, 1.25× write, 5-min TTL; below the 1,024-token minimum Anthropic silently skips caching — no error). Benchmark 2026-10-04: 2,146-token prefix cached, warm and cross-book reads confirmed.
+- Anthropic static system prompt uses ephemeral caching; below 1,024 tokens it skips silently. Benchmark: 2,146-token prefix cached, warm and cross-book reads confirmed.
 - Phase 2B identity integrity lives in `_shared/narrative/identity.ts` as pure functions (resolve, classify, gate, versioned commit/undo); not wired to live generation until 2D — no proposed entity gets an id or becomes canon without evidence and an explicit commit.
+- Share book-type opening guidance from `_shared/writers/opening.ts` in writing, intro and preview prompts to prevent formulaic openings without changing cache or model roles.
