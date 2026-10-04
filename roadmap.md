@@ -1,4 +1,5 @@
 # Roadmap — Pass 5 final acceptance
+- [ ] Phase 2A: pure adaptive context engine and five configurable book-type profiles; run 10,000-word benchmark. Do not connect to live generation or start 2B.
 - [x] Step 1 UI walkthrough (browser)
 - [x] Step 2 30k+ manuscript soak (existing 46,896-word book, no generation)
 - [x] Step 3 Severity calibration + cross-stage dedup
