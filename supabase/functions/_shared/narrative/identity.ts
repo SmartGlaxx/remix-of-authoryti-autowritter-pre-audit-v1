@@ -183,3 +183,28 @@ export function undoSection(reg: readonly RegistryEntity[], sectionKey: string):
     return { ...e, history: h };
   });
 }
+
+// ---------- Phase 2C helpers (pure; persistence atomicity lives in the DB RPC commit_identity_batch) ----------
+
+/** Logical idempotency identity — never raw content hash alone. extraction_id is excluded on purpose. */
+export interface IdempotencyKey { bookId: string; sectionId: string; contentHash: string; purpose: string; schemaVersion: number }
+export const idempotencyKey = (k: IdempotencyKey) => [k.bookId, k.sectionId, k.contentHash, k.purpose, k.schemaVersion].join("|");
+
+/** Validates a whole batch against the registry. Returns a plan or a rejection; never partially applies. */
+export function planBatch(reg: readonly RegistryEntity[], changes: readonly Commit[]): { ok: true; changes: Commit[] } | { ok: false; index: number; error: string } {
+  let sim: RegistryEntity[] = [...reg];
+  for (let i = 0; i < changes.length; i++) {
+    if (!sim.some((e) => e.id === changes[i].entityId)) return { ok: false, index: i, error: `unknown entity ${changes[i].entityId}` };
+    try { sim = commitChange(sim, changes[i]); } catch (err) { return { ok: false, index: i, error: (err as Error).message }; }
+  }
+  return { ok: true, changes: [...changes] };
+}
+
+/** Multi-model disagreement: confidence is not authority. Any disagreement → no id. */
+export function arbitrateModels(votes: readonly { model: string; entityId: string | null; confidence: number }[], material: boolean): Resolution {
+  const ids = new Set(votes.map((v) => v.entityId));
+  if (ids.size === 1 && votes.length && votes[0].entityId) {
+    return { classification: "EXISTING_ENTITY", entityId: votes[0].entityId, candidates: [], severity: "OK", conflicts: [], reason: "models agree" };
+  }
+  return { classification: "AMBIGUOUS", entityId: null, candidates: votes.filter((v) => v.entityId).map((v) => ({ id: v.entityId!, score: v.confidence, reasons: [v.model] })), severity: material ? "BLOCK" : "WARNING", conflicts: [], reason: "models disagree; confidence is not authority" };
+}
