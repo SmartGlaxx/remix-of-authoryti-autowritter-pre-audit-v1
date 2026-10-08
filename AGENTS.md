@@ -21,3 +21,4 @@
 - Anthropic static system prompt uses ephemeral caching; below 1,024 tokens it skips silently. Benchmark: 2,146-token prefix cached, warm and cross-book reads confirmed.
 - Phase 2B identity integrity lives in `_shared/narrative/identity.ts` as pure functions (resolve, classify, gate, versioned commit/undo); not wired to live generation until 2D — no proposed entity gets an id or becomes canon without evidence and an explicit commit.
 - Share book-type opening guidance from `_shared/writers/opening.ts` in writing, intro and preview prompts to prevent formulaic openings without changing cache or model roles.
+- Style Diversity layer lives in `_shared/writers/rhetoric.ts` (pure); the opening-strategy ledger is derived from saved section text rather than stored, so regeneration needs no undo, and the strategy goes only in the dynamic prompt tail to keep the cached prefix byte-identical.
