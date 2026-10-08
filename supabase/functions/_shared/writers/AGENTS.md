@@ -1,0 +1,4 @@
+- 15 expression sliders + Story Divergence mode live in `supabase/functions/_shared/writers/sliders.ts` (pure, shared); legacy fields (velocity, scope, entityComplexity, perspectiveMultiplexing, emotionalIntensity, divergenceAllowed) are read through it — no data migration needed.
+- `books.voice_manifest` is written once, server-side, on first section generation (`_shared/writers/manifest.ts`) and never overwritten.
+- Share book-type opening guidance from `_shared/writers/opening.ts` in writing, intro and preview prompts to prevent formulaic openings without changing cache or model roles.
+- Style Diversity layer lives in `_shared/writers/rhetoric.ts` (pure); the opening-strategy ledger is derived from saved section text rather than stored, so regeneration needs no undo, and the strategy goes only in the dynamic prompt tail to keep the cached prefix byte-identical.
