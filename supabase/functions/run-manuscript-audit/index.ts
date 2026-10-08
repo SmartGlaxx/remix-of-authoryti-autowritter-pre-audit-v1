@@ -113,7 +113,7 @@ async function runAudit(ctx: { db: any; auditId: string; bookId: string; userId:
       plot_threads: () => plotThreadFindings(rows, bookComplete),
       canonical_facts: () => canonicalFactFindings(rows),
       continuity_history: () => continuityHistoryFindings(checks, sections),
-      redundancy: () => redundancyFindings(sections),
+      redundancy: () => [...redundancyFindings(sections), ...rhetoricalRepetitionFindings(sections)],
     };
 
     const stageList = (Object.keys(progress) as AuditStage[]).filter((s) => progress[s].status === "pending" && s !== "evidence_validation" && s !== "deduplication");

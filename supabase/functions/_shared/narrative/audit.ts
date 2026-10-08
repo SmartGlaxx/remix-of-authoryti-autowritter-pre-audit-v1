@@ -1,4 +1,5 @@
 // Pass 5 — Manuscript-level auditor: pure logic (no I/O). AUDIT-ONLY.
+import { openingFamily } from "../writers/rhetoric.ts";
 // Nothing here rewrites prose, mutates canon, closes threads or deletes chapters.
 // Shared by the run-manuscript-audit edge function, the browser and tests.
 import { normText, toPosition } from "./rules.ts";
@@ -575,4 +576,28 @@ export function toFindingRow(f: ValidatedFinding, ctx: { auditId: string; bookId
     user_canon_protected: f.userCanonProtected, explanation: f.explanation, suggested_action: f.suggestedAction,
     auto_fixable: false, status: "OPEN", dedup_key: f.dedupKey,
   };
+}
+
+/** Rhetorical pattern repetition (Style Diversity layer): same opening template reused across 3+ sections. Read-only. */
+export function rhetoricalRepetitionFindings(sections: ManuscriptSection[], threshold = 3): RawFinding[] {
+  const byFamily = new Map<string, ManuscriptSection[]>();
+  for (const sec of sections) {
+    const fam = openingFamily(sec.content);
+    if (fam) byFamily.set(fam, [...(byFamily.get(fam) ?? []), sec]);
+  }
+  const out: RawFinding[] = [];
+  for (const [fam, secs] of byFamily) {
+    if (secs.length < threshold) continue;
+    const [a, b] = secs;
+    const ex = (s: ManuscriptSection) => s.content.trim().split(/(?<=[.!?])\s+/)[0].slice(0, 300);
+    out.push({
+      category: "redundancy", severity: "LOW", confidence: 1,
+      title: `Same opening template ("${fam.replace(/_/g, " ")}") in ${secs.length} sections`,
+      description: `Sections ${secs.map((s) => `${s.chapterIndex + 1}.${s.subsectionIndex + 1}`).join(", ")} open with variants of the same rhetorical template.`,
+      evidenceExcerpt: ex(b), contradictingExcerpt: ex(a), contradictingEvidence: null, related: emptyRelated(),
+      explanation: "Repeated rhetorical opening pattern across sections.", suggestedAction: "Rewrite some of these openings with a different approach (scene, case, question, claim).",
+      evidenceLocation: { chapterIndex: b.chapterIndex, subsectionIndex: b.subsectionIndex }, contradictingLocation: { chapterIndex: a.chapterIndex, subsectionIndex: a.subsectionIndex },
+    });
+  }
+  return out;
 }
