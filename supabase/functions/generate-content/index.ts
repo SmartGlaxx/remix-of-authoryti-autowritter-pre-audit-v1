@@ -560,6 +560,15 @@ serve(async (req) => {
       }
     }
 
+    // ── Style Diversity: planned opening strategy (dynamic tail only; cached prefix untouched) ──
+    try {
+      const ledger = buildLedger(book.outline, { chapterIndex, subsectionIndex });
+      const strategy = planOpeningStrategy({ bookType: book.bookType, writerId: book.controls?.writerId ?? null, position: ledger.length, ledger });
+      userPrompt = `${userPrompt}\n\n${renderOpeningStrategyBlock(strategy, ledger)}`;
+      console.log(`[rhetoric] strategy=${strategy} prior=${ledger.length}`);
+    } catch (e) { console.warn("[rhetoric] skipped:", e instanceof Error ? e.message : e); }
+
+
     // ── Pass 3: provider-neutral AI call (role = writer) ──
     const bookModelConfig = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
     // Freeze the Book Voice Manifest on first generation (never overwritten).
