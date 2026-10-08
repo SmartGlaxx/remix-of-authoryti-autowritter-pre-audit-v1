@@ -18,3 +18,4 @@
 - Both writer preview entry points share a single WriterStudio UI while `try-writer` remains preview-only — the page and creation dialog must show the same locked profile modes and bounded expression controls.
 - Anthropic static system prompt uses ephemeral caching; below 1,024 tokens it skips silently. Benchmark: 2,146-token prefix cached, warm and cross-book reads confirmed.
 - Phase 2B identity integrity lives in `_shared/narrative/identity.ts` as pure functions (resolve, classify, gate, versioned commit/undo); not wired to live generation until 2D — no proposed entity gets an id or becomes canon without evidence and an explicit commit.
+- Identity commits persist only through the `commit_identity_batch` database function (server-only, one transaction, idempotent on book+section+content hash+purpose+schema version, rejects authority inversion) — partial batches and retry duplicates are impossible at the database level, not just in tests.
