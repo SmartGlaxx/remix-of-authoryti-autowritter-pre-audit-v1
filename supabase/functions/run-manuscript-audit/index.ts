@@ -10,7 +10,7 @@ import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrati
 import {
   applyConsolidation, buildAuditPrompt, buildConsolidationPrompt, buildEvidenceIndex, buildManuscriptSections, canonicalFactFindings, computeAuditInputs, continuityHistoryFindings,
   deduplicateFindings, initialStageProgress, isNonfiction, LLM_STAGES, manuscriptText, parseStageOutput, plotThreadFindings,
-  redundancyFindings, renderIdCatalog, renderManuscriptDigest, renderOutlineText, STAGE_CATEGORY, structuralGapFindings,
+  redundancyFindings, rhetoricalRepetitionFindings, renderIdCatalog, renderManuscriptDigest, renderOutlineText, STAGE_CATEGORY, structuralGapFindings,
   summarizeFindings, toFindingRow, validateFinding, type AuditStage, type RawFinding, type StageProgress, type ValidatedFinding,
 } from "../_shared/narrative/audit.ts";
 
