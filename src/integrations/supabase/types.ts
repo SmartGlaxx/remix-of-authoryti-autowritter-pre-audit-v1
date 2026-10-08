@@ -678,6 +678,131 @@ export type Database = {
           },
         ]
       }
+      identity_attribute_versions: {
+        Row: {
+          attribute: string
+          authority: string
+          book_id: string
+          commit_id: string | null
+          created_at: string
+          effective_position: number
+          entity_id: string
+          evidence: string
+          id: string
+          source: string
+          source_section_key: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          attribute: string
+          authority: string
+          book_id: string
+          commit_id?: string | null
+          created_at?: string
+          effective_position: number
+          entity_id: string
+          evidence: string
+          id?: string
+          source: string
+          source_section_key: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          attribute?: string
+          authority?: string
+          book_id?: string
+          commit_id?: string | null
+          created_at?: string
+          effective_position?: number
+          entity_id?: string
+          evidence?: string
+          id?: string
+          source?: string
+          source_section_key?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_attribute_versions_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "identity_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      identity_commits: {
+        Row: {
+          book_id: string
+          content_hash: string
+          created_at: string
+          extraction_id: string | null
+          id: string
+          purpose: string
+          schema_version: number
+          section_id: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          content_hash: string
+          created_at?: string
+          extraction_id?: string | null
+          id?: string
+          purpose: string
+          schema_version: number
+          section_id: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          content_hash?: string
+          created_at?: string
+          extraction_id?: string | null
+          id?: string
+          purpose?: string
+          schema_version?: number
+          section_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      identity_entities: {
+        Row: {
+          aliases: string[]
+          book_id: string
+          created_at: string
+          id: string
+          introduced_position: number
+          kind: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          aliases?: string[]
+          book_id: string
+          created_at?: string
+          id?: string
+          introduced_position?: number
+          kind: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          aliases?: string[]
+          book_id?: string
+          created_at?: string
+          id?: string
+          introduced_position?: number
+          kind?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       manuscript_audit_findings: {
         Row: {
           audit_id: string
@@ -1811,6 +1936,19 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_request_logs: { Args: never; Returns: undefined }
+      commit_identity_batch: {
+        Args: {
+          p_book_id: string
+          p_changes: Json
+          p_content_hash: string
+          p_extraction_id: string
+          p_purpose: string
+          p_schema_version: number
+          p_section_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       mark_first_chapter_completed: {
         Args: { _user_id: string }
         Returns: undefined
