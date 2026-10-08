@@ -32,3 +32,7 @@
 - [x] Book Ideas generator (+ → Get book ideas; OpenAI only; accept/adjust modal; sliders ±2, models locked)
 - [x] Fix: Claude rejects temperature (Test voice error)
 - [x] Saved book ideas: quick list, select & save (full setup made only on save), Saved tab, remove, open → start book
+
+- [x] Style Diversity layer: pattern families, opening planner, audit check, Try Writer rotation
+- [ ] Cache on/off opening test (needs approved spend on your Claude key)
+- [ ] Revise-once opening rewrite (streaming writer; needs design)

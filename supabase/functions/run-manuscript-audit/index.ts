@@ -10,7 +10,7 @@ import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrati
 import {
   applyConsolidation, buildAuditPrompt, buildConsolidationPrompt, buildEvidenceIndex, buildManuscriptSections, canonicalFactFindings, computeAuditInputs, continuityHistoryFindings,
   deduplicateFindings, initialStageProgress, isNonfiction, LLM_STAGES, manuscriptText, parseStageOutput, plotThreadFindings,
-  redundancyFindings, renderIdCatalog, renderManuscriptDigest, renderOutlineText, STAGE_CATEGORY, structuralGapFindings,
+  redundancyFindings, rhetoricalRepetitionFindings, renderIdCatalog, renderManuscriptDigest, renderOutlineText, STAGE_CATEGORY, structuralGapFindings,
   summarizeFindings, toFindingRow, validateFinding, type AuditStage, type RawFinding, type StageProgress, type ValidatedFinding,
 } from "../_shared/narrative/audit.ts";
 
@@ -113,7 +113,7 @@ async function runAudit(ctx: { db: any; auditId: string; bookId: string; userId:
       plot_threads: () => plotThreadFindings(rows, bookComplete),
       canonical_facts: () => canonicalFactFindings(rows),
       continuity_history: () => continuityHistoryFindings(checks, sections),
-      redundancy: () => redundancyFindings(sections),
+      redundancy: () => [...redundancyFindings(sections), ...rhetoricalRepetitionFindings(sections)],
     };
 
     const stageList = (Object.keys(progress) as AuditStage[]).filter((s) => progress[s].status === "pending" && s !== "evidence_validation" && s !== "deduplication");
