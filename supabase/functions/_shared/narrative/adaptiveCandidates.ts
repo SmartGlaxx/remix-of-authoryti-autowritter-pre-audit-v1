@@ -5,6 +5,7 @@ import { selectNarrativeState, type NarrativeRows, type OutlineCharacter } from 
 import { assembleAdaptiveContext, countContextWords, profileForBookType, type AssembledContext, type ContextCandidate } from "./adaptiveContext.ts";
 import { toPosition, type StoryPosition } from "./rules.ts";
 import { parseReplacements, replacementTag } from "./deprecations.ts";
+import { castKey, castStatus, plannedDebuts } from "./cast.ts";
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -39,12 +40,21 @@ export function buildAdaptiveCandidates(input: AdaptiveInput): { candidates: Con
   const profile = profileForBookType(input.bookType);
   const current = toPosition(position);
   const out: ContextCandidate[] = [];
-  const state = selectNarrativeState(rows, position, (outline?.characters ?? []) as OutlineCharacter[]);
+  const cast = (outline?.characters ?? []) as OutlineCharacter[];
+  const state = selectNarrativeState(rows, position, cast, outline?.chapters ?? []);
+  // Planned cast is outline canon, but only characters whose planned debut is at or before the
+  // target are eligible for this scene; later debuts are withheld (no early appearances).
+  const debuts = plannedDebuts(cast as Row[], outline?.chapters ?? []);
+  const withheld = new Set<string>();
+  const evidenced = new Set(state.characters.filter((c) => c.state).map((c) => c.name));
 
   // Canon: outline-level characters (pre-book) + clean canonical facts known before the target.
-  for (const c of (outline?.characters ?? []) as OutlineCharacter[]) {
+  for (const c of cast) {
     if (!c?.name) continue;
-    const text = [c.name, c.role, c.description].filter(Boolean).join(" — ");
+    const status = evidenced.has(c.name) ? "established" : castStatus(debuts.get(castKey(c)), position);
+    if (status === "future") { withheld.add(c.name.toLowerCase()); continue; }
+    const tag = status === "enters_now" ? " [planned to first appear in THIS section]" : status === "unplaced" ? " [planned cast; not yet on page]" : "";
+    const text = [c.name + tag, c.role, c.description].filter(Boolean).join(" — ");
     out.push({ id: `outline-char:${c.id ?? c.name}`, tier: "canon", text, source: "outline", authority: "OUTLINE_CANON", establishedAt: null, relevance: 0.9 });
   }
   for (const f of state.facts) {
@@ -64,6 +74,7 @@ export function buildAdaptiveCandidates(input: AdaptiveInput): { candidates: Con
   for (const e of input.identityEntities ?? []) {
     const p = Number(e.introduced_position);
     if (!Number.isFinite(p) || p >= current) continue;
+    if ([e.name, ...(e.aliases ?? [])].some((n: unknown) => typeof n === "string" && withheld.has(n.toLowerCase()))) continue; // planned later debut
     const at = { chapterIndex: Math.floor(p / 10000), subsectionIndex: p % 10000 };
     const tier = ARTIFACT_TYPES.has(String(e.kind)) ? "artifacts" : "entities";
     out.push({ id: `identity:${e.id}`, tier, text: `${e.name} (${e.kind})${e.aliases?.length ? `, also: ${e.aliases.join(", ")}` : ""}`, source: "identity registry", authority: "APPROVED_GENERATED_STATE", establishedAt: at, relevance: 0.8 });

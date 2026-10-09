@@ -104,7 +104,7 @@ async function runAudit(ctx: { db: any; auditId: string; bookId: string; userId:
     const config = await loadBookModelConfig(db, bookId, userId);
     const deps = createAIDeps(db, userId);
     const last = [...sections].reverse().find((s) => s.content.trim())!;
-    const stateText = renderNarrativeContext(selectNarrativeState(rows, { chapterIndex: last.chapterIndex, subsectionIndex: last.subsectionIndex + 1 }, ctx.outline?.characters ?? []));
+    const stateText = renderNarrativeContext(selectNarrativeState(rows, { chapterIndex: last.chapterIndex, subsectionIndex: last.subsectionIndex + 1 }, ctx.outline?.characters ?? [], ctx.outline?.chapters ?? []));
     const digest = renderManuscriptDigest(sections);
     const outlineText = renderOutlineText(sections);
     const idCatalog = renderIdCatalog(rows, checks);

@@ -3,6 +3,7 @@
 // it selects only what was true strictly BEFORE that position and renders a
 // compact, structured block for the writer prompt.
 import { AUTHORITY_RANK, toPosition, type Authority, type StoryPosition } from "./rules.ts";
+import { castKey, castStatus, plannedDebuts, type CastStatus } from "./cast.ts";
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -20,7 +21,7 @@ export interface NarrativeRows {
   snapshots: Row[];       // story_state_snapshots
 }
 
-export interface OutlineCharacter { id?: string; name?: string; role?: string; description?: string; personality?: string; appearance?: string }
+export interface OutlineCharacter { id?: string; name?: string; role?: string; description?: string; personality?: string; appearance?: string; firstAppearance?: StoryPosition }
 
 export interface MergedCharacterState {
   location: string | null; physical: string | null; emotional: string | null;
@@ -31,7 +32,7 @@ export interface MergedCharacterState {
 
 export interface SelectedNarrativeState {
   position: StoryPosition;
-  characters: { id: string; name: string; role: string | null; baseline: OutlineCharacter | null; state: MergedCharacterState | null }[];
+  characters: { id: string; name: string; role: string | null; baseline: OutlineCharacter | null; state: MergedCharacterState | null; cast?: CastStatus }[];
   activeThreads: { id: string; title: string; description: string | null; setupPromise: string | null; requiredResolution: string | null; status: "OPEN" | "DEVELOPING"; importance: string; clues: string[]; developments: string[]; characters: string[] }[];
   facts: Row[];
   disputedFacts: Row[];
@@ -83,7 +84,7 @@ function closurePosition(t: Row, eventPos: Map<string, number>): number | null {
   return null;
 }
 
-export function selectNarrativeState(rows: NarrativeRows, position: StoryPosition, outlineCharacters: OutlineCharacter[] = []): SelectedNarrativeState {
+export function selectNarrativeState(rows: NarrativeRows, position: StoryPosition, outlineCharacters: OutlineCharacter[] = [], outlineChapters: Row[] = []): SelectedNarrativeState {
   const p = toPosition(position);
   const before = (x: number | null) => x == null || x < p; // strictly before current position
 
@@ -98,8 +99,14 @@ export function selectNarrativeState(rows: NarrativeRows, position: StoryPositio
   const pastEventIds = new Set(pastEvents.map((e) => e.id));
   const participantsOf = (id: string) => rows.participants.filter((x) => x.event_id === id).map((x) => charName.get(x.character_id)).filter(Boolean) as string[];
 
-  // Characters: baseline profile + merged temporal state before p
-  const characters = rows.characters.filter((c) => c.is_active !== false).map((c) => {
+  // Characters: baseline profile + merged temporal state before p, gated by planned debut.
+  // Outline cast is included even before extraction creates profiles; a planned character
+  // whose debut is after p is withheld (outline canon is kept, but is not present-scene knowledge).
+  const recentParticipantIds = new Set(rows.participants.filter((x) => pastEventIds.has(x.event_id)).map((x) => x.character_id));
+  const debuts = plannedDebuts(outlineCharacters as Row[], outlineChapters);
+  const matchedKeys = new Set<string>();
+  const characters: SelectedNarrativeState["characters"] = [];
+  for (const c of rows.characters.filter((c) => c.is_active !== false)) {
     const states = rows.states
       .filter((s) => s.character_id === c.id && (rowPos(s) ?? Infinity) < p)
       .filter((s) => {
@@ -109,10 +116,27 @@ export function selectNarrativeState(rows: NarrativeRows, position: StoryPositio
       })
       .sort((a, b) => (rowPos(a)! - rowPos(b)!) || ((a.version ?? 1) - (b.version ?? 1)));
     const baseline = outlineCharacters.find((o) => (c.source_key && o.id === c.source_key) || (o.name && o.name === c.name)) ?? null;
-    return { id: c.id, name: c.name, role: c.role ?? null, baseline, state: mergeCharacterStates(states) };
-  });
+    const state = mergeCharacterStates(states);
+    const evidence = !!state || recentParticipantIds.has(c.id);
+    let cast: CastStatus = "established";
+    if (baseline) {
+      const key = castKey(baseline);
+      if (matchedKeys.has(key)) continue; // one entry per planned character
+      matchedKeys.add(key);
+      cast = evidence ? "established" : castStatus(debuts.get(key), position);
+      if (cast === "future") continue;
+    } else if (!evidence) continue; // extracted character with nothing known before p (e.g. from a later section)
+    characters.push({ id: c.id, name: c.name, role: c.role ?? null, baseline, state, cast });
+  }
+  for (const o of outlineCharacters) {
+    const key = castKey(o);
+    if (!key || !o.name || matchedKeys.has(key)) continue;
+    const cast = castStatus(debuts.get(key), position);
+    if (cast === "future") continue;
+    matchedKeys.add(key);
+    characters.push({ id: `outline:${key}`, name: o.name, role: o.role ?? null, baseline: o, state: null, cast });
+  }
   // Characters with state or recent participation first
-  const recentParticipantIds = new Set(rows.participants.filter((x) => pastEventIds.has(x.event_id)).map((x) => x.character_id));
   characters.sort((a, b) => Number(!!b.state || recentParticipantIds.has(b.id)) - Number(!!a.state || recentParticipantIds.has(a.id)));
 
   // Threads active at p
@@ -190,7 +214,8 @@ export function renderNarrativeContext(s: SelectedNarrativeState): string {
     for (const c of chars) {
       const b = c.baseline;
       const base = [c.role || b?.role, b?.description || b?.personality].filter(Boolean).join(" — ");
-      out.push(`- ${c.name}${base ? `: ${base.slice(0, 200)}` : ""}`);
+      const tag = !c.state && c.cast === "enters_now" ? " [planned to first appear in THIS section]" : !c.state && c.cast === "unplaced" ? " [planned cast; not yet on page]" : "";
+      out.push(`- ${c.name}${tag}${base ? `: ${base.slice(0, 200)}` : ""}`);
       const st = c.state;
       if (st) {
         const parts = [
@@ -252,6 +277,6 @@ export function renderNarrativeContext(s: SelectedNarrativeState): string {
   return `[NARRATIVE_MEMORY] Structured story state strictly before ${at(s.position)}. Use it for continuity; never mention it.\n${body}\n[/NARRATIVE_MEMORY]`;
 }
 
-export function buildNarrativeContext(rows: NarrativeRows, position: StoryPosition, outlineCharacters: OutlineCharacter[] = []): string {
-  return renderNarrativeContext(selectNarrativeState(rows, position, outlineCharacters));
+export function buildNarrativeContext(rows: NarrativeRows, position: StoryPosition, outlineCharacters: OutlineCharacter[] = [], outlineChapters: Row[] = []): string {
+  return renderNarrativeContext(selectNarrativeState(rows, position, outlineCharacters, outlineChapters));
 }

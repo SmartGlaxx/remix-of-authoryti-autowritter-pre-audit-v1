@@ -465,11 +465,15 @@ serve(async (req) => {
     // position drives story memory, so it arrives separately. Missing = old clients.
     const absChapter: number = Number.isInteger(body.absoluteChapterIndex) && body.absoluteChapterIndex >= 0 && body.absoluteChapterIndex <= 999 ? body.absoluteChapterIndex : chapterIndex;
 
+    // Dry run: assemble prompts exactly as a real write would, return them, make no AI call,
+    // charge nothing and write nothing. Used to verify the deployed context pipeline.
+    const dryRun = body.dryRun === true;
+
     // ── Credit & daily word cap enforcement ──
     const estimatedWords = targetWordsPerSubsection || 600;
     const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     
-    const { data: creditCheck, error: creditError } = await adminSupabase.rpc(
+    const { data: creditCheck, error: creditError } = dryRun ? { data: { allowed: true }, error: null } : await adminSupabase.rpc(
       "check_and_deduct_word_credits",
       { _user_id: auth.user.id, _estimated_words: estimatedWords, _skip_daily_cap: reqAutomationLevel === "auto-draft" }
     );
@@ -489,7 +493,7 @@ serve(async (req) => {
     if (!chapter || !subsection) throw new Error("Invalid chapter or subsection index");
 
     // Audit log
-    await auditLog(auth.user.id, "generate_content", "book", book.id, { chapterIndex, subsectionIndex, chapterTitle: chapter.title });
+    if (!dryRun) await auditLog(auth.user.id, "generate_content", "book", book.id, { chapterIndex, subsectionIndex, chapterTitle: chapter.title });
 
     const isChildren = book.bookType === "children";
     const isComic = book.bookType === "comic";
@@ -593,7 +597,7 @@ serve(async (req) => {
         const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
         if (owned) {
           const rows = await loadNarrativeRows(adminSupabase, book.id);
-          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex: absChapter, subsectionIndex }, owned.outline?.characters ?? []);
+          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex: absChapter, subsectionIndex }, owned.outline?.characters ?? [], owned.outline?.chapters ?? []);
           if (narrativeBlock) {
             userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${narrativeBlock}\n\n`);
             console.log(`[narrative-context] injected chars=${narrativeBlock.length}`);
@@ -612,6 +616,12 @@ serve(async (req) => {
       console.log(`[rhetoric] strategy=${strategy} prior=${ledger.length}`);
     } catch (e) { console.warn("[rhetoric] skipped:", e instanceof Error ? e.message : e); }
 
+
+    if (dryRun) {
+      return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ── Pass 3: provider-neutral AI call (role = writer) ──
     const bookModelConfig = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);

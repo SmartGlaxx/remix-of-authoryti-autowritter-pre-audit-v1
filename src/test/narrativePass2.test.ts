@@ -93,7 +93,7 @@ describe("Pass 2 — point-in-time narrative context", () => {
   it("never uses state recorded at the section being (re)written", () => {
     const s = selectNarrativeState(fixture(), { chapterIndex: 0, subsectionIndex: 1 });
     expect(s.recentEvents).toHaveLength(0);
-    expect(s.characters[0].state).toBeNull();
+    expect(s.characters.every((c) => c.state === null)).toBe(true); // a character first recorded at this section is not yet known
   });
 });
 

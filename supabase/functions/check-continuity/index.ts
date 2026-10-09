@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
     // Relevant structured state only (bounded by context LIMITS) — never the whole manuscript.
     const rows = await loadNarrativeRows(db, bookId);
-    const stateText = renderNarrativeContext(selectNarrativeState(rows, { chapterIndex: ch, subsectionIndex: sub }, owned.outline?.characters ?? []));
+    const stateText = renderNarrativeContext(selectNarrativeState(rows, { chapterIndex: ch, subsectionIndex: sub }, owned.outline?.characters ?? [], owned.outline?.chapters ?? []));
     const nonfiction = isNonfiction(bookRow?.book_type);
     // Deterministic guard: replaced APIs/terms established before this section must not reappear.
     const replacements = parseReplacements(rows.entities.filter((e) => typeof e.first_chapter_index === "number" && (e.first_chapter_index < ch || (e.first_chapter_index === ch && (e.first_subsection_index ?? 0) < sub))));

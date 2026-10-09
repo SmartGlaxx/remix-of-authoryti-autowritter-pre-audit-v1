@@ -7,3 +7,5 @@
 - Person names with ≥2 tokens and different surnames resolve as separate entities; a shared given name is not duplicate evidence, and any later same-person claim goes to review (`reviewMerge`), never auto-merge.
 - The browser sends a one-chapter outline slice with `chapterIndex: 0`; story-memory position comes from `absoluteChapterIndex` (server falls back to `chapterIndex` for old clients) — otherwise every section reads memory as if it were chapter 1.
 - Benchmarks and live tests run on the book's own writer profile with the user's provider keys (production models), never on the built-in gateway defaults.
+- Planned cast is gated by debut in pure `cast.ts` (explicit `firstAppearance`, else first outline section naming them by full name or a cast-unique name token); both Standard and Adaptive include outline characters before extraction but withhold later debuts — outline canon is preserved without becoming present-scene knowledge.
+- `generate-content` accepts `dryRun: true` to return the assembled prompts with no AI call, charge or write — used to verify deployed context before any paid benchmark.
