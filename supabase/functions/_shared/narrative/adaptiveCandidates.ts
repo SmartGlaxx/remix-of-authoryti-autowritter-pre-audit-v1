@@ -4,6 +4,7 @@
 import { selectNarrativeState, type NarrativeRows, type OutlineCharacter } from "./context.ts";
 import { assembleAdaptiveContext, countContextWords, profileForBookType, type AssembledContext, type ContextCandidate } from "./adaptiveContext.ts";
 import { toPosition, type StoryPosition } from "./rules.ts";
+import { parseReplacements, replacementTag } from "./deprecations.ts";
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -71,6 +72,13 @@ export function buildAdaptiveCandidates(input: AdaptiveInput): { candidates: Con
     if (typeof e.first_chapter_index !== "number") continue;
     const tier = ARTIFACT_TYPES.has(String(e.entity_type)) ? "artifacts" : "entities";
     out.push({ id: `entity:${e.id}`, tier, text: `${e.name} (${e.entity_type})${e.description ? `: ${e.description}` : ""}`, source: `section ${e.first_chapter_index}:${e.first_subsection_index ?? 0}`, authority: "APPROVED_GENERATED_STATE", establishedAt: { chapterIndex: e.first_chapter_index, subsectionIndex: e.first_subsection_index ?? 0 }, relevance: 0.75 });
+  }
+
+  // Replaced artifacts: keep the history but mark the legacy name unmistakably, highest artifact relevance.
+  const visibleArtifacts = state.entities.filter((e) => typeof e.first_chapter_index === "number" && ARTIFACT_TYPES.has(String(e.entity_type)));
+  for (const r of parseReplacements(visibleArtifacts.map((e) => ({ name: e.name, description: e.description, source: `section ${e.first_chapter_index}:${e.first_subsection_index ?? 0}` })))) {
+    const src = visibleArtifacts.find((e) => e.name.replace(/\(\)$/, "") === r.active) ?? visibleArtifacts[0];
+    out.push({ id: `replaced:${r.legacy}`, tier: "artifacts", text: replacementTag(r), source: r.source, authority: "APPROVED_GENERATED_STATE", establishedAt: { chapterIndex: src.first_chapter_index, subsectionIndex: src.first_subsection_index ?? 0 }, relevance: 1 });
   }
 
   // Recent prose: saved sections strictly before the target, newest first, tail-limited to the tier budget.

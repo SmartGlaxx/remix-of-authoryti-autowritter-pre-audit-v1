@@ -40,6 +40,9 @@
 # Phase 2D
 - [x] A/B memory switch (Standard vs Adaptive) in Book Settings, per-section measurements saved
 - [x] First controlled runs: fiction, self-help, technical, earlier-section rewrite (both modes)
-- [ ] Long-book runs (30k+ words) to measure savings; technical name-drift check
+- [x] Separate ids for different full names sharing a first name; merges go to review
+- [x] REPLACED — DO NOT USE tag in technical context + continuity guard for legacy names
+- [ ] Live technical chapter retest (paid AI)
+- [ ] Long-book runs (30k+ words) in both modes to measure savings (paid AI)
 - [x] Identity commits from accepted text (skips uncertain names)
 - [ ] Same-surname/first-name people (e.g. two Johns) held back as possible duplicates — decide whether full names should count as distinct

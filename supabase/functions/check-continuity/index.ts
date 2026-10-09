@@ -3,6 +3,7 @@
 // strictly before the section, revises repairable errors (≤3 cycles), saves the final
 // text back, and records an append-only continuity_checks row. Narrative extraction
 // runs AFTER this (client-sequenced), so candidate drafts never reach story state.
+import { findDeprecatedUses, parseReplacements } from "../_shared/narrative/deprecations.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
@@ -77,6 +78,8 @@ Deno.serve(async (req) => {
     const rows = await loadNarrativeRows(db, bookId);
     const stateText = renderNarrativeContext(selectNarrativeState(rows, { chapterIndex: ch, subsectionIndex: sub }, owned.outline?.characters ?? []));
     const nonfiction = isNonfiction(bookRow?.book_type);
+    // Deterministic guard: replaced APIs/terms established before this section must not reappear.
+    const replacements = parseReplacements(rows.entities.filter((e) => typeof e.first_chapter_index === "number" && (e.first_chapter_index < ch || (e.first_chapter_index === ch && (e.first_subsection_index ?? 0) < sub))));
     const config = await loadBookModelConfig(db, bookId, userId);
     const deps = createAIDeps(db, userId);
     const models = new Set<string>();
@@ -86,7 +89,7 @@ Deno.serve(async (req) => {
         const p = buildCheckerPrompt({ stateText, sectionText: text, nonfiction, chapterNumber: ch + 1, subsectionNumber: sub + 1 });
         const { text: out, meta } = await generateAIText({ role: "continuity_checker", config, userId, bookId, request: { ...p, json: true, temperature: 0, reasoning: "low" } }, deps);
         models.add(meta.model);
-        return parseCheckerOutput(out, text).issues;
+        return [...parseCheckerOutput(out, text).issues, ...findDeprecatedUses(text, replacements)];
       },
       async revise(text, targets: ContinuityIssue[]) {
         const p = buildRevisionPrompt({ sectionText: text, issues: targets, stateText, nonfiction });
