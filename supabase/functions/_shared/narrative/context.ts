@@ -3,6 +3,7 @@
 // it selects only what was true strictly BEFORE that position and renders a
 // compact, structured block for the writer prompt.
 import { AUTHORITY_RANK, toPosition, type Authority, type StoryPosition } from "./rules.ts";
+import { castKey, castStatus, plannedDebuts, type CastStatus } from "./cast.ts";
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
