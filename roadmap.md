@@ -36,3 +36,8 @@
 - [x] Style Diversity layer: pattern families, opening planner, audit check, Try Writer rotation
 - [ ] Cache on/off opening test (needs approved spend on your Claude key)
 - [ ] Revise-once opening rewrite (streaming writer; needs design)
+
+# Phase 2D
+- [x] A/B memory switch (Standard vs Adaptive) in Book Settings, per-section measurements saved
+- [ ] Controlled real runs: fiction, practical nonfiction, technical, regeneration, long-distance, Pass 4 (needs author to write sections with each mode; paid AI use)
+- [ ] Identity commits from live text after Pass 4 (after first comparison results)
