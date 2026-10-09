@@ -13,6 +13,7 @@ export interface SyncPlan {
 }
 
 const KIND: Record<string, EntityKind> = { person: "person", character: "person", organization: "organization", company: "organization", place: "place", location: "place", object: "object", item: "object", framework: "framework", claim: "claim", definition: "definition", concept: "definition", artifact: "artifact", api: "artifact", code: "artifact", version: "artifact", recipe: "recipe" };
+const RANK: Record<string, number> = { USER_CANON: 4, OUTLINE_CANON: 3, APPROVED_GENERATED_STATE: 2, AI_INFERENCE: 1 };
 export const kindFor = (t: string | null | undefined): EntityKind => KIND[String(t ?? "").toLowerCase()] ?? "other";
 
 export function planIdentitySync(registry: readonly RegistryEntity[], proposals: readonly Proposal[], pos: StoryPosition): SyncPlan {
@@ -32,8 +33,15 @@ export function planIdentitySync(registry: readonly RegistryEntity[], proposals:
       plan.skipped.push({ name: p.name, classification: res.classification, reason: res.reason });
       continue;
     }
+    const authority = p.outline ? "OUTLINE_CANON" : "AI_INFERENCE";
+    const existing = sim.find((e) => e.id === key);
+    const prior = existing ? (existing.history[p.attribute] ?? []).filter((v) => toPosition(v.effectiveAt) <= toPosition(pos)).sort((a, b) => toPosition(b.effectiveAt) - toPosition(a.effectiveAt))[0] : undefined;
+    if (prior && prior.value.trim().toLowerCase() !== (p.value ?? "").trim().toLowerCase() && RANK[prior.authority] > RANK[authority]) {
+      plan.skipped.push({ name: p.name, classification: "LOWER_AUTHORITY", reason: `${p.attribute} is held by ${prior.authority}; not overwritten` });
+      continue;
+    }
     if (p.value?.trim() && p.evidence.trim()) {
-      plan.changes.push({ entity_key: key, attribute: p.attribute, value: p.value.trim(), authority: p.outline ? "OUTLINE_CANON" : "AI_INFERENCE", evidence: p.evidence.slice(0, 500), source: p.outline ? "outline" : "accepted section" });
+      plan.changes.push({ entity_key: key, attribute: p.attribute, value: p.value.trim(), authority, evidence: p.evidence.slice(0, 500), source: p.outline ? "outline" : "accepted section" });
     }
   }
   return plan;
