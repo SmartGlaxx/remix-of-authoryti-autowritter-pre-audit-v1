@@ -44,7 +44,8 @@ Deno.serve(async (req) => {
 
     if (body.action === "save") {
       const c = normalizeConfig(body.config);
-      await db.from("book_model_configs").upsert({ book_id: bookId, user_id: userId, mode: c.mode, single_model: c.singleModel ?? null, profile_writer: c.mode === "profile" ? c.profileWriter : null, profile_tier: c.mode === "profile" ? c.profileTier : null, role_models: c.roleModels ?? {}, fallbacks: c.fallbacks ?? {} }, { onConflict: "book_id" });
+      const { error: saveErr } = await db.from("book_model_configs").upsert({ book_id: bookId, user_id: userId, mode: c.mode, single_model: c.singleModel ?? null, profile_writer: c.mode === "profile" ? c.profileWriter : null, profile_tier: c.mode === "profile" ? c.profileTier : null, role_models: c.roleModels ?? {}, fallbacks: c.fallbacks ?? {} }, { onConflict: "book_id" });
+      if (saveErr) { console.error("[model-config] save failed:", saveErr.message); return json({ error: "Could not save the writer setup" }, 500); }
     } else if (body.action === "reset") {
       await db.from("book_model_configs").delete().eq("book_id", bookId).eq("user_id", userId);
     }

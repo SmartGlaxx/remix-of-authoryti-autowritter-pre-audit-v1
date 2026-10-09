@@ -37,11 +37,11 @@ function setCachedNovelText(key: string, text: string) {
     if (oldest) NOVEL_TEXT_CACHE.delete(oldest);
   }
 }
-function trimToSentenceBoundary(textChunk: string): string {
-  const matches = [...textChunk.matchAll(/[.!?]\s+[A-Z]/g)];
-  if (matches.length === 0) return textChunk;
-  const last = matches[matches.length - 1];
-  return textChunk.slice((last.index || 0) + 1);
+/** Drops the partial sentence at the START of a tail slice (keeps everything after the first boundary). */
+export function trimToSentenceBoundary(textChunk: string): string {
+  const first = /[.!?]\s+(?=[A-Z])/.exec(textChunk);
+  if (!first) return textChunk;
+  return textChunk.slice(first.index + first[0].length);
 }
 
 const corsHeaders = {
@@ -461,6 +461,9 @@ serve(async (req) => {
     }
 
     const { book, chapterIndex, subsectionIndex, previousSummary, previousRawContent, tonalAnchors, ieltsBand, targetWordsPerSubsection, teaserStyle, automationLevel: reqAutomationLevel, aiModel: reqAiModel } = body;
+    // The browser sends a one-chapter outline slice (chapterIndex is then 0); the real chapter
+    // position drives story memory, so it arrives separately. Missing = old clients.
+    const absChapter: number = Number.isInteger(body.absoluteChapterIndex) && body.absoluteChapterIndex >= 0 && body.absoluteChapterIndex <= 999 ? body.absoluteChapterIndex : chapterIndex;
 
     // ── Credit & daily word cap enforcement ──
     const estimatedWords = targetWordsPerSubsection || 600;
@@ -571,7 +574,7 @@ serve(async (req) => {
           adminSupabase.from("identity_entities").select("id, kind, name, aliases, introduced_position").eq("book_id", book.id).limit(2000),
         ]);
         const objective = [subsection.title, subsection.description ?? subsection.summary].filter(Boolean).join(": ") || chapter.title || "Continue the book";
-        const { context, candidateCount } = buildAdaptiveContext({ bookType: book.bookType, position: { chapterIndex, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] });
+        const { context, candidateCount } = buildAdaptiveContext({ bookType: book.bookType, position: { chapterIndex: absChapter, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] });
         userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${context.text}\n\n`);
         const omittedCounts: Record<string, number> = {};
         for (const o of context.omitted) omittedCounts[o.reason] = (omittedCounts[o.reason] ?? 0) + 1;
@@ -590,7 +593,7 @@ serve(async (req) => {
         const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
         if (owned) {
           const rows = await loadNarrativeRows(adminSupabase, book.id);
-          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex, subsectionIndex }, owned.outline?.characters ?? []);
+          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex: absChapter, subsectionIndex }, owned.outline?.characters ?? []);
           if (narrativeBlock) {
             userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${narrativeBlock}\n\n`);
             console.log(`[narrative-context] injected chars=${narrativeBlock.length}`);
@@ -687,7 +690,7 @@ serve(async (req) => {
           let cost: number | null = null;
           try { cost = aiMeta.model ? estimateCostUSD(String(aiMeta.model), usage as never) : null; } catch { cost = null; }
           await adminSupabase.from("context_engine_runs").insert({
-            ...runMetrics, book_id: book.id, user_id: auth.user.id, chapter_index: chapterIndex, subsection_index: subsectionIndex,
+            ...runMetrics, book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex,
             book_type: book.bookType, prompt_words: (systemPrompt + userPrompt).split(/\s+/).length,
             model: aiMeta.model ?? null, input_tokens: usage.inputTokens ?? null, cached_input_tokens: usage.cachedInputTokens ?? null,
             output_tokens: usage.outputTokens ?? null, estimated_cost_usd: cost, latency_ms: Date.now() - startedAt,

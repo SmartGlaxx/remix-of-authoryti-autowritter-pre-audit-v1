@@ -42,7 +42,11 @@
 - [x] First controlled runs: fiction, self-help, technical, earlier-section rewrite (both modes)
 - [x] Separate ids for different full names sharing a first name; merges go to review
 - [x] REPLACED — DO NOT USE tag in technical context + continuity guard for legacy names
-- [ ] Live technical chapter retest (paid AI)
+- [x] Live technical chapter retest (DeepSeek Flash + GPT-6 Luna, Daniel/Balanced) — passed
 - [ ] Long-book runs (30k+ words) in both modes to measure savings (paid AI)
 - [x] Identity commits from accepted text (skips uncertain names)
-- [ ] Same-surname/first-name people (e.g. two Johns) held back as possible duplicates — decide whether full names should count as distinct
+- [x] Different full names sharing a first name are separate people
+- [x] Fix: writer profiles could not be saved (database rejected mode "profile")
+- [x] Fix: browser always sent chapter 1 position to story memory (absoluteChapterIndex)
+- [x] Fix: extraction now records artifacts/frameworks/definitions and "replaces" wording
+- [ ] Place names like "Harbor office" vs "Harbor Office" held back as possible duplicates (case/wording variants) — review

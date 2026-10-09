@@ -37,6 +37,8 @@ export interface ExtractionPlan {
   dropped: { kind: string; reason: string; item: string }[];
 }
 
+export const ENTITY_TYPES = ["location", "organization", "object", "faction", "artifact", "framework", "definition", "other"];
+
 // ---------- Prompt ----------
 export function buildExtractionPrompt(args: { text: string; position: StoryPosition; characters: KnownCharacter[]; threads: KnownThread[] }): { system: string; user: string } {
   const system = `You are a strict story-state extraction engine. You read ONE newly written section of a book and record ONLY what that text explicitly establishes.
@@ -57,7 +59,9 @@ character_changes[]: {name, location, physical_condition, emotional_state, goals
 facts[]: {subject, predicate, value, category ("character"|"world"|"plot"|"timeline"|"general"), confidence (0-1), evidence}
 thread_updates[]: {thread_id, change ("develops"|"complicates"|"clue"|"resolves"|"abandons"|"supersedes"), notes, evidence, superseded_by_title}
 new_threads[]: {title, description, setup_promise, importance ("major"|"minor"), evidence}
-entities[]: {name, entity_type ("location"|"organization"|"object"|"faction"|"other"), description, evidence}`;
+entities[]: {name, entity_type ("location"|"organization"|"object"|"faction"|"artifact"|"framework"|"definition"|"other"), description, evidence}
+- Use "artifact" for named functions, APIs, endpoints, classes, libraries and versions; "framework" for named models/methods/pillars; "definition" for defined terms.
+- When the text says a newer artifact or term replaces an older one (e.g. "v1 used X; v2 uses Y instead"), record the NEW one with a description that contains the exact words "replaces <old name>".`;
   const chars = args.characters.map((c) => `- ${c.name}${c.aliases?.length ? ` (aka ${c.aliases.join(", ")})` : ""}`).join("\n") || "(none recorded)";
   const threads = args.threads.map((t) => `- id=${t.id} [${t.status}] ${t.title}${t.setup_promise && t.setup_promise !== t.title ? ` — ${t.setup_promise}` : ""}`).join("\n") || "(none)";
   const user = `POSITION: chapter ${args.position.chapterIndex + 1}, section ${args.position.subsectionIndex + 1}
@@ -180,7 +184,7 @@ export function planExtraction(raw: Record<string, unknown>, ctx: { text: string
   for (const en of arr(raw.entities) as Record<string, unknown>[]) {
     const name = str(en?.name, 200), evidence = str(en?.evidence, 600);
     if (!name || !ok(evidence)) { drop("entity", "missing name or evidence", en); continue; }
-    const t = ["location", "organization", "object", "faction", "other"].includes(String(en.entity_type)) ? String(en.entity_type) : "other";
+    const t = ENTITY_TYPES.includes(String(en.entity_type)) ? String(en.entity_type) : "other";
     if (!plan.entities.some((x) => normText(x.name) === normText(name))) plan.entities.push({ name, entity_type: t, description: str(en.description, 400), evidence: evidence! });
   }
   return plan;

@@ -15,6 +15,20 @@
       "when": 1791511259939,
       "tag": "0001_context_engine_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791536708621,
+      "tag": "0002_allow_profile_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791536915050,
+      "tag": "0003_entity_artifact_types",
+      "breakpoints": true
     }
   ]
 }

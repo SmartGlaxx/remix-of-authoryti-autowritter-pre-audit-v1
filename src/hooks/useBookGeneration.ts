@@ -284,6 +284,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     const payload = {
       book: strippedBook,
       chapterIndex: 0,
+      absoluteChapterIndex: chapterIndex,
       subsectionIndex,
       previousSummary: trimContext(previousSummary, MAX_SUMMARY_CHARS),
       previousRawContent: trimContext(previousRawContent),

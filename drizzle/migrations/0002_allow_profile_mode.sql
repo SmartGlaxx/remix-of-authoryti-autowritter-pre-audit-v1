@@ -1,0 +1,2 @@
+ALTER TABLE public.book_model_configs DROP CONSTRAINT IF EXISTS book_model_configs_mode_check;
+ALTER TABLE public.book_model_configs ADD CONSTRAINT book_model_configs_mode_check CHECK (mode = ANY (ARRAY['legacy','optimized','single','custom','profile']));
