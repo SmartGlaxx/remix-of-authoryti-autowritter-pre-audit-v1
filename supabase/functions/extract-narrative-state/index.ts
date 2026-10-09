@@ -6,6 +6,7 @@ import { processSectionExtraction, type ModelCaller } from "../_shared/narrative
 import { generateAIText } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import type { BookModelConfig } from "../_shared/ai/roles.ts";
+import { syncIdentityForSection } from "../_shared/narrative/identityRepo.ts";
 import { createSupabaseNarrativeRepo, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 
 const corsHeaders = {
@@ -55,6 +56,14 @@ Deno.serve(async (req) => {
     const config = await loadBookModelConfig(db, bookId, userId);
     const outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: chapterIndex as number, subsectionIndex: subsectionIndex as number });
     console.log("[extract-narrative-state]", JSON.stringify(outcome));
+    // Phase 2D: only accepted, freshly extracted text feeds the identity registry. Never fails the extraction.
+    if (outcome.status === "completed") {
+      try {
+        const identity = await syncIdentityForSection(db, bookId, userId, { chapterIndex: chapterIndex as number, subsectionIndex: subsectionIndex as number });
+        (outcome as Record<string, unknown>).identity = identity;
+        console.log("[identity-sync]", JSON.stringify(identity));
+      } catch (e) { console.warn("[identity-sync] skipped:", e instanceof Error ? e.message : e); }
+    }
     // no_prose = section not saved yet → 409 so the client can retry shortly.
     const denied = outcome.status === "failed" && /credit_limit_reached|denied access/i.test(String((outcome as any).error ?? ""));
     const status = outcome.status === "no_prose" ? 409 : denied ? 403 : outcome.status === "failed" ? 500 : 200;
