@@ -57,3 +57,13 @@
 - [x] Fix: browser always sent chapter 1 position to story memory (absoluteChapterIndex)
 - [x] Fix: extraction now records artifacts/frameworks/definitions and "replaces" wording
 - [ ] Place names like "Harbor office" vs "Harbor Office" held back as possible duplicates (case/wording variants) — review
+
+## First-appearance setting (done 2026-10-09)
+- CharacterReference.firstAppearance added; editable in ChapterView character detail (Auto = first mention).
+- cast.ts already honored it; 4 new tests (Tomas Vey mention-vs-appearance case); 267 tests pass.
+- Dry-run on live build (free): absChapter correct (9 and 1); Standard Ch2.5 retains 99,960 chars earlier prose; Petr Saul absent from both modes at Ch2.5, present at Ch10 (established); Adaptive context ~3,000 words vs Standard ~100k chars.
+
+## Paid 30k A/B comparison (approved, ready to start)
+- Books: [2D-V standard/adaptive] full copies; same manuscript, Daniel/Balanced, matched tasks.
+- Record: context words, raw+cached input tokens, output tokens, provider cost, latency, retries, continuity outcomes, identity errors per matched section.
+- Report continuity/identity separately from cost (manuscript uses Ruth et al. vs outline Mara — known mismatch).
