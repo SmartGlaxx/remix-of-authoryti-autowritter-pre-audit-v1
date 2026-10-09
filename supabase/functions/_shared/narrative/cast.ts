@@ -51,10 +51,10 @@ export function plannedDebuts(cast: Row[], chapters: Row[]): DebutMap {
   return out;
 }
 
-export type CastStatus = "established" | "enters_now" | "future";
-/** established = debut strictly before p (or unknown); enters_now = planned debut is this section. */
+export type CastStatus = "established" | "enters_now" | "future" | "unplaced";
+/** established = planned debut strictly before p; enters_now = this section; unplaced = outline never places them (eligible, never claimed as on-page). */
 export function castStatus(debut: StoryPosition | null | undefined, position: StoryPosition): CastStatus {
-  if (!debut) return "established";
+  if (!debut) return "unplaced";
   const d = toPosition(debut), p = toPosition(position);
   return d < p ? "established" : d === p ? "enters_now" : "future";
 }
