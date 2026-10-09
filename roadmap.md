@@ -39,5 +39,7 @@
 
 # Phase 2D
 - [x] A/B memory switch (Standard vs Adaptive) in Book Settings, per-section measurements saved
-- [ ] Controlled real runs: fiction, practical nonfiction, technical, regeneration, long-distance, Pass 4 (needs author to write sections with each mode; paid AI use)
-- [ ] Identity commits from live text after Pass 4 (after first comparison results)
+- [x] First controlled runs: fiction, self-help, technical, earlier-section rewrite (both modes)
+- [ ] Long-book runs (30k+ words) to measure savings; technical name-drift check
+- [x] Identity commits from accepted text (skips uncertain names)
+- [ ] Same-surname/first-name people (e.g. two Johns) held back as possible duplicates — decide whether full names should count as distinct
