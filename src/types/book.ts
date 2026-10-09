@@ -396,6 +396,10 @@ export interface CharacterReference {
   personality?: CharacterPersonality;
   backstory?: CharacterBackstory;
   storyRole?: CharacterStoryRole;
+  /** Author-set planned entry point. Overrides the name-mention debut inferred from the outline.
+   *  Use when a character is mentioned before they physically appear (e.g. named on a union card
+   *  in Ch2 but found alive in Ch4). chapterIndex/subsectionIndex are 0-based. */
+  firstAppearance?: { chapterIndex: number; subsectionIndex?: number };
 }
 
 export interface BookOutline {
