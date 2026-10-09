@@ -31,6 +31,41 @@ describe("Planned debuts", () => {
   });
 });
 
+describe("Explicit first-appearance setting", () => {
+  const veyCast = [...cast, { id: "vey", name: "Tomas Vey", role: "union organizer" }];
+  const veyOutline = {
+    characters: veyCast,
+    chapters: [
+      ...outline.chapters.slice(0, 1),
+      { title: "C2", subsections: [sub("At the cannery Mara is chased off by a man with a scarred hand."), sub("The union card names Tomas Vey as organizer."), sub("Mara asks around."), sub("Nobody has seen Vey in weeks.")] },
+      { title: "C3", subsections: [sub("The scarred man is identified as Petr Saul, Hale's deputy.")] },
+      { title: "C4", subsections: [sub("Mara finds nothing."), sub("A cold trail."), sub("A rumor."), sub("A locked door."), sub("Mara finds Tomas Vey alive in the boathouse.")] },
+    ],
+  };
+
+  it("a name mention alone would place Tomas Vey in Ch2.1", () => {
+    expect(plannedDebuts(veyCast, veyOutline.chapters).get("vey")).toEqual(at(1, 1));
+  });
+
+  it("the author's firstAppearance setting overrides the name-mention debut", () => {
+    const configured = veyCast.map((c) => c.id === "vey" ? { ...c, firstAppearance: { chapterIndex: 3, subsectionIndex: 4 } } : c);
+    expect(plannedDebuts(configured, veyOutline.chapters).get("vey")).toEqual(at(3, 4));
+  });
+
+  it("with the setting, Vey stays out of Ch2 context in both modes despite being named there", () => {
+    const configured = veyCast.map((c) => c.id === "vey" ? { ...c, firstAppearance: { chapterIndex: 3, subsectionIndex: 4 } } : c);
+    const outline2 = { ...veyOutline, characters: configured };
+    expect(buildNarrativeContext(empty, at(1, 2), configured, veyOutline.chapters)).not.toContain("Tomas Vey");
+    const { context } = buildAdaptiveContext({ bookType: "novel", position: at(1, 2), objective: "Mara asks about the union", outline: outline2, rows: empty });
+    expect(context.text).not.toContain("Tomas Vey");
+  });
+
+  it("with the setting, Vey enters at his configured debut section", () => {
+    const configured = veyCast.map((c) => c.id === "vey" ? { ...c, firstAppearance: { chapterIndex: 3, subsectionIndex: 4 } } : c);
+    expect(buildNarrativeContext(empty, at(3, 4), configured, veyOutline.chapters)).toContain("Tomas Vey [planned to first appear in THIS section]");
+  });
+});
+
 describe("Standard mode cast", () => {
   it("receives Mara Quell and John Hale before any extraction", () => {
     const ctx = buildNarrativeContext(empty, at(0, 0), cast, outline.chapters);
