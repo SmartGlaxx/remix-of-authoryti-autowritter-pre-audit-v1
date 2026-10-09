@@ -15,6 +15,12 @@ export async function syncIdentityForSection(db: Db, bookId: string, userId: str
     .eq("status", "completed").order("updated_at", { ascending: false }).limit(1).maybeSingle();
   if (!ext) return { status: "skipped", reason: "no accepted extraction" };
 
+  // Regeneration undo: drop generated attribute versions committed from an older text of this section.
+  const sectionKey = `${pos.chapterIndex}:${pos.subsectionIndex}`;
+  const { data: oldCommits } = await db.from("identity_commits").select("id").eq("book_id", bookId).eq("section_id", sectionKey).neq("content_hash", ext.content_hash);
+  if (oldCommits?.length) {
+    await db.from("identity_attribute_versions").delete().eq("book_id", bookId).eq("source_section_key", sectionKey).neq("authority", "USER_CANON").in("commit_id", oldCommits.map((c: { id: string }) => c.id));
+  }
   const [ents, vers, chars, sents] = await Promise.all([
     db.from("identity_entities").select("*").eq("book_id", bookId).limit(5000),
     db.from("identity_attribute_versions").select("*").eq("book_id", bookId).limit(20000),
