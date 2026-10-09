@@ -7,6 +7,8 @@ import { openingDirective } from "../_shared/writers/opening.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
+import { buildAdaptiveContext, resolveContextEngine, type ContextEngine } from "../_shared/narrative/adaptiveCandidates.ts";
+import { estimateCostUSD } from "../_shared/ai/registry.ts";
 import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { LEGACY_PICKER_MAP } from "../_shared/ai/roles.ts";
@@ -493,9 +495,20 @@ serve(async (req) => {
     const isScreenplay = book.bookType === "drama";
     const band = ieltsBand || 7;
 
+    // ── Phase 2D A/B switch: read from the saved book (never trusted from the client). Default legacy. ──
+    const startedAt = Date.now();
+    let engine: ContextEngine = "legacy";
+    if (book.id) {
+      try {
+        const { data: eb } = await adminSupabase.from("books").select("controls, user_id").eq("id", book.id).maybeSingle();
+        if (eb && eb.user_id === auth.user.id) engine = resolveContextEngine(eb.controls);
+      } catch (e) { console.warn("[context-engine] lookup failed, using legacy:", e instanceof Error ? e.message : e); }
+    }
+    const runMetrics: Record<string, unknown> = { engine, profile_id: null, context_words: 0, candidates: 0, included: 0, omitted: {}, fell_back: false };
+
     // ── Fetch full prior novel text (with in-memory cache) for narrative books ──
     let previousNovelText: string | undefined;
-    if (isNarrative && book.id && !isChildrensBook) {
+    if (engine === "legacy" && isNarrative && book.id && !isChildrensBook) {
       try {
         // Lookup current char count to build cache key (changes invalidate cache)
         const { data: bookRow } = await adminSupabase
@@ -534,17 +547,45 @@ serve(async (req) => {
     const systemPrompt = buildStaticSystemPrompt(book, band, isScreenplay, isChildren, isComic, isNarrative, book.controls);
     
     // Variable user prompt = changes per subsection (not cached)
-    let userPrompt = buildVariablePrompt(
+    const legacyPrompt = () => buildVariablePrompt(
       book, chapter, subsection,
       previousNovelText,
       previousSummary, previousRawContent, tonalAnchors, teaserStyle,
       isScreenplay, isChildren, isComic, targetWordsPerSubsection, reqAutomationLevel
     );
+    let userPrompt = engine === "adaptive"
+      // Adaptive: prior prose comes only from the assembled context, never from client-sent text.
+      ? buildVariablePrompt(book, chapter, subsection, undefined, undefined, undefined, tonalAnchors, teaserStyle,
+          isScreenplay, isChildren, isComic, targetWordsPerSubsection, reqAutomationLevel)
+      : legacyPrompt();
 
     // ── Pass 2: structured narrative memory (point-in-time, strictly before this section) ──
     // Supplements (never replaces) the linear manuscript context. Any failure here is
     // non-fatal: the section is written exactly as before.
-    if (book.id) {
+    if (engine === "adaptive" && book.id) {
+      try {
+        const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
+        if (!owned) throw new Error("not owner");
+        const [rows, idRes] = await Promise.all([
+          loadNarrativeRows(adminSupabase, book.id),
+          adminSupabase.from("identity_entities").select("id, kind, name, aliases, introduced_position").eq("book_id", book.id).limit(2000),
+        ]);
+        const objective = [subsection.title, subsection.description ?? subsection.summary].filter(Boolean).join(": ") || chapter.title || "Continue the book";
+        const { context, candidateCount } = buildAdaptiveContext({ bookType: book.bookType, position: { chapterIndex, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] });
+        userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${context.text}\n\n`);
+        const omittedCounts: Record<string, number> = {};
+        for (const o of context.omitted) omittedCounts[o.reason] = (omittedCounts[o.reason] ?? 0) + 1;
+        Object.assign(runMetrics, { profile_id: context.profileId, context_words: context.wordCount, candidates: candidateCount, included: context.included.length, omitted: omittedCounts });
+        console.log(`[context-engine] adaptive profile=${context.profileId} words=${context.wordCount} included=${context.included.length}/${candidateCount}`);
+      } catch (e) {
+        // Fail open: write exactly as legacy would with the client-sent window.
+        console.warn("[context-engine] adaptive failed, falling back:", e instanceof Error ? e.message : e);
+        runMetrics.fell_back = true;
+        runMetrics.error = e instanceof Error ? e.message.slice(0, 300) : String(e);
+        userPrompt = legacyPrompt();
+      }
+    }
+    if ((engine === "legacy" || runMetrics.fell_back) && book.id) {
       try {
         const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
         if (owned) {
@@ -639,6 +680,21 @@ serve(async (req) => {
       if (u) console.log(`[cache] cached=${u.cachedInputTokens ?? "unknown"} input=${u.inputTokens ?? "unknown"}`);
       const cleaned = stripMetaLabels(full).trim();
       if (cleaned) await finalizeFullText(cleaned);
+      // Phase 2D measurement: one row per generated section, both engines. Never blocks the writer.
+      if (book.id) {
+        try {
+          const usage = (aiMeta.usage ?? {}) as { inputTokens?: number | null; outputTokens?: number | null; cachedInputTokens?: number | null };
+          let cost: number | null = null;
+          try { cost = aiMeta.model ? estimateCostUSD(String(aiMeta.model), usage as never) : null; } catch { cost = null; }
+          await adminSupabase.from("context_engine_runs").insert({
+            ...runMetrics, book_id: book.id, user_id: auth.user.id, chapter_index: chapterIndex, subsection_index: subsectionIndex,
+            book_type: book.bookType, prompt_words: (systemPrompt + userPrompt).split(/\s+/).length,
+            model: aiMeta.model ?? null, input_tokens: usage.inputTokens ?? null, cached_input_tokens: usage.cachedInputTokens ?? null,
+            output_tokens: usage.outputTokens ?? null, estimated_cost_usd: cost, latency_ms: Date.now() - startedAt,
+            output_words: cleaned ? cleaned.split(/\s+/).length : 0,
+          });
+        } catch (e) { console.warn("[context-engine] metrics skipped:", e instanceof Error ? e.message : e); }
+      }
     }, (e) => console.error("[generate-content] stream error:", e instanceof Error ? e.message : e));
 
     return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
