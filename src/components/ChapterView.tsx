@@ -570,6 +570,39 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
               characters={[selectedCharacter]} 
               visualStyleGuide={book.outline?.visualStyleGuide} 
             />
+            <Separator className="my-6" />
+            <div className="space-y-2">
+              <div className="text-sm font-medium">First appears in</div>
+              <p className="text-xs text-muted-foreground">
+                When this character physically enters the story. Leave on Auto to use the first outline section that names them — set it manually if they are only mentioned earlier (e.g. named on a document before appearing in person).
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={selectedCharacter.firstAppearance ? String(selectedCharacter.firstAppearance.chapterIndex) : "auto"}
+                  onChange={(e) => {
+                    if (e.target.value === "auto") { handleSetFirstAppearance(selectedCharacter.id, null); return; }
+                    handleSetFirstAppearance(selectedCharacter.id, { chapterIndex: Number(e.target.value), subsectionIndex: 0 });
+                  }}
+                >
+                  <option value="auto">Auto (first mention)</option>
+                  {chapters.map((ch, i) => (
+                    <option key={i} value={i}>Chapter {ch.chapterNumber ?? i + 1}: {ch.title}</option>
+                  ))}
+                </select>
+                {selectedCharacter.firstAppearance && (
+                  <select
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={String(selectedCharacter.firstAppearance.subsectionIndex ?? 0)}
+                    onChange={(e) => handleSetFirstAppearance(selectedCharacter.id, { chapterIndex: selectedCharacter.firstAppearance!.chapterIndex, subsectionIndex: Number(e.target.value) })}
+                  >
+                    {(chapters[selectedCharacter.firstAppearance.chapterIndex]?.subsections ?? []).map((sub, i) => (
+                      <option key={i} value={i}>Section {i + 1}{sub.title ? `: ${sub.title}` : ""}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </CardContent>
         </ScrollArea>
       </Card>
