@@ -77,11 +77,28 @@ function nameMatch(e: RegistryEntity, surface: string): "exact" | "alias" | "non
   return "none";
 }
 
+/**
+ * Two full person names (≥2 tokens each) with different surnames are different people:
+ * a shared given name alone ("John Reyes" vs "John Hale") is not evidence of duplication.
+ */
+export function distinctFullNames(a: string, b: string): boolean {
+  const ta = nameTokens(a), tb = nameTokens(b);
+  return ta.length >= 2 && tb.length >= 2 && ta[ta.length - 1] !== tb[tb.length - 1];
+}
+
 /** Weak signal only: shared non-trivial token (e.g. "Acme" in "Acme Corp" vs "Acme Inc"). */
 function partialName(e: RegistryEntity, surface: string): boolean {
   const stop = new Set(["the", "a", "of", "inc", "corp", "ltd", "llc", "co", "mr", "mrs", "dr"]);
   const t = new Set(nameTokens(surface).filter((x) => !stop.has(x) && x.length > 2));
-  return [e.name, ...e.aliases].some((n) => nameTokens(n).some((x) => t.has(x)));
+  return [e.name, ...e.aliases].some((n) => {
+    if (e.kind === "person" && distinctFullNames(n, surface)) return false;
+    return nameTokens(n).some((x) => t.has(x));
+  });
+}
+
+/** Merging two committed entities is never automatic: later alias evidence always goes to review. */
+export function reviewMerge(a: RegistryEntity, b: RegistryEntity, evidence: string): { autoMerge: false; severity: Severity; reason: string } {
+  return { autoMerge: false, severity: "NEEDS_REVIEW", reason: `possible same identity: ${a.name} / ${b.name}${evidence.trim() ? ` (${evidence.trim().slice(0, 200)})` : ""}; author verification required` };
 }
 
 /**
