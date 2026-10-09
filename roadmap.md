@@ -45,9 +45,11 @@
 - [x] Live technical chapter retest (DeepSeek Flash + GPT-6 Luna, Daniel/Balanced) — passed
 - [x] 30k base novel built (32,951 words, DeepSeek Flash + GPT-6 Luna)
 - [x] Fix: Standard mode kept only the last sentence of earlier text once a book passed ~100k characters
-- [ ] Re-run 30k A/B once the fixed writer step is live (last 2 runs hit an older live version) — blocked on deploy
-- [ ] Adaptive shows author-listed cast before they enter the story (Petr Saul in ch2 rewrite) — gate outline cast by first appearance
-- [ ] Standard mode never sends the author's cast list; the base novel renamed Mara/John Hale to Ruth/Hollis
+- [x] Deployed dry run (free): live build has all fixes, correct chapter position, Standard keeps ~100k chars of earlier prose
+- [ ] Paid 30k A/B on [2D-V …] copies — waiting on author approval
+- [x] Adaptive gates author-listed cast by planned first appearance
+- [x] Standard mode sends the author's cast list before extraction (gated by first appearance)
+- [ ] Name-only mention counts as a debut (Old Vey eligible from Ch2.3 because "Tomas Vey" is named there) — author decision
 - [ ] Story-memory step sometimes hits the CPU limit on long books (2 of 45 sections; retry worked)
 - [x] Identity commits from accepted text (skips uncertain names)
 - [x] Different full names sharing a first name are separate people
