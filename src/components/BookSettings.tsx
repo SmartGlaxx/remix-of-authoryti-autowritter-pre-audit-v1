@@ -43,6 +43,16 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     book.controls.writerId = id;
     toast.success("Writer updated");
   };
+  const [contextEngine, setContextEngine] = useState<"legacy" | "adaptive">((book.controls as { context_engine?: string }).context_engine === "adaptive" ? "adaptive" : "legacy");
+  const saveEngine = async (m: "legacy" | "adaptive") => {
+    const prev = contextEngine;
+    setContextEngine(m);
+    const next = { ...book.controls, context_engine: m };
+    const { error } = await supabase.from("books").update({ controls: next as never }).eq("id", book.id);
+    if (error) { setContextEngine(prev); toast.error("Couldn't change memory mode."); return; }
+    (book.controls as { context_engine?: string }).context_engine = m;
+    toast.success(m === "adaptive" ? "Adaptive memory on" : "Standard memory on");
+  };
   const sliders = effectiveSlidersFor({ bookType: book.bookType, toneProfile: book.toneProfile, controls: book.controls });
   const divergence = resolveDivergence(book.controls as never);
   const typeInfo = BOOK_TYPE_INFO[book.bookType];
@@ -217,6 +227,17 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Story Divergence</p>
                   <Badge variant={divergence === "strict" ? "secondary" : "success"}>{DIVERGENCE_OPTIONS.find((d) => d.value === divergence)?.label}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Memory Mode (test)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(["legacy", "adaptive"] as const).map((m) => (
+                      <Button key={m} size="sm" variant={contextEngine === m ? "default" : "outline"} onClick={() => saveEngine(m)}>
+                        {m === "legacy" ? "Standard" : "Adaptive"}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Adaptive picks only the most relevant earlier material for each new section. Used for side-by-side testing.</p>
                 </div>
               </CardContent>
             </Card>
