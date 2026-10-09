@@ -477,10 +477,6 @@ serve(async (req) => {
       "check_and_deduct_word_credits",
       { _user_id: auth.user.id, _estimated_words: estimatedWords, _skip_daily_cap: reqAutomationLevel === "auto-draft" }
     );
-    const _unusedCreditCheck = false && await adminSupabase.rpc(, error: creditError } = await adminSupabase.rpc(
-      "check_and_deduct_word_credits",
-      { _user_id: auth.user.id, _estimated_words: estimatedWords, _skip_daily_cap: reqAutomationLevel === "auto-draft" }
-    );
 
     if (creditError) { console.error("Credit check failed:", creditError); throw new Error("Credit check failed"); }
 
