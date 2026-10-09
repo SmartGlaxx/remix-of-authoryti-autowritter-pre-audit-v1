@@ -504,6 +504,92 @@ export type Database = {
           },
         ]
       }
+      context_engine_runs: {
+        Row: {
+          book_id: string
+          book_type: string
+          cached_input_tokens: number | null
+          candidates: number
+          chapter_index: number
+          context_words: number
+          created_at: string
+          engine: string
+          error: string | null
+          estimated_cost_usd: number | null
+          fell_back: boolean
+          id: string
+          included: number
+          input_tokens: number | null
+          latency_ms: number | null
+          model: string | null
+          omitted: Json
+          output_tokens: number | null
+          output_words: number | null
+          profile_id: string | null
+          prompt_words: number
+          subsection_index: number
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          book_type: string
+          cached_input_tokens?: number | null
+          candidates?: number
+          chapter_index: number
+          context_words?: number
+          created_at?: string
+          engine: string
+          error?: string | null
+          estimated_cost_usd?: number | null
+          fell_back?: boolean
+          id?: string
+          included?: number
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model?: string | null
+          omitted?: Json
+          output_tokens?: number | null
+          output_words?: number | null
+          profile_id?: string | null
+          prompt_words?: number
+          subsection_index: number
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          book_type?: string
+          cached_input_tokens?: number | null
+          candidates?: number
+          chapter_index?: number
+          context_words?: number
+          created_at?: string
+          engine?: string
+          error?: string | null
+          estimated_cost_usd?: number | null
+          fell_back?: boolean
+          id?: string
+          included?: number
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model?: string | null
+          omitted?: Json
+          output_tokens?: number | null
+          output_words?: number | null
+          profile_id?: string | null
+          prompt_words?: number
+          subsection_index?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "context_engine_runs_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       continuity_checks: {
         Row: {
           attempts: Json
