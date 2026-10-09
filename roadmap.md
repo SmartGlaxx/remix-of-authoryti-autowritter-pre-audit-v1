@@ -42,7 +42,16 @@
 - [x] First controlled runs: fiction, self-help, technical, earlier-section rewrite (both modes)
 - [x] Separate ids for different full names sharing a first name; merges go to review
 - [x] REPLACED — DO NOT USE tag in technical context + continuity guard for legacy names
-- [ ] Live technical chapter retest (paid AI)
-- [ ] Long-book runs (30k+ words) in both modes to measure savings (paid AI)
+- [x] Live technical chapter retest (DeepSeek Flash + GPT-6 Luna, Daniel/Balanced) — passed
+- [x] 30k base novel built (32,951 words, DeepSeek Flash + GPT-6 Luna)
+- [x] Fix: Standard mode kept only the last sentence of earlier text once a book passed ~100k characters
+- [ ] Re-run 30k A/B once the fixed writer step is live (last 2 runs hit an older live version) — blocked on deploy
+- [ ] Adaptive shows author-listed cast before they enter the story (Petr Saul in ch2 rewrite) — gate outline cast by first appearance
+- [ ] Standard mode never sends the author's cast list; the base novel renamed Mara/John Hale to Ruth/Hollis
+- [ ] Story-memory step sometimes hits the CPU limit on long books (2 of 45 sections; retry worked)
 - [x] Identity commits from accepted text (skips uncertain names)
-- [ ] Same-surname/first-name people (e.g. two Johns) held back as possible duplicates — decide whether full names should count as distinct
+- [x] Different full names sharing a first name are separate people
+- [x] Fix: writer profiles could not be saved (database rejected mode "profile")
+- [x] Fix: browser always sent chapter 1 position to story memory (absoluteChapterIndex)
+- [x] Fix: extraction now records artifacts/frameworks/definitions and "replaces" wording
+- [ ] Place names like "Harbor office" vs "Harbor Office" held back as possible duplicates (case/wording variants) — review

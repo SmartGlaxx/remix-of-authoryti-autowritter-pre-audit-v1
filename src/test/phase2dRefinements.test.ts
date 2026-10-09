@@ -63,3 +63,28 @@ describe("Replaced technical artifacts", () => {
     expect(context.text).toContain("[REPLACED — DO NOT USE: getUser()] (Active replacement: fetchUser())");
   });
 });
+
+describe("Extraction records technical artifacts and replacements", () => {
+  it("keeps artifact type and the 'replaces' wording so the tag can be built", async () => {
+    const { buildExtractionPrompt, validateExtraction, ENTITY_TYPES } = await import("../../supabase/functions/_shared/narrative/extraction.ts") as any;
+    expect(ENTITY_TYPES).toContain("artifact");
+    const p = buildExtractionPrompt({ text: "x", position: { chapterIndex: 0, subsectionIndex: 1 }, characters: [], threads: [] });
+    expect(p.system).toContain('"replaces <old name>"');
+    const reps = parseReplacements([{ name: "`fetchUser`", description: "Canonical client function; replaces `getUser(userId)`." }]);
+    expect(reps).toEqual([{ legacy: "getUser", active: "fetchUser", source: "`fetchUser`" }]);
+    void validateExtraction;
+  });
+});
+
+describe("Replacement parsing direction", () => {
+  it("'replaced by' on the old artifact never inverts legacy and active", () => {
+    const reps = parseReplacements([
+      { name: "getUser(userId)", description: "Deprecated v1 function; replaced by fetchUser." },
+      { name: "fetchUser", description: "Canonical client; replaces getUser(userId)." },
+    ]);
+    expect(reps).toEqual([{ legacy: "getUser", active: "fetchUser", source: "fetchUser" }]);
+    expect(findDeprecatedUses("Key on the id alone and the caller gets the cached payload.", reps)).toEqual([]);
+    expect(findDeprecatedUses("const u = await getUser(id);", reps)).toHaveLength(1);
+    expect(findDeprecatedUses("In v1 this was getUser, which has been replaced by fetchUser.", reps)).toEqual([]);
+  });
+});

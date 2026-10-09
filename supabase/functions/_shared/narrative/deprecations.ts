@@ -7,11 +7,11 @@ export interface Replacement { legacy: string; active: string; source: string }
 
 const IDENT = "([A-Za-z_$][\\w$.]*(?:\\(\\))?)";
 const PATTERNS: { re: RegExp; legacyIsName: boolean }[] = [
-  { re: new RegExp(`\\b(?:replaces|replaced|supersedes|superseded|renamed from|formerly|previously)\\s+\`?${IDENT}`, "i"), legacyIsName: false },
+  { re: new RegExp(`\\b(?:replaces|replaced|supersedes|superseded|renamed from|formerly|previously)\\s+(?!by\\b)\`?${IDENT}`, "i"), legacyIsName: false },
   { re: new RegExp(`\\b(?:replaced by|superseded by|renamed to|deprecated in favou?r of|use instead)\\s+\`?${IDENT}`, "i"), legacyIsName: true },
 ];
 
-const bare = (s: string) => s.replace(/`/g, "").replace(/\(\)$/, "").trim();
+const bare = (s: string) => s.replace(/`/g, "").replace(/\([^()]*\)$/, "").trim();
 const call = (s: string) => `${bare(s)}()`;
 
 /** Reads replacement relations from artifact names + descriptions. */
