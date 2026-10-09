@@ -593,7 +593,7 @@ serve(async (req) => {
         const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
         if (owned) {
           const rows = await loadNarrativeRows(adminSupabase, book.id);
-          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex: absChapter, subsectionIndex }, owned.outline?.characters ?? []);
+          const narrativeBlock = buildNarrativeContext(rows, { chapterIndex: absChapter, subsectionIndex }, owned.outline?.characters ?? [], owned.outline?.chapters ?? []);
           if (narrativeBlock) {
             userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${narrativeBlock}\n\n`);
             console.log(`[narrative-context] injected chars=${narrativeBlock.length}`);
