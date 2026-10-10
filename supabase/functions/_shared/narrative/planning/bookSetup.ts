@@ -18,7 +18,8 @@ export interface SetupCastMember {
   /** Lightweight = book-only character with no Persona Studio profile. */
   lightweight: boolean; note?: string;
 }
-export interface SetupViewpoint { castKey: string; purpose: string; chapters: number[] }
+/** `sections` are "chapter:section" keys (0-based). Viewpoints may share a chapter; each section/scene keeps exactly one. */
+export interface SetupViewpoint { castKey: string; purpose: string; chapters: number[]; sections?: string[] }
 export interface BookSetup {
   schema: number; stage: SetupStage;
   premise: string; fixedRequirements: string[];
@@ -75,6 +76,7 @@ export function normalizeSetup(raw: any): BookSetup {
     perspective: raw.perspective === "multiple" ? "multiple" : "single",
     viewpoints: (Array.isArray(raw.viewpoints) ? raw.viewpoints : []).slice(0, 8).map((v: any) => ({
       castKey: s(v?.castKey, 60), purpose: s(v?.purpose, 600), chapters: (Array.isArray(v?.chapters) ? v.chapters : []).map(int).filter((x: number | null): x is number => x !== null).slice(0, 200),
+      sections: (Array.isArray(v?.sections) ? v.sections : []).map((x: unknown) => String(x)).filter((x: string) => /^\d{1,3}:\d{1,3}$/.test(x)).slice(0, 400),
     })).filter((v: SetupViewpoint) => v.castKey),
     cast,
     narration: {
@@ -111,15 +113,21 @@ export function validateSetup(st: BookSetup, ctx: { bookType: string; penNames?:
   for (const c of st.cast) if (pens.includes(c.name.trim().toLowerCase())) out.push({ code: "PEN_NAME_AS_CHARACTER", message: `"${c.name}" is one of your pen names. Pen names cannot be characters or narrators.`, blocking: true });
   // Viewpoints.
   if (st.perspective === "single" && st.viewpoints.length > 1) out.push({ code: "SINGLE_ONE_VIEWPOINT", message: "Single perspective uses one viewpoint character.", blocking: true });
-  const seen = new Map<number, string>();
+  // Several viewpoints may share a chapter (separate scenes/sections). Head-hopping = two viewpoints in one section.
+  const seenCh = new Map<number, string>(); const seenSec = new Map<string, string>(); const shared = new Set<number>();
   for (const v of st.viewpoints) {
     if (!byKey.has(v.castKey)) out.push({ code: "VIEWPOINT_NOT_IN_CAST", message: "Every viewpoint character must be in the cast.", blocking: true });
     for (const ch of v.chapters) {
       if (ctx.chapterCount && ch >= ctx.chapterCount) out.push({ code: "VIEWPOINT_CHAPTER_RANGE", message: `Chapter ${ch + 1} is past the end of the book.`, blocking: false });
-      if (seen.has(ch) && seen.get(ch) !== v.castKey) out.push({ code: "HEAD_HOPPING", message: `Chapter ${ch + 1} has two viewpoint characters. Give each chapter one viewpoint.`, blocking: true });
-      seen.set(ch, v.castKey);
+      if (seenCh.has(ch) && seenCh.get(ch) !== v.castKey) shared.add(ch);
+      seenCh.set(ch, v.castKey);
+    }
+    for (const k of v.sections ?? []) {
+      if (seenSec.has(k) && seenSec.get(k) !== v.castKey) { const [c, sc] = k.split(":").map(Number); out.push({ code: "HEAD_HOPPING", message: `Chapter ${c + 1}, section ${sc + 1} has two viewpoint characters. Keep one viewpoint per scene.`, blocking: true }); }
+      seenSec.set(k, v.castKey);
     }
   }
+  for (const ch of shared) out.push({ code: "VIEWPOINT_SHARED_CHAPTER", message: `Chapter ${ch + 1} switches viewpoint between scenes. Each scene keeps one viewpoint, with a clear break between them.`, blocking: false });
   for (const t of st.twists) if (t.status === "approved" && ctx.chapterCount && t.revealChapter !== null && t.revealChapter >= ctx.chapterCount) out.push({ code: "TWIST_CHAPTER_RANGE", message: "A twist is scheduled past the last chapter.", blocking: true });
   const dupIds = st.cast.map((c) => c.identityId).filter(Boolean);
   if (new Set(dupIds).size !== dupIds.length) out.push({ code: "DUPLICATE_IDENTITY", message: "The same persona is in the cast twice.", blocking: true });
@@ -165,8 +173,8 @@ export function setupPlannerGuidance(st: BookSetup): { guidance: string; alterna
   lines.push(`Point of view: ${st.narration.pov.replace(/_/g, " ")}${st.narration.personaLed ? " (persona-led: one primary first-person narrator)" : ""}.`);
   if (name(st.narration.narratorKey)) lines.push(`Narrator: ${name(st.narration.narratorKey)}, ${st.narration.vantage} narration${st.narration.vantage === "retrospective" && st.narration.tellingDate ? ` told from ${st.narration.tellingDate}` : ""}.`);
   if (st.perspective === "multiple" && st.viewpoints.length) {
-    lines.push("Multiple viewpoints (one viewpoint per scene, no head-hopping; each viewpoint knows only what that character has learned):");
-    st.viewpoints.forEach((v) => lines.push(`- ${name(v.castKey) ?? v.castKey}: ${v.purpose || "viewpoint"}${v.chapters.length ? ` — chapters ${v.chapters.map((c) => c + 1).join(", ")}` : ""}`));
+    lines.push("Multiple viewpoints (a chapter may switch viewpoint between scenes with a clear break; one viewpoint per scene, no head-hopping; each viewpoint knows only what that character has learned):");
+    st.viewpoints.forEach((v) => lines.push(`- ${name(v.castKey) ?? v.castKey}: ${v.purpose || "viewpoint"}${v.chapters.length ? ` — chapters ${v.chapters.map((c) => c + 1).join(", ")}` : ""}${v.sections?.length ? ` — sections ${v.sections.map((k) => k.split(":").map((n) => Number(n) + 1).join(".")).join(", ")}` : ""}`));
   }
   if (st.universeId) lines.push("This book belongs to a shared universe: respect established dates, ages, deaths and relationships of existing characters.");
   lines.push("This setup is a planning direction, not established canon.");

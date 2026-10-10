@@ -103,3 +103,8 @@
 - [x] Characters-to-confirm review in Planning Studio
 - [x] 33 Phase 4 tests (504 total)
 - [ ] Live security checks against the new planning service — blocked until the updated service finishes deploying
+
+- [x] Phase 4 fail-closed AI test mode + deployment handshake (506/506 tests)
+- [x] Viewpoints may share a chapter in separate sections
+- [ ] Phase 4 live checks (`/tmp/sec/p4v.py`, 14 checks) — blocked until the updated planning service is deployed; handshake still reports the old build
+- [ ] Later: consolidate the Plan tab's older story-options box with the Setup tab (both call the same `alternatives` service; keep both until then)

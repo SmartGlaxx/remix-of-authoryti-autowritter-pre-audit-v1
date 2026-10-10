@@ -68,6 +68,16 @@ export async function selectRoute(modelKey: string, deps: AIDeps): Promise<Route
   return { adapter: "lovable_gateway", apiKey: deps.env.LOVABLE_API_KEY, source: "platform_gateway" };
 }
 
+/**
+ * Fail-closed test mode: no key (user BYOK, platform or gateway) is ever reachable, so any call that
+ * was not answered by a mock throws `test_mode_blocked` instead of reaching a paid provider.
+ */
+export const TEST_MODE_ERROR = "test_mode_blocked";
+export function failClosedDeps(deps: AIDeps): AIDeps {
+  const block = async (): Promise<never> => { throw new AIProviderError("test_mode_blocked", "Test mode: real AI calls are blocked."); };
+  return { ...deps, env: {}, getUserKey: block, fetch: (async () => block()) as typeof fetch };
+}
+
 const FALLBACK_ON = new Set(["missing_key", "auth", "unavailable", "network", "rate_limit"]);
 const emptyUsage = (): Usage => ({ inputTokens: null, outputTokens: null, cachedInputTokens: null, requestId: null });
 
@@ -181,5 +191,5 @@ export function toChatSSE(chunks: AsyncGenerator<string>, onDone?: (full: string
 /** HTTP status for a controlled AI error. */
 export function statusForAIError(e: unknown): number {
   if (!(e instanceof AIProviderError)) return 500;
-  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, unknown: 500 } as const)[e.code];
+  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, test_mode_blocked: 403, unknown: 500 } as const)[e.code];
 }

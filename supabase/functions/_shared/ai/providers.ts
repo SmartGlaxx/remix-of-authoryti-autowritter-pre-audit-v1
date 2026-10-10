@@ -27,7 +27,7 @@ export interface Usage {
 
 export type AIEvent = { type: "text"; text: string } | { type: "usage"; usage: Partial<Usage> };
 
-export type AIErrorCode = "missing_key" | "auth" | "rate_limit" | "payment" | "forbidden" | "bad_request" | "unavailable" | "network" | "inactive_role" | "unknown";
+export type AIErrorCode = "test_mode_blocked" | "missing_key" | "auth" | "rate_limit" | "payment" | "forbidden" | "bad_request" | "unavailable" | "network" | "inactive_role" | "unknown";
 
 export class AIProviderError extends Error {
   constructor(public code: AIErrorCode, message: string, public status: number | null = null, public retryable = false) {
