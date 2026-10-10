@@ -51,3 +51,42 @@ export async function syncKnowledgeForSection(db: Db, o: {
   }
   return { status: "ok", recorded: plan.rows.length, heldForReview: plan.reviews.length };
 }
+
+// ── Generation-time loading (progressive books with a narrator identity) ──
+import { knowledgeCandidates, narratorBoundaries, parseStoryDate, scenePoint, type EvalNarration, type LifeRecord } from "./knowledge.ts";
+import type { ApproximateDate, NarrativeVantage } from "./chronology.ts";
+import type { ContextCandidate } from "./adaptiveContext.ts";
+
+export interface NarratorContext { candidates: ContextCandidate[]; narration: EvalNarration; lifeRecords: LifeRecord[]; sceneDate: ApproximateDate | null }
+
+/**
+ * Scene date comes from the section plan (storyDate / isFlashback) when present. Without a date the
+ * manuscript position is used only for linear scenes; flashbacks without dates stay "unclear".
+ */
+// deno-lint-ignore no-explicit-any
+export async function loadNarratorContext(db: Db, bookId: string, userId: string, pos: StoryPosition, sectionPlan?: any): Promise<NarratorContext | null> {
+  const { data: b } = await db.from("books").select("narrator_identity_id, narrative_vantage, narrator_telling_date, universe_id, controls").eq("id", bookId).eq("user_id", userId).maybeSingle();
+  if (!b?.narrator_identity_id) return null;
+  const [{ data: ident }, { data: rows }, { data: personas }] = await Promise.all([
+    db.from("narrative_identities").select("id, display_name").eq("id", b.narrator_identity_id).eq("user_id", userId).maybeSingle(),
+    db.from("knowledge_acquisitions").select("*").eq("user_id", userId).eq("identity_id", b.narrator_identity_id).limit(2000),
+    db.from("personas").select("identity_id, birth_date, death_date").eq("user_id", userId).limit(2000),
+  ]);
+  const ids = await loadIdentitiesFor(db, userId, b.universe_id ?? null);
+  const byId = new Map(ids.map((i) => [i.id, i]));
+  const sceneDate = (sectionPlan?.storyDate && typeof sectionPlan.storyDate === "object") ? sectionPlan.storyDate as ApproximateDate : parseStoryDate(typeof sectionPlan?.storyDate === "string" ? sectionPlan.storyDate : null);
+  const scene = scenePoint({ ...pos, storyDate: sceneDate, nonLinear: sectionPlan?.isFlashback === true || sectionPlan?.nonLinear === true });
+  const vantage: NarrativeVantage = b.narrative_vantage === "retrospective" ? "retrospective" : "immediate";
+  const telling = b.narrator_telling_date ? { date: b.narrator_telling_date as ApproximateDate } : null;
+  const bounds = narratorBoundaries(rows ?? [], b.narrator_identity_id, scene, vantage, telling);
+  const name = ident?.display_name ?? "The narrator";
+  const pov = String(b.controls?.pointOfView ?? b.controls?.pov ?? "first").toLowerCase();
+  return {
+    candidates: knowledgeCandidates(bounds, name),
+    narration: { vantage, firstPerson: !pov.includes("third"), narratorName: name,
+      inScene: bounds.inScene.map((r: Record<string, any>) => r.claim), hindsightOnly: bounds.hindsightOnly.map((r: Record<string, any>) => r.claim),
+      notYetKnown: [...bounds.unknown, ...bounds.uncertain].map((r: Record<string, any>) => r.claim) },
+    lifeRecords: (personas ?? []).filter((p: Record<string, any>) => byId.has(p.identity_id)).map((p: Record<string, any>) => ({ name: byId.get(p.identity_id)!.displayName, aliases: byId.get(p.identity_id)!.aliases, birth: p.birth_date, death: p.death_date })),
+    sceneDate,
+  };
+}

@@ -98,6 +98,8 @@ export function anchorCandidates(anchors: Row[], position: StoryPosition): Conte
 
 export interface PlanningContextInput extends AdaptiveInput {
   master?: Row | null; readyPlans?: Row[]; anchors?: Row[];
+  /** Phase 3: narrator-knowledge candidates (already filtered by scene chronology and vantage). */
+  extraCandidates?: ContextCandidate[];
 }
 export interface PlanningContextResult {
   mode: "planned" | "legacy"; fallbackReason?: PlanFallbackReason;
@@ -112,7 +114,7 @@ export function buildPlanningAwareContext(input: PlanningContextInput): Planning
   const planC = plan.usable ? planCandidates(plan, input.position) : [];
   const anchorC = anchorCandidates(input.anchors ?? [], input.position);
   const secrets = plan.usable ? futureSecrets(plan.master, input.position.chapterIndex) : [];
-  const all = [...planC, ...anchorC, ...base.candidates];
+  const all = [...planC, ...anchorC, ...(input.extraCandidates ?? []), ...base.candidates];
   const safe = all.filter((c) => !leaksSecret(c.text, secrets));
   const objective = plan.usable ? `${plan.section.objective}${input.objective ? ` | ${input.objective}` : ""}` : input.objective;
   const context = assembleAdaptiveContext({ bookType: input.bookType, position: input.position, objective, candidates: safe, historicalNeedIds: base.needIds });
