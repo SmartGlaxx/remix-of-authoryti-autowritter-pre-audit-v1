@@ -111,6 +111,54 @@ export function parseAlternatives(raw: string, count: AlternativeCount): ParseRe
   });
 }
 
+// ── Service 1b: nonfiction concepts (separate from fiction alternatives — no twists) ─────
+export interface NonfictionConcept {
+  id: string; title: string; coreThesis: string; approach: string; pillars: string[]; readerOutcome: string; summary: string;
+}
+
+export function assertConceptsEligible(bookType: string, count: number): void {
+  if (adapterForBookType(bookType).isFiction) throw new Error("Book concepts are for nonfiction; fiction uses story alternatives");
+  if (!(STORY_ALTERNATIVE_COUNTS as readonly number[]).includes(count)) throw new Error("Count must be 3, 5, 7 or 10");
+}
+
+export function buildConceptsPrompt(b: BookBrief, count: AlternativeCount): Prompt {
+  assertConceptsEligible(b.bookType, count);
+  const a = adapterForBookType(b.bookType);
+  return {
+    system: system(a, "You design genuinely different approaches to a nonfiction book for an author to choose from."),
+    user: `${briefText(b)}\n\nWrite exactly ${count} distinct book concepts. Each is about 300 words and differs in its central argument or promise, ` +
+      "its method of delivering it (framework, case studies, chronology, problem-solution, field guide, etc.) and what the reader can do or understand at the end. " +
+      "No protagonists, plot, twists or reveals. Never invent sources, statistics or quotations.\n" +
+      'JSON: {"concepts":[{"title":"","coreThesis":"(one or two sentences)","approach":"(how the book is organised and argued)","pillars":["(3-6 key supports: evidence, cases, steps)"],"readerOutcome":"(what the reader gains)","summary":"(~300 words)"}]}',
+  };
+}
+
+export function parseConcepts(raw: string, count: AlternativeCount): ParseResult<NonfictionConcept[]> {
+  return parseWith(raw, (o, issues) => {
+    const list = Array.isArray(o?.concepts) ? o.concepts : [];
+    if (list.length !== count) issues.push(`Expected ${count} concepts, got ${list.length}`);
+    const out: NonfictionConcept[] = list.map((x: any, i: number) => ({
+      id: `concept${i + 1}`, title: str(x?.title), coreThesis: str(x?.coreThesis), approach: str(x?.approach),
+      pillars: Array.isArray(x?.pillars) ? x.pillars.map(str).filter(Boolean).slice(0, 8) : [], readerOutcome: str(x?.readerOutcome), summary: str(x?.summary),
+    }));
+    out.forEach((x, i) => {
+      if (!x.title || !x.coreThesis || !x.approach || !x.readerOutcome) issues.push(`Concept ${i + 1} is missing fields`);
+      if (x.pillars.length < 2) issues.push(`Concept ${i + 1} needs at least two pillars`);
+      if (/\b(plot twist|protagonist|twist)\b/i.test(`${x.coreThesis} ${x.approach} ${x.summary}`)) issues.push(`Concept ${i + 1} uses fiction structure`);
+    });
+    if (new Set(out.map((x) => x.title.toLowerCase())).size !== out.length) issues.push("Concept titles must be distinct");
+    for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+      if (overlap(`${out[i].coreThesis} ${out[i].approach}`, `${out[j].coreThesis} ${out[j].approach}`) > 0.7) issues.push(`Concepts ${i + 1} and ${j + 1} are too similar`);
+    }
+    return out;
+  });
+}
+
+/** A chosen nonfiction concept steers the master plan as author guidance — never as a story alternative. */
+export function conceptGuidance(c: NonfictionConcept): string {
+  return [`Chosen concept: ${c.title}`, `Core thesis: ${c.coreThesis}`, `Approach: ${c.approach}`, `Pillars: ${c.pillars.join("; ")}`, `Reader outcome: ${c.readerOutcome}`].join("\n");
+}
+
 // ── Service 2: master plan ───────────────────────────────────────────────────
 export interface MasterPlanDraft {
   premise: string; synopsis: string; ending: string; skeleton: MasterPlanSkeleton; alternative: StoryAlternative | null;

@@ -441,6 +441,13 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
                     <Settings className="w-4 h-4" />
                     Book Settings
                   </button>
+                  <a
+                    href={`/books/${book.id}/plan`}
+                    className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Planning Studio
+                  </a>
                 </div>
               </AppSidebar>
             </div>
