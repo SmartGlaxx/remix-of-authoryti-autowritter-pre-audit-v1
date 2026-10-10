@@ -7,6 +7,8 @@ import {
   checkEvidence, classifyBeats, deterministicValidation, routeFinding, runValidationLoop,
   type Adapter, type BeatCheck, type BeatIntent, type Claim, type EvidenceTier, type Finding, type LoopResult,
 } from "./validation.ts";
+import { ageFindings, parseEpistemic, postDeathFindings, type EvalNarration, type LifeRecord } from "../knowledge.ts";
+import type { ApproximateDate } from "../chronology.ts";
 
 export type Stage = 1 | 2 | 3 | 4 | 5;
 export type StagedFinding = Finding & { stage: Stage; sourceRef?: string };
@@ -19,6 +21,8 @@ export interface EvalContext {
   secrets: string[]; controls?: unknown; motifs?: string[]; terminology?: string[];
   /** Decided-as-new-canon dedup keys: those contradictions are intentional, not violations. */
   approvedCanonKeys?: string[];
+  /** Phase 3 (optional): narrator knowledge boundaries, life dates and the scene's story date. */
+  narration?: EvalNarration; lifeRecords?: LifeRecord[]; sceneDate?: ApproximateDate | null;
 }
 export interface Prompt { system: string; user: string }
 export interface Usage { inputTokens?: number | null; outputTokens?: number | null; costUsd?: number | null }
@@ -58,6 +62,14 @@ export function buildEvaluatorPrompt(draft: string, ctx: EvalContext): Prompt {
   const anchors = ctx.anchors.slice(0, 40).map((a) => `- ${a.key}: "${clip(a.text, 200)}"`).join("\n") || "- (none)";
   const facts = ctx.facts.slice(0, 80).map((f) => `- ${f.id}: ${clip(f.text, 200)}`).join("\n") || "- (none)";
   const nonfiction = ctx.adapter === "narrative_nonfiction";
+  const n = ctx.narration;
+  const secretsBlock = ctx.secrets.length ? `PROTECTED FUTURE TWISTS (validator-only; never quote them back):\n${ctx.secrets.slice(0, 20).map((x, i) => `${i + 1}. ${clip(x, 200)}`).join("\n")}` : "";
+  const narrationBlock = n ? [
+    `NARRATION: ${n.firstPerson ? "first person" : "limited/third person"}, ${n.vantage}${n.narratorName ? `, narrator ${n.narratorName}` : ""}.`,
+    n.inScene.length ? `Narrator knows in this scene:\n${n.inScene.slice(0, 30).map((x) => `- ${clip(x, 160)}`).join("\n")}` : "",
+    n.hindsightOnly.length ? `Narrator learned later (hindsight reflection only, never in-scene action):\n${n.hindsightOnly.slice(0, 20).map((x) => `- ${clip(x, 160)}`).join("\n")}` : "",
+    n.notYetKnown.length ? `Narrator does NOT know yet:\n${n.notYetKnown.slice(0, 20).map((x) => `- ${clip(x, 160)}`).join("\n")}` : "",
+  ].filter(Boolean).join("\n") : "";
   return {
     system: [
       "You are a strict manuscript validator. You never rewrite prose. You report only what the text shows.",
@@ -67,16 +79,21 @@ export function buildEvaluatorPrompt(draft: string, ctx: EvalContext): Prompt {
       `Writing quality is judged for this genre on: ${qualityRubric(ctx.adapter).join("; ")}. These are advisory: report them as minor or info, never material.`,
       "Setup-only and deferred beats are CORRECT when planted but unresolved. Explaining a deferred mystery early is a violation.",
       "Every finding must quote a short exact excerpt from the draft and cite the canon id/anchor key it conflicts with when relevant.",
+      ctx.secrets.length ? "Disclosure check: a twist is DISCLOSED only when the passage lets the reader understand the twist itself. Mentioning a name, object or place involved, hints and foreshadowing are NOT disclosure. Use certainty 'definite' only when the twist is plainly given away." : "",
+      n ? "Epistemic check: flag 'premature_knowledge' when the narrator states as known something they do not know yet, and 'pov_violation' when a first-person/limited narrator states another character's private thoughts or secret actions as fact. Speculation, guesses, lies, mistakes, unreliable narration and (in retrospective narration) clearly framed hindsight are literary devices: set device=true and do not mark them definite." : "",
       "Return JSON only.",
-    ].join(" "),
+    ].filter(Boolean).join(" "),
     user: [
       `SECTION OBJECTIVE: ${clip(ctx.objective, 600)}`, `PLANNED BEATS:\n${beats}`,
       `EXACT ANCHORS (must match verbatim when used):\n${anchors}`, `ESTABLISHED CANON:\n${facts}`,
+      ...(secretsBlock ? [secretsBlock] : []), ...(narrationBlock ? [narrationBlock] : []),
       `DRAFT:\n---\n${draft}\n---`,
       `Respond with: {"beats":[{"id":"","planted":true,"resolved":false,"explanationRevealed":false}],` +
       `"continuity":[{"kind":"fact|identity|timeline|canon|anchor","severity":"material|moderate|minor","message":"","excerpt":"","sourceRef":""}],` +
       `"claims":[{"id":"","tier":"documented|recollection|uncertain|illustrative","sourceProvided":false,"presentedAsFact":true,"excerpt":""}],` +
-      `"quality":[{"severity":"moderate|minor|info","message":"","excerpt":""}]}`,
+      `"quality":[{"severity":"moderate|minor|info","message":"","excerpt":""}]` +
+      (ctx.secrets.length ? `,"disclosures":[{"secret":1,"disclosed":false,"certainty":"definite|possible","excerpt":""}]` : "") +
+      (n ? `,"epistemic":[{"kind":"premature_knowledge|pov_violation","certainty":"definite|possible","device":false,"message":"","excerpt":""}]` : "") + "}",
     ].join("\n\n"),
   };
 }
@@ -133,12 +150,15 @@ export function parseEvaluation(raw: string, ctx: EvalContext): StagedFinding[] 
     out.push({ code: "WRITING_QUALITY", category: "writing_quality", severity: sev, message: str(q?.message) || "Quality note.", excerpt: str(q?.excerpt, 300) || undefined, repairable: sev === "minor", stage: 5 });
   }
 
+  if (ctx.secrets.length || ctx.narration) for (const f of parseEpistemic(o, draftOf(ctx))) out.push({ ...f, stage: 3 });
+
   const approved = new Set(ctx.approvedCanonKeys ?? []);
   return out.map((f) => (approved.has(findingKey(f)) && f.stage === 3 ? { ...f, severity: "info", canonKind: undefined, message: `${f.message} (approved canon change)` } : f));
 }
 
 export function stageOneFindings(draft: string, ctx: EvalContext): StagedFinding[] {
   return deterministicValidation(draft, { controls: ctx.controls, secrets: ctx.secrets, adapter: ctx.adapter, motifs: ctx.motifs, terminology: ctx.terminology })
+    .concat(ctx.lifeRecords?.length ? [...ageFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null), ...postDeathFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null)] : [])
     .map((f) => ({ ...f, stage: (f.category === "writing_quality" ? 5 : 1) as Stage }));
 }
 

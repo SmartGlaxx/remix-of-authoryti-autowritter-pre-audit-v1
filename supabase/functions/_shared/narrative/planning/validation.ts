@@ -50,11 +50,14 @@ export function findOutputArtifacts(text: string): Finding[] {
   return out;
 }
 
-/** A future reveal's secret appearing early is a material canon breach. */
+/**
+ * Phase 3: a protected term appearing early is only a note — foreshadowing must stay possible.
+ * Premature disclosure is judged semantically by the evaluator (see knowledge.ts parseEpistemic).
+ */
 export function findSecretLeaks(text: string, secrets: string[]): Finding[] {
   const t = text.toLowerCase();
   const hit = secrets.map((s) => s.trim()).filter((s) => s.length >= 4 && t.includes(s.toLowerCase()));
-  return hit.length ? [{ code: "SECRET_LEAK", category: "deterministic", severity: "material", canonKind: "canon", message: "A planned future reveal appears before its chapter.", excerpt: hit[0], repairable: true }] : [];
+  return hit.length ? [{ code: "SECRET_TERM_PRESENT", category: "deterministic", severity: "minor", message: "A protected term appears before its reveal. Fine as foreshadowing; check it doesn't give the twist away.", excerpt: hit[0], repairable: false }] : [];
 }
 
 // ── 2. Contextual repetition ─────────────────────────────────────────────────
