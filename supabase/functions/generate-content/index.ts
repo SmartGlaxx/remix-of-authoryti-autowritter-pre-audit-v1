@@ -4,6 +4,7 @@ import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sli
 import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
+import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -187,7 +188,7 @@ PACING & MOMENTUM RULES (STRICTLY ENFORCED):
 }
 
 // ── Build system prompt (STATIC portion for cache optimization) ──
-function buildStaticSystemPrompt(book: any, band: number, isScreenplay: boolean, isChildren: boolean, isComic: boolean, isNarrative: boolean, controls: any): string {
+function buildStaticSystemPrompt(book: any, band: number, isScreenplay: boolean, isChildren: boolean, isComic: boolean, isNarrative: boolean, controls: any, configuredBansOnly = false): string {
   const languageGuidelines = getLanguageGuidelines(band);
   const hookFrequency = controls?.hookFrequency ?? 5;
   const velocity = controls?.velocity ?? 5;
@@ -336,8 +337,7 @@ ${isNarrative && !isChildren ? `CHARACTER DESCRIPTION (MANDATORY for every narra
 
 FORMAT & WORD BAN RULES (STRICTLY ENFORCED):
 - NEVER use markdown formatting such as **, *, ##, or any other markdown syntax in your output. Write in plain prose only.
-- NEVER use the word "magic" or "magical" in any context. Find more specific, vivid alternatives.
-- Do not use asterisks for emphasis.
+${configuredBansOnly ? "" : `- NEVER use the word "magic" or "magical" in any context. Find more specific, vivid alternatives.\n`}- Do not use asterisks for emphasis.
 - NEVER prefix any line with literal labels like "Hook:", "Teaser:", "Scene:", "Beat:", "Note:", "[HOOK]", "[TEASER]", or any meta-tag. Hooks and teasers must read as natural narrative — the reader must never be told they are reading a hook or a teaser.
 - If a teaser or hook is required, write it as ordinary prose that opens the section organically. No tags, no brackets, no labels of any kind.${bannedWordsBlock}`;
 }
@@ -590,7 +590,7 @@ serve(async (req) => {
 
     // ── Build prompts with cache-optimized structure ──
     // Static system prompt = CACHE ANCHOR (identical across subsections of same book)
-    const systemPrompt = buildStaticSystemPrompt(book, band, isScreenplay, isChildren, isComic, isNarrative, book.controls);
+    const systemPrompt = buildStaticSystemPrompt(book, band, isScreenplay, isChildren, isComic, isNarrative, book.controls, pipeline === "progressive");
     
     // Variable user prompt = changes per subsection (not cached)
     const legacyPrompt = () => buildVariablePrompt(
@@ -663,8 +663,8 @@ serve(async (req) => {
       runMetrics.plan_mode = "legacy"; runMetrics.plan_fallback = progressive.plan.reason;
     }
 
-    // ── Style Diversity: planned opening strategy (dynamic tail only; cached prefix untouched) ──
-    try {
+    // ── Style Diversity: planned opening strategy — Progressive Planning only (Standard prompts unchanged) ──
+    if (progressive && progressive.plan.usable) try {
       const ledger = buildLedger(book.outline, { chapterIndex, subsectionIndex });
       const strategy = planOpeningStrategy({ bookType: book.bookType, writerId: book.controls?.writerId ?? null, position: ledger.length, ledger });
       userPrompt = `${userPrompt}\n\n${renderOpeningStrategyBlock(strategy, ledger)}`;

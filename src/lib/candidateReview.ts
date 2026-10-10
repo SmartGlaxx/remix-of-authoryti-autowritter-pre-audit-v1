@@ -23,7 +23,7 @@ export async function callPlanBook<T = any>(body: Record<string, unknown>): Prom
   return { ok: res.ok, status: res.status, data };
 }
 
-export type SectionOutcome = { state: "accepted"; text: string | null } | { state: "held"; candidateId: string } | { state: "pending" };
+export type SectionOutcome = { state: "accepted"; text: string | null } | { state: "held"; candidateId: string } | { state: "pending" } | { state: "timeout" };
 
 /**
  * Progressive books validate after the text streams. Wait for the server's verdict so a held
@@ -36,7 +36,14 @@ export async function awaitSectionOutcome(bookId: string, chapter: number, subse
     if (r.ok && r.data.state !== "pending") return r.data;
     await new Promise((res) => setTimeout(res, 3000));
   }
-  return { state: "pending" };
+  // Still validating server-side: the draft is safe; the caller must pause, never regenerate.
+  return { state: "timeout" };
+}
+
+/** Before writing a progressive section, see whether an earlier run already produced an outcome. */
+export async function priorSectionOutcome(bookId: string, chapter: number, subsection: number): Promise<SectionOutcome> {
+  const r = await callReview<SectionOutcome>({ action: "section_status", bookId, chapter, subsection, since: "1970-01-01T00:00:00.000Z" });
+  return r.ok ? r.data : { state: "pending" };
 }
 
 export const isProgressiveBook = (controls: unknown) => (controls as Record<string, unknown> | null)?.planning_pipeline === "progressive";

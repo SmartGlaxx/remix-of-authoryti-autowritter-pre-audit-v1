@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
-import { awaitSectionOutcome, isProgressiveBook } from "@/lib/candidateReview";
+import { awaitSectionOutcome, isProgressiveBook, priorSectionOutcome } from "@/lib/candidateReview";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
 function applyContinuityResult(outline: BookOutline, chIdx: number, subIdx: number, r: ContinuityResult): BookOutline {
@@ -497,7 +497,10 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
         try {
           const startedAt = new Date(Date.now() - 5000).toISOString();
-          let content = await retryWithBackoff(
+          // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
+          const prior = isProgressiveBook(book.controls) && !subsection.content ? await priorSectionOutcome(book.id, chIdx, subIdx) : { state: "pending" as const };
+          if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
             () => streamContent(
               { ...currentBook, outline, tonalAnchors },
               chIdx,
@@ -512,7 +515,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           );
           // Progressive Planning: only the server-accepted text is kept; a held draft waits for the author.
           if (isProgressiveBook(book.controls)) {
-            const outcome = await awaitSectionOutcome(book.id, chIdx, subIdx, startedAt);
+            const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chIdx, subIdx, startedAt);
+            if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — open Planning Studio to see its status before continuing");
             if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
             if (outcome.state === "pending") throw new Error("checks on this section did not finish; open Planning Studio to review");
             if (outcome.text) content = outcome.text;

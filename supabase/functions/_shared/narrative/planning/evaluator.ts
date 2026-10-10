@@ -34,6 +34,23 @@ export function intentForKind(kind: string): BeatIntent {
   return "immediate_payoff";
 }
 
+/**
+ * Genre-adaptive writing-quality rubric (Stage 5). Advisory only: these dimensions are reported as
+ * minor/info notes and never block acceptance until calibrated against human editorial review.
+ */
+export const QUALITY_RUBRICS: Record<string, string[]> = {
+  fiction: ["beat execution through action", "POV and voice discipline", "dialogue with subtext", "pacing and tension", "sensory grounding", "character motivation"],
+  children: ["age-appropriate vocabulary and syntax", "narrative momentum", "emotional resonance", "sensory wonder", "read-aloud rhythm"],
+  narrative_nonfiction: ["scenes grounded in the provided record", "perspective integrity", "clarity of chronology", "no invented detail presented as fact"],
+  self_help: ["actionable usefulness", "logical instructional progression", "concrete examples", "clarity without platitudes"],
+  business: ["actionable usefulness", "evidence and concrete cases", "logical argument progression", "authority without filler"],
+  finance: ["accuracy and stated assumptions", "actionable usefulness", "worked examples", "no invented figures"],
+  technical: ["conceptual accuracy", "step-by-step clarity", "precise terminology", "worked examples", "no invented figures"],
+  cookbook: ["ingredient, quantity and timing precision", "technique clarity", "sensory description of results", "kitchen practicality"],
+  magazine: ["strong lede", "editorial flow", "balanced depth and readability", "clear takeaway"],
+};
+export const qualityRubric = (adapter: string): string[] => QUALITY_RUBRICS[adapter] ?? QUALITY_RUBRICS.technical;
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 export function buildEvaluatorPrompt(draft: string, ctx: EvalContext): Prompt {
@@ -47,6 +64,7 @@ export function buildEvaluatorPrompt(draft: string, ctx: EvalContext): Prompt {
       "Judge four things independently: (2) plan fulfilment, (3) continuity against ESTABLISHED canon and exact anchors,",
       nonfiction ? "(4) factual/epistemic integrity of real-world claims," : "(4) skip epistemic checks (not narrative nonfiction),",
       "(5) writing quality: only unintended narration repetition, broken logic, or incoherence. Style preferences are 'info'.",
+      `Writing quality is judged for this genre on: ${qualityRubric(ctx.adapter).join("; ")}. These are advisory: report them as minor or info, never material.`,
       "Setup-only and deferred beats are CORRECT when planted but unresolved. Explaining a deferred mystery early is a violation.",
       "Every finding must quote a short exact excerpt from the draft and cite the canon id/anchor key it conflicts with when relevant.",
       "Return JSON only.",
