@@ -15,7 +15,8 @@ import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
 import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext, futureSecrets } from "../_shared/narrative/planning/planningContext.ts";
-import { blocksAcceptance, deterministicValidation, routeFinding } from "../_shared/narrative/planning/validation.ts";
+import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
+import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 
 // ── Security Config ──
@@ -761,39 +762,53 @@ serve(async (req) => {
       if (cleaned && lease && book.id) {
         // Last renewal just before the write; a lost worker never attempts the commit.
         const alive = heartbeat ? await heartbeat.beat() : true;
-        heartbeat?.stop();
-        if (!alive) { runMetrics.error = "commit: lease lost before save"; console.warn("[phase-f] commit skipped: lease lost"); }
+        if (!alive) { heartbeat?.stop(); runMetrics.error = "commit: lease lost before save"; console.warn("[phase-f] commit skipped: lease lost"); }
         else {
-        // Phase G: free validation runs BEFORE acceptance. A material breach means this draft is
-        // not accepted at all — the previously accepted manuscript stays exactly as it was.
-        const hash = contentHash(cleaned);
-        let rejected = false;
+        // Phase G: all five validation stages run BEFORE acceptance (Stage 1 free + one combined
+        // evaluator call, ≤2 targeted repairs, full revalidation). Material findings hold the draft as a
+        // recoverable candidate; the previously accepted manuscript stays exactly as it was.
+        let finalText = cleaned;
+        let decision: "accept" | "blocked_material" | "needs_author_review" = "accept";
         try {
-          const pm = progressive?.plan.usable ? (progressive.plan as { master?: unknown }).master : null;
-          const secrets = pm ? futureSecrets(pm as never, absChapter) : [];
-          const findings = deterministicValidation(cleaned, { controls: book.controls, secrets, adapter: isChildrensBook ? "childrens" : undefined });
-          for (const f of findings) {
-            const route = routeFinding(f);
-            const dk = `pg_${book.id}_${absChapter}_${subsectionIndex}_${hash.slice(0, 16)}_${f.code}`.slice(0, 400);
-            if (route === "canon_reconciliation") {
-              await adminSupabase.rpc("record_canon_discrepancy", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_severity: "CRITICAL", p_type: f.code, p_description: f.message, p_excerpt: f.excerpt ?? "", p_canon_ref: { source: "phase_g" }, p_content_hash: hash, p_dedup_key: dk });
-            } else if (route !== "none") {
-              await adminSupabase.from("editorial_validation_findings").upsert({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, content_hash: hash, code: f.code, category: f.category, severity: f.severity, route, message: f.message, excerpt: f.excerpt ?? null, dedup_key: dk }, { onConflict: "dedup_key", ignoreDuplicates: true });
-            }
-          }
-          rejected = blocksAcceptance(findings);
-        } catch (e) { console.warn("[phase-g] validation step failed:", e instanceof Error ? e.message : e); }
-        if (rejected) {
-          runMetrics.error = "phase-g: draft not accepted (material finding sent to author)";
+          const { data: factRows } = await adminSupabase.from("canonical_facts").select("id, subject, predicate, value, is_canonical, conflict_status, canon_status, source_chapter_index, source_subsection_index").eq("book_id", book.id).eq("canon_status", "ESTABLISHED").limit(400);
+          const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
+          const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes });
+          if (isChildrensBook) ctx.adapter = "childrens";
+          const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
+          const { evaluate, repair } = modelCallers(cfg, auth.user.id, book.id, createAIDeps(adminSupabase, auth.user.id));
+          const warnRatio = Number((book.controls as Record<string, unknown> | null)?.revisionWarnRatio) || undefined;
+          const r = await runPreAcceptance(cleaned, ctx, evaluate, repair, { warnRatio });
+          finalText = r.text; decision = r.decision;
+          Object.assign(runMetrics, { validation_status: r.decision, validation_rounds: r.rounds, validation_input_tokens: r.usage.inputTokens, validation_output_tokens: r.usage.outputTokens, validation_cost_usd: r.usage.costUsd });
+          await persistOutcome(r, { db: adminSupabase, bookId: book.id, userId: auth.user.id, chapter: absChapter, sub: subsectionIndex, hash: contentHash(finalText),
+            masterPlanId: progressive?.plan.usable ? progressive.master?.id ?? null : null, origin: "generated" });
+        } catch (e) {
+          // Critical checks are never skipped: if validation itself fails, the draft is not accepted.
+          decision = "needs_author_review";
+          console.warn("[phase-g] validation step failed:", e instanceof Error ? e.message : e);
+          await adminSupabase.rpc("save_candidate_draft", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex,
+            p_master_plan_id: progressive?.master?.id ?? null, p_text: cleaned, p_hash: contentHash(cleaned), p_status: "NEEDS_AUTHOR_REVIEW",
+            p_findings: [{ code: "VALIDATION_FAILED", stage: 3, severity: "moderate", message: "Checks could not complete; retry validation before accepting." }], p_usage: {}, p_origin: "generated", p_parent: null, p_dedup_keys: [] }).then(() => {}, () => {});
+        }
+        const stillAlive = heartbeat ? await heartbeat.beat() : true;
+        heartbeat?.stop();
+        if (decision !== "accept" || !stillAlive) {
+          runMetrics.error = !stillAlive ? "commit: lease lost during validation" : `phase-g: draft held for author (${decision})`;
           await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
         } else {
+        const hash = contentHash(finalText);
         // Fence check + manuscript write + acceptance record + lease release: one transaction.
         const { data: c, error: ce } = await adminSupabase.rpc("commit_fenced_section", {
           p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: lease.worker, p_token: lease.fencing_token,
-          p_text: cleaned, p_hash: hash, p_master_plan_id: progressive?.plan.usable ? progressive.master?.id ?? null : null, p_replace: body.replaceAccepted === true,
+          p_text: finalText, p_hash: hash, p_master_plan_id: progressive?.plan.usable ? progressive.master?.id ?? null : null, p_replace: body.replaceAccepted === true,
         });
         if (ce) { console.warn("[phase-f] commit rejected:", ce.message); runMetrics.error = `commit: ${ce.message.slice(0, 200)}`; }
-        else { for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k); console.log("[phase-f] commit", JSON.stringify(c)); }
+        else {
+          for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k);
+          console.log("[phase-f] commit", JSON.stringify(c));
+          // Replacing an accepted section flags derived/later memory inside commit_fenced_section itself.
+          await adminSupabase.rpc("write_accepted_outline_text", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_text: finalText, p_hash: hash }).then(() => {}, () => {});
+        }
         }
         }
       } else if (cleaned && !progressive) await finalizeFullText(cleaned);
