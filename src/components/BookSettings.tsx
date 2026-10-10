@@ -53,6 +53,17 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     (book.controls as { context_engine?: string }).context_engine = m;
     toast.success(m === "adaptive" ? "Adaptive memory on" : "Standard memory on");
   };
+  const [vantage, setVantage] = useState<NarrativeVantage>(book.narrativeVantage ?? "immediate");
+  const vantageLocked = (book.wordCount ?? 0) > 0;
+  const saveVantage = async (v: NarrativeVantage) => {
+    if (vantageLocked || v === vantage) return;
+    const prev = vantage;
+    setVantage(v);
+    const { error } = await supabase.from("books").update({ narrative_vantage: v }).eq("id", book.id);
+    if (error) { setVantage(prev); toast.error("This can only change before writing starts."); return; }
+    book.narrativeVantage = v;
+    toast.success("Storytelling moment updated");
+  };
   const sliders = effectiveSlidersFor({ bookType: book.bookType, toneProfile: book.toneProfile, controls: book.controls });
   const divergence = resolveDivergence(book.controls as never);
   const typeInfo = BOOK_TYPE_INFO[book.bookType];
