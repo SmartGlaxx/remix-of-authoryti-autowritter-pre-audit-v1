@@ -1,0 +1,258 @@
+// Phase 4 — optional advanced Book Setup inside Planning Studio. Every step is skippable; the
+// server validates and stores the setup apart from prose, and the master planner reads it.
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { callPlanBook } from "@/lib/candidateReview";
+import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
+
+type Row = Record<string, any>;
+const COUNTS = [3, 5, 7, 10];
+const POV_LABEL: Record<string, string> = { first_person: "First person", third_limited: "Third person (close)", third_omniscient: "Third person (all-knowing)", second_person: "Second person" };
+const nice = (r: string) => r.replace(/_/g, " ");
+
+async function callPersona(body: Row) {
+  const { data: s } = await supabase.auth.getSession();
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/persona-studio`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }, body: JSON.stringify(body),
+  });
+  return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
+}
+
+export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; isFiction: boolean; onSaved: () => void }) {
+  const [st, setSt] = useState<BookSetup | null>(null);
+  const [hasProse, setHasProse] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [count, setCount] = useState(3);
+  const [chapterCount, setChapterCount] = useState(12);
+  const [identities, setIdentities] = useState<Row[]>([]);
+  const [universes, setUniverses] = useState<Row[]>([]);
+  const [pens, setPens] = useState<Row[]>([]);
+  const [search, setSearch] = useState("");
+  const [newName, setNewName] = useState("");
+  const [pending, setPending] = useState<{ name: string; matches: Row[] } | null>(null);
+  const [recs, setRecs] = useState<Row[]>([]);
+  const [newFixed, setNewFixed] = useState("");
+
+  const load = async () => {
+    const [r, ids, us, ps] = await Promise.all([
+      callPlanBook({ action: "setup_get", bookId: book.id }),
+      supabase.from("narrative_identities").select("id, display_name, level, universe_id").is("merged_into_id", null).order("display_name").limit(1000),
+      supabase.from("fictional_universes").select("id, name").eq("is_archived", false).order("name"),
+      supabase.from("author_identities").select("id, pen_name").eq("is_archived", false).order("pen_name"),
+    ]);
+    const s0 = r.ok ? (r.data.setup as BookSetup) : emptySetup();
+    if (!s0.premise) s0.premise = book.theme ?? "";
+    setSt(s0); setHasProse(!!r.data?.hasProse);
+    setIdentities(ids.data ?? []); setUniverses(us.data ?? []); setPens(ps.data ?? []);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [book.id]);
+
+  const issues = useMemo(() => (st ? validateSetup(st, { bookType: book.book_type, penNames: pens as any, chapterCount }) : []), [st, pens, chapterCount, book.book_type]);
+  if (!st) return <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>;
+  const up = (patch: Partial<BookSetup>) => setSt({ ...st, ...patch });
+  const run = async (label: string, fn: () => Promise<void>) => { setBusy(label); try { await fn(); } catch (e) { toast.error(e instanceof Error ? e.message : "Something went wrong"); } finally { setBusy(null); } };
+  const universeIds = identities.filter((i) => (i.universe_id ?? null) === st.universeId);
+  const libraryHits = search.trim() ? universeIds.filter((i) => i.display_name.toLowerCase().includes(search.toLowerCase()) && !st.cast.some((c) => c.identityId === i.id)).slice(0, 8) : [];
+
+  const save = (stage?: BookSetup["stage"]) => run("save", async () => {
+    const r = await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: { ...st, stage: stage ?? st.stage } });
+    if (!r.ok) throw new Error(r.data.message ?? r.data.issues?.filter((i: Row) => i.blocking).map((i: Row) => i.message).join(" ") ?? r.data.error ?? "Couldn't save");
+    setSt(r.data.setup); toast.success("Setup saved — you can come back to it any time"); onSaved();
+  });
+
+  const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
+    // Save fixed requirements first so the server keeps them in every option.
+    await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
+    const r = await callPlanBook({ action: isFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
+    if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
+    const list: Row[] = (isFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
+    if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
+    else { const fresh = list.find((a) => !st.alternatives.some((b) => b.title === a.title)) ?? list[0]; const next = [...st.alternatives]; next[replaceIndex] = { ...(fresh as any), id: `alt${replaceIndex + 1}` }; up({ alternatives: next }); }
+  });
+
+  const proposeTwists = () => run("twists", async () => {
+    await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
+    const r = await callPlanBook({ action: "twists", bookId: book.id, count: 3, premise: st.premise, chapterCount });
+    if (!r.ok) throw new Error(r.data.error ?? "Couldn't propose twists");
+    const keep = st.twists.filter((t) => t.status === "approved");
+    up({ twists: [...keep, ...r.data.twists.map((t: Row, i: number) => ({ ...t, id: `t${Date.now()}${i}` }))], stage: "twists" });
+  });
+
+  const addCast = (m: Partial<SetupCastMember> & { name: string }) => up({ cast: [...st.cast, { key: `c${Date.now()}${st.cast.length}`, role: "supporting", identityId: null, lightweight: true, ...m } as SetupCastMember] });
+  const setCast = (key: string, patch: Partial<SetupCastMember>) => up({ cast: st.cast.map((c) => (c.key === key ? { ...c, ...patch } : c)) });
+
+  const createPersistent = (name: string, decision?: string, existingId?: string) => run("persist", async () => {
+    const r = await callPersona({ action: "create_identity", displayName: name, universeId: st.universeId, level: "story_character", decision, existingId });
+    if (r.status === 409 && r.data.status === "needs_confirmation") { setPending({ name, matches: r.data.resolution.matches }); return; }
+    if (!r.ok) throw new Error(r.data.error ?? "Couldn't save character");
+    setPending(null); setNewName("");
+    const existing = st.cast.find((c) => c.name.toLowerCase() === name.toLowerCase() && !c.identityId);
+    if (existing) setCast(existing.key, { identityId: r.data.identityId, lightweight: false }); else addCast({ name, identityId: r.data.identityId, lightweight: false });
+    await load().catch(() => {});
+    toast.success(r.data.reused ? "Linked to your existing character" : "Character saved to your library");
+  });
+
+  const locked = hasProse;
+  return (
+    <div className="space-y-6 mt-4">
+      <p className="text-sm text-muted-foreground">Every step here is optional. Skip anything, save as you go, and come back later. Books that don't use this keep writing exactly as before.</p>
+      {locked && <div className="flex gap-2 items-start text-sm rounded-md border border-border p-3"><Lock className="w-4 h-4 mt-0.5 text-primary" /><span>Writing has started. The story, narrator, point of view, universe and character identities are locked to protect what's already written. Cast notes, roles and pen name can still change.</span></div>}
+
+      {/* 1. Concept & story options */}
+      <Card>
+        <CardHeader><CardTitle>1. {isFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
+          <CardDescription>{isFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise" />
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Must-keep details (every option will keep these — e.g. a setting, a character, a fact):</p>
+            <div className="flex flex-wrap gap-2">{st.fixedRequirements.map((f, i) => <Badge key={i} variant="secondary" className="gap-1">{f}{!locked && <button aria-label="Remove" onClick={() => up({ fixedRequirements: st.fixedRequirements.filter((_, j) => j !== i) })}><X className="w-3 h-3" /></button>}</Badge>)}</div>
+            {!locked && <div className="flex gap-2"><Input value={newFixed} onChange={(e) => setNewFixed(e.target.value)} placeholder="Add a must-keep detail" /><Button variant="outline" disabled={!newFixed.trim()} onClick={() => { up({ fixedRequirements: [...st.fixedRequirements, newFixed.trim()] }); setNewFixed(""); }}>Add</Button></div>}
+          </div>
+          {!locked && <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">How many:</span>
+            {COUNTS.map((c) => <Button key={c} size="sm" variant={count === c ? "default" : "outline"} onClick={() => setCount(c)}>{c}</Button>)}
+            <Input type="number" className="w-24" value={chapterCount} min={1} max={80} onChange={(e) => setChapterCount(Math.max(1, Math.min(80, +e.target.value || 12)))} aria-label="Chapters" />
+            <span className="text-xs text-muted-foreground">chapters</span>
+            <Button onClick={() => genAlternatives()} disabled={!!busy}>{busy === "alts" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{st.alternatives.length ? "New set" : "Show options"}</Button>
+            <Button variant="ghost" onClick={() => up({ storyMode: "skip", selectedIndex: null, stage: "cast" })}>Skip — use my own idea</Button>
+          </div>}
+          {st.storyMode === "skip" && <p className="text-sm text-muted-foreground">Using your own idea. You can still pick an option later, before writing starts.</p>}
+          <div className="grid gap-3">
+            {st.alternatives.map((a, i) => (
+              <div key={a.id + i} className={`rounded-lg border p-4 ${st.selectedIndex === i ? "border-primary" : "border-border"}`}>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1"><h4 className="font-medium">{a.title}</h4><p className="text-sm text-muted-foreground">{a.logline}</p></div>
+                  {!locked && <Button size="icon" variant="ghost" aria-label="Regenerate this option" disabled={!!busy} onClick={() => genAlternatives(i)}>{busy === `alt${i}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}</Button>}
+                  <Button size="sm" disabled={locked} variant={st.selectedIndex === i ? "default" : "outline"} onClick={() => up({ selectedIndex: i, storyMode: "explore", stage: isFiction ? "twists" : "cast" })}>{st.selectedIndex === i ? "Selected" : "Choose"}</Button>
+                </div>
+                <details className="mt-2"><summary className="text-xs cursor-pointer text-muted-foreground">Read the whole story</summary><p className="text-sm whitespace-pre-wrap mt-2">{a.summary}</p>{a.ending && <p className="text-sm mt-2"><span className="text-muted-foreground">Ending:</span> {a.ending}</p>}</details>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2. Plot twists (fiction only) */}
+      {isFiction && <Card>
+        <CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>2. Plot twists</CardTitle><CardDescription>Optional. Approved twists guide the plan with planted clues; they're never revealed early or treated as fact until written.</CardDescription></div>
+          <Switch checked={st.twistsEnabled} disabled={locked} onCheckedChange={(on) => up({ twistsEnabled: on })} aria-label="Plot twists on or off" /></div></CardHeader>
+        {st.twistsEnabled && <CardContent className="space-y-3">
+          {!locked && <Button variant="outline" onClick={proposeTwists} disabled={!!busy}>{busy === "twists" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Suggest twists</Button>}
+          {st.twists.map((t) => (
+            <div key={t.id} className="rounded-lg border border-border p-3 space-y-2">
+              <Textarea rows={2} value={t.text} disabled={locked} onChange={(e) => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, text: e.target.value, authorEdited: true } : x) })} />
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Reveal in chapter</span>
+                <Input type="number" className="w-20" min={1} disabled={locked} value={t.revealChapter === null ? "" : t.revealChapter + 1} onChange={(e) => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, revealChapter: e.target.value ? Math.max(0, +e.target.value - 1) : null } : x) })} />
+                <Badge variant={t.status === "approved" ? "default" : t.status === "rejected" ? "destructive" : "secondary"}>{t.status}</Badge>
+                {!locked && <><Button size="sm" variant="outline" onClick={() => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, status: "approved" } : x) })}><Check className="w-3 h-3 mr-1" />Approve</Button>
+                <Button size="sm" variant="ghost" onClick={() => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, status: "rejected" } : x) })}>Reject</Button></>}
+              </div>
+              {t.clues.length > 0 && <p className="text-xs text-muted-foreground">Clues: {t.clues.join(" · ")}</p>}
+            </div>
+          ))}
+        </CardContent>}
+      </Card>}
+
+      {/* 3. Cast */}
+      <Card>
+        <CardHeader><CardTitle>{isFiction ? "3" : "2"}. Characters</CardTitle>
+          <CardDescription>Use characters from your library or add new ones. Book-only characters don't need a profile. Roles apply to this book only — a character's lasting profile is never changed here.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Input className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your characters" />
+            <Button variant="outline" disabled={!!busy} onClick={() => run("recs", async () => { await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st }); const r = await callPlanBook({ action: "recommend_cast", bookId: book.id }); if (!r.ok) throw new Error(r.data.error); setRecs(r.data.recommendations); })}>Suggest from story</Button>
+            <Button variant="ghost" asChild><Link to="/personas">Open Persona Studio (full profiles, AI or hybrid)</Link></Button>
+          </div>
+          {libraryHits.length > 0 && <div className="flex flex-wrap gap-2">{libraryHits.map((i) => <Button key={i.id} size="sm" variant="secondary" disabled={locked && false} onClick={() => { addCast({ name: i.display_name, identityId: i.id, lightweight: false }); setSearch(""); }}><Plus className="w-3 h-3 mr-1" />{i.display_name}</Button>)}</div>}
+          {recs.length > 0 && <div className="rounded-md border border-border p-3 space-y-1"><p className="text-xs text-muted-foreground">Suggestions (you decide — nothing is created or merged automatically):</p>
+            {recs.map((r, i) => <div key={i} className="flex flex-wrap items-center gap-2 text-sm"><span className="font-medium">{r.name}</span><Badge variant="outline">{nice(r.status)}</Badge><span className="text-muted-foreground">{r.reason}</span>
+              {!r.name.startsWith("(") && !st.cast.some((c) => c.name === r.name) && (r.status === "existing_match" ? <Button size="sm" variant="ghost" onClick={() => addCast({ name: r.matches[0].displayName, identityId: r.matches[0].id, lightweight: false })}>Use existing</Button> : <Button size="sm" variant="ghost" onClick={() => addCast({ name: r.name })}>Add</Button>)}</div>)}</div>}
+          <div className="flex flex-wrap gap-2">
+            <Input className="max-w-xs" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New character name" />
+            <Button variant="outline" disabled={!newName.trim()} onClick={() => { addCast({ name: newName.trim() }); setNewName(""); }}>Add book-only</Button>
+            <Button variant="outline" disabled={!newName.trim() || !!busy} onClick={() => createPersistent(newName.trim())}>Save to library</Button>
+          </div>
+          {pending && <div className="rounded-md border border-primary/50 p-3 space-y-2 text-sm">
+            <p>"{pending.name}" looks like a character you already have. Is it the same person?</p>
+            <div className="flex flex-wrap gap-2">{pending.matches.map((m: Row) => <Button key={m.id} size="sm" onClick={() => createPersistent(pending.name, "use_existing", m.id)}>Yes — {m.displayName}</Button>)}
+              <Button size="sm" variant="outline" onClick={() => createPersistent(pending.name, "create_distinct")}>No — a different person</Button>
+              <Button size="sm" variant="ghost" onClick={() => setPending(null)}>Cancel</Button></div>
+          </div>}
+          <div className="space-y-2">{st.cast.map((c) => (
+            <div key={c.key} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+              <span className="font-medium min-w-[8rem]">{c.name}</span>
+              <Badge variant="outline">{c.identityId ? "in library" : "book-only"}</Badge>
+              <Select value={c.role} onValueChange={(v) => setCast(c.key, { role: v as any })}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent>{BOOK_ROLES.map((r) => <SelectItem key={r} value={r}>{nice(r)}</SelectItem>)}</SelectContent></Select>
+              <Input className="flex-1 min-w-[10rem]" value={c.note ?? ""} onChange={(e) => setCast(c.key, { note: e.target.value })} placeholder="Note for this book" />
+              {!c.identityId && !locked && <Button size="sm" variant="ghost" onClick={() => createPersistent(c.name)}>Save to library</Button>}
+              {!locked && <Button size="icon" variant="ghost" aria-label="Remove" onClick={() => up({ cast: st.cast.filter((x) => x.key !== c.key), viewpoints: st.viewpoints.filter((v) => v.castKey !== c.key), narration: { ...st.narration, narratorKey: st.narration.narratorKey === c.key ? null : st.narration.narratorKey } })}><Trash2 className="w-4 h-4" /></Button>}
+            </div>))}</div>
+        </CardContent>
+      </Card>
+
+      {/* 4. Narration, perspective, universe, pen name */}
+      <Card>
+        <CardHeader><CardTitle>{isFiction ? "4" : "3"}. Narrator, perspective, universe & pen name</CardTitle>
+          <CardDescription>A pen name is only the name printed as author — it never becomes a character or narrator.</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">Point of view</span>
+              <Select value={st.narration.pov} disabled={locked} onValueChange={(v) => up({ narration: { ...st.narration, pov: v } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(POV_LABEL).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}</SelectContent></Select></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">Narrator / main viewpoint character</span>
+              <Select value={st.narration.narratorKey ?? "none"} disabled={locked} onValueChange={(v) => up({ narration: { ...st.narration, narratorKey: v === "none" ? null : v } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None / not needed</SelectItem>{st.cast.map((c) => <SelectItem key={c.key} value={c.key}>{c.name}</SelectItem>)}</SelectContent></Select></label>
+          </div>
+          {st.narration.pov === "first_person" && <div className="grid sm:grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">When is the story told?</span>
+              <Select value={st.narration.vantage} disabled={locked} onValueChange={(v) => up({ narration: { ...st.narration, vantage: v as any } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="immediate">As it happens (immediate)</SelectItem><SelectItem value="retrospective">Looking back (retrospective)</SelectItem></SelectContent></Select></label>
+            {st.narration.vantage === "retrospective" && <label className="space-y-1 text-sm"><span className="text-muted-foreground">Told from (date)</span><Input disabled={locked} value={st.narration.tellingDate ?? ""} onChange={(e) => up({ narration: { ...st.narration, tellingDate: e.target.value } })} placeholder="e.g. March 2031" /></label>}
+            <label className="flex items-center gap-2 text-sm sm:col-span-2"><Switch checked={st.narration.personaLed} disabled={locked} onCheckedChange={(on) => up({ narration: { ...st.narration, personaLed: on } })} />Persona-led (one character tells the whole book in first person)</label>
+          </div>}
+          {isFiction && <div className="space-y-2">
+            <div className="flex gap-2"><Button size="sm" variant={st.perspective === "single" ? "default" : "outline"} disabled={locked} onClick={() => up({ perspective: "single", viewpoints: st.viewpoints.slice(0, 1) })}>Single perspective</Button>
+              <Button size="sm" variant={st.perspective === "multiple" ? "default" : "outline"} disabled={locked} onClick={() => up({ perspective: "multiple" })}>Multiple perspectives</Button></div>
+            {st.perspective === "multiple" && <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">One viewpoint per chapter — each character only knows what they've learned.</p>
+              {st.viewpoints.map((v, i) => <div key={i} className="flex flex-wrap gap-2 items-center">
+                <Select value={v.castKey} onValueChange={(k) => up({ viewpoints: st.viewpoints.map((x, j) => j === i ? { ...x, castKey: k } : x) })}><SelectTrigger className="w-40"><SelectValue placeholder="Character" /></SelectTrigger><SelectContent>{st.cast.map((c) => <SelectItem key={c.key} value={c.key}>{c.name}</SelectItem>)}</SelectContent></Select>
+                <Input className="flex-1 min-w-[10rem]" value={v.purpose} placeholder="Why this viewpoint?" onChange={(e) => up({ viewpoints: st.viewpoints.map((x, j) => j === i ? { ...x, purpose: e.target.value } : x) })} />
+                <Input className="w-40" value={v.chapters.map((c) => c + 1).join(",")} placeholder="Chapters e.g. 1,3,5" onChange={(e) => up({ viewpoints: st.viewpoints.map((x, j) => j === i ? { ...x, chapters: e.target.value.split(",").map((n) => parseInt(n, 10) - 1).filter((n) => n >= 0) } : x) })} />
+                <Button size="icon" variant="ghost" aria-label="Remove viewpoint" onClick={() => up({ viewpoints: st.viewpoints.filter((_, j) => j !== i) })}><Trash2 className="w-4 h-4" /></Button>
+              </div>)}
+              {st.cast.length > 0 && !locked && <Button size="sm" variant="outline" onClick={() => up({ viewpoints: [...st.viewpoints, { castKey: st.cast[0].key, purpose: "", chapters: [] }] })}><Plus className="w-3 h-3 mr-1" />Add viewpoint</Button>}
+            </div>}
+          </div>}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">Shared universe</span>
+              <Select value={st.universeId ?? "none"} disabled={locked} onValueChange={(v) => { const u = v === "none" ? null : v; if (st.cast.some((c) => c.identityId)) { toast.error("Remove library characters first — characters never move between universes."); return; } up({ universeId: u }); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Standalone book</SelectItem>{universes.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>
+              {!locked && <Button size="sm" variant="link" className="px-0" onClick={() => run("uni", async () => { const name = window.prompt("Name of the new universe"); if (!name?.trim()) return; const { data: u } = await supabase.auth.getUser(); const { error } = await supabase.from("fictional_universes").insert({ user_id: u.user!.id, name: name.trim() }); if (error) throw error; await load(); })}>+ New universe</Button>}</label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">Pen name (printed as author)</span>
+              <Select value={st.penNameId ?? "none"} onValueChange={(v) => up({ penNameId: v === "none" ? null : v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">My account name</SelectItem>{pens.map((p) => <SelectItem key={p.id} value={p.id}>{p.pen_name}</SelectItem>)}</SelectContent></Select>
+              <Button size="sm" variant="link" className="px-0" onClick={() => run("pen", async () => { const name = window.prompt("New pen name"); if (!name?.trim()) return; const { data: u } = await supabase.auth.getUser(); const { error } = await supabase.from("author_identities").insert({ user_id: u.user!.id, pen_name: name.trim() }); if (error) throw error; await load(); })}>+ New pen name</Button></label>
+          </div>
+          {st.universeId && <p className="text-xs text-muted-foreground">Established dates, ages, deaths and relationships from this universe will be respected. Ideas in this setup never become universe facts until they're written and accepted.</p>}
+        </CardContent>
+      </Card>
+
+      {issues.length > 0 && <div className="space-y-1">{issues.map((i, k) => <p key={k} className={`text-sm ${i.blocking ? "text-destructive" : "text-muted-foreground"}`}>{i.blocking ? "Fix: " : "Note: "}{i.message}</p>)}</div>}
+      <div className="flex flex-wrap gap-2 sticky bottom-0 bg-background py-3 border-t border-border">
+        <Button onClick={() => save()} disabled={!!busy}>{busy === "save" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save setup</Button>
+        <Button variant="outline" onClick={() => save("planning")} disabled={!!busy || issues.some((i) => i.blocking)}>Save & continue to planning</Button>
+        <span className="text-xs text-muted-foreground self-center">The master plan in the Plan tab will use this setup.</span>
+      </div>
+    </div>
+  );
+}
