@@ -59,7 +59,8 @@ describe("Phase F exact-detail enforcement", () => {
   });
   it("detects missing and wrongly reproduced details", () => {
     const v = checkAnchors("She typed 7-4-1-90 and thought of ilse varga.", anchors, ["door_code", "mentor"]);
-    expect(v.map((x) => [x.key, x.kind])).toEqual([["door_code", "missing"], ["mentor", "variant"]]);
+    expect(checkAnchors("She typed nothing.", anchors, ["door_code"])[0].kind).toBe("missing");
+    expect(v.map((x) => [x.key, x.kind])).toEqual([["door_code", "variant"], ["mentor", "variant"]]);
     expect(checkAnchors("She typed 7-4-1-9. Ilse Varga nodded.", anchors, ["door_code", "mentor"])).toEqual([]);
   });
   it("repairs with at most 2 targeted attempts and rejects over-rewrites", async () => {
