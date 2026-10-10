@@ -12,7 +12,7 @@ import { estimateCostUSD } from "../_shared/ai/registry.ts";
 import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
-import { resolvePipeline, renderPlanBlock, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
+import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext } from "../_shared/narrative/planning/planningContext.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
@@ -523,18 +523,29 @@ serve(async (req) => {
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
     let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
+    let heartbeat: Heartbeat | null = null;
     if (pipeline === "progressive" && book.id) {
       progressive = await loadProgressiveState(adminSupabase, book.id, auth.user.id, book.bookType, serverOutline, absChapter, subsectionIndex);
       if (!progressive.gate.ok && !dryRun) {
         return new Response(JSON.stringify({ error: progressive.gate.reason, code: progressive.gate.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      // Explicit progressive selection never silently downgrades to unplanned writing.
+      const planReq = requireApprovedPlan(progressive.plan);
+      if (!planReq.ok && !dryRun) {
+        return new Response(JSON.stringify({ error: planReq.reason, code: planReq.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (!dryRun) {
         const worker = `gc_${crypto.randomUUID()}`;
-        const { data: acq, error: acqErr } = await adminSupabase.rpc("acquire_generation_lease", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: worker, p_ttl_seconds: 900 });
+        const { data: acq, error: acqErr } = await adminSupabase.rpc("acquire_generation_lease", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: worker, p_ttl_seconds: LEASE_TTL_SECONDS });
         if (acqErr || !acq?.acquired) {
           return new Response(JSON.stringify({ error: "This section is already being written elsewhere. Try again shortly.", code: "LEASE_HELD" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         lease = { lease_id: acq.lease_id, fencing_token: Number(acq.fencing_token), worker };
+        const l = lease;
+        heartbeat = createLeaseHeartbeat(async () => {
+          const { data, error } = await adminSupabase.rpc("renew_generation_lease", { p_lease_id: l.lease_id, p_worker: l.worker, p_token: l.fencing_token, p_ttl_seconds: LEASE_TTL_SECONDS });
+          return !error && data?.renewed === true;
+        }, { onLost: () => console.warn("[phase-f] lease lost; this worker will not commit") });
       }
     }
     const runMetrics: Record<string, unknown> = { engine, profile_id: null, context_words: 0, candidates: 0, included: 0, omitted: {}, fell_back: false };
