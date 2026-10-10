@@ -64,6 +64,13 @@
       "when": 1791615472622,
       "tag": "0008_phase_g_editorial_validation",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791617930075,
+      "tag": "0009_phase_h_candidates_canon_activation",
+      "breakpoints": true
     }
   ]
 }
