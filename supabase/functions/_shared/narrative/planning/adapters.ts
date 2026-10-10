@@ -4,7 +4,7 @@
 
 export type AdapterId =
   | "fiction" | "self_help" | "business" | "finance"
-  | "children" | "cookbook" | "magazine" | "technical";
+  | "children" | "cookbook" | "magazine" | "technical" | "narrative_nonfiction";
 
 export interface GenreAdapter {
   id: AdapterId;
@@ -25,6 +25,8 @@ export interface GenreAdapter {
   weight: (t: number) => number;
   /** Minimum words for any section (keeps allocation sane). */
   minSectionWords: number;
+  /** True-story planning: scenes allowed, but every planned claim carries an evidence tier and nothing is invented as fact. */
+  factual?: boolean;
 }
 
 const flat = () => 1;
@@ -32,13 +34,22 @@ const flat = () => 1;
 export const GENRE_ADAPTERS: readonly GenreAdapter[] = [
   {
     id: "fiction", label: "Fiction", isFiction: true,
-    bookTypes: ["novel", "fiction-serial", "short-story", "drama", "comic", "poetry", "biography", "memoir"],
+    bookTypes: ["novel", "fiction-serial", "short-story", "drama", "comic", "poetry"],
     masterFields: ["protagonist", "central_conflict", "stakes", "reveals"],
     chapterObjectives: ["setup", "complication", "reveal", "reversal", "climax", "resolution"],
     sectionUnit: "scene", sectionsPerChapter: { min: 2, max: 6, default: 4 },
     beatKinds: ["entry", "goal", "obstacle", "turn", "exit_hook"],
     // Slight build toward the climax, short denouement.
     weight: (t) => (t > 0.92 ? 0.8 : 0.9 + 0.3 * t), minSectionWords: 400,
+  },
+  {
+    id: "narrative_nonfiction", label: "Biography / memoir", isFiction: false, factual: true,
+    bookTypes: ["biography", "memoir"],
+    masterFields: ["subject", "historical_scope", "primary_sources", "epistemic_boundaries"],
+    chapterObjectives: ["context_origins", "formative_period", "catalyst", "peak_struggle", "turning_point", "aftermath_legacy"],
+    sectionUnit: "scene", sectionsPerChapter: { min: 1, max: 6, default: 3 },
+    beatKinds: ["scene_anchor", "documented_fact", "subject_perspective", "source_note", "reflective_meaning"],
+    weight: flat, minSectionWords: 300,
   },
   {
     id: "self_help", label: "Self-help", isFiction: false,
