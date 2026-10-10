@@ -15,7 +15,8 @@ import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
 import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext, futureSecrets } from "../_shared/narrative/planning/planningContext.ts";
-import { blocksAcceptance, deterministicValidation, routeFinding } from "../_shared/narrative/planning/validation.ts";
+import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
+import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 
 // ── Security Config ──
@@ -805,9 +806,7 @@ serve(async (req) => {
         else {
           for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k);
           console.log("[phase-f] commit", JSON.stringify(c));
-          // Replacing an accepted section: memory derived from the old text (and everything after it)
-          // stops being authoritative until re-extracted or confirmed. Nothing is deleted.
-          if (body.replaceAccepted === true) await adminSupabase.rpc("flag_downstream_memory", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_reason: "upstream_section_replaced" }).then(() => {}, (e: unknown) => console.warn("[phase-h] memory flag failed:", e));
+          // Replacing an accepted section flags derived/later memory inside commit_fenced_section itself.
         }
         }
         }
