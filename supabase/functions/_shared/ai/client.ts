@@ -74,7 +74,7 @@ export async function selectRoute(modelKey: string, deps: AIDeps): Promise<Route
  */
 export const TEST_MODE_ERROR = "test_mode_blocked";
 export function failClosedDeps(deps: AIDeps): AIDeps {
-  const block = async (): Promise<never> => { throw new AIProviderError(TEST_MODE_ERROR as any, "Test mode: real AI calls are blocked."); };
+  const block = async (): Promise<never> => { throw new AIProviderError("test_mode_blocked", "Test mode: real AI calls are blocked."); };
   return { ...deps, env: {}, getUserKey: block, fetch: (async () => block()) as typeof fetch };
 }
 
@@ -191,5 +191,5 @@ export function toChatSSE(chunks: AsyncGenerator<string>, onDone?: (full: string
 /** HTTP status for a controlled AI error. */
 export function statusForAIError(e: unknown): number {
   if (!(e instanceof AIProviderError)) return 500;
-  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, unknown: 500 } as const)[e.code];
+  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, test_mode_blocked: 403, unknown: 500 } as const)[e.code];
 }
