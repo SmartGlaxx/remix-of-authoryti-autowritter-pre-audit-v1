@@ -50,6 +50,13 @@
       "when": 1791602264450,
       "tag": "0006_phase_d_planning_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791604711188,
+      "tag": "0007_phase_f_fenced_revision",
+      "breakpoints": true
     }
   ]
 }

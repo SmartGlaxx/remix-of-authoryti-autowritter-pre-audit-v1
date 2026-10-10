@@ -12,7 +12,7 @@ import { estimateCostUSD } from "../_shared/ai/registry.ts";
 import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
-import { resolvePipeline, renderPlanBlock, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
+import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext } from "../_shared/narrative/planning/planningContext.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
@@ -523,18 +523,29 @@ serve(async (req) => {
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
     let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
+    let heartbeat: Heartbeat | null = null;
     if (pipeline === "progressive" && book.id) {
       progressive = await loadProgressiveState(adminSupabase, book.id, auth.user.id, book.bookType, serverOutline, absChapter, subsectionIndex);
       if (!progressive.gate.ok && !dryRun) {
         return new Response(JSON.stringify({ error: progressive.gate.reason, code: progressive.gate.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      // Explicit progressive selection never silently downgrades to unplanned writing.
+      const planReq = requireApprovedPlan(progressive.plan);
+      if (!planReq.ok && !dryRun) {
+        return new Response(JSON.stringify({ error: planReq.reason, code: planReq.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (!dryRun) {
         const worker = `gc_${crypto.randomUUID()}`;
-        const { data: acq, error: acqErr } = await adminSupabase.rpc("acquire_generation_lease", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: worker, p_ttl_seconds: 900 });
+        const { data: acq, error: acqErr } = await adminSupabase.rpc("acquire_generation_lease", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: worker, p_ttl_seconds: LEASE_TTL_SECONDS });
         if (acqErr || !acq?.acquired) {
           return new Response(JSON.stringify({ error: "This section is already being written elsewhere. Try again shortly.", code: "LEASE_HELD" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         lease = { lease_id: acq.lease_id, fencing_token: Number(acq.fencing_token), worker };
+        const l = lease;
+        heartbeat = createLeaseHeartbeat(async () => {
+          const { data, error } = await adminSupabase.rpc("renew_generation_lease", { p_lease_id: l.lease_id, p_worker: l.worker, p_token: l.fencing_token, p_ttl_seconds: LEASE_TTL_SECONDS });
+          return !error && data?.renewed === true;
+        }, { onLost: () => console.warn("[phase-f] lease lost; this worker will not commit") });
       }
     }
     const runMetrics: Record<string, unknown> = { engine, profile_id: null, context_words: 0, candidates: 0, included: 0, omitted: {}, fell_back: false };
@@ -666,7 +677,7 @@ serve(async (req) => {
         return { mode: cfg.mode, writer: r("writer"), continuity_checker: r("continuity_checker"), continuity_reviser: r("continuity_reviser"), narrative_extractor: r("narrative_extractor"), planner: r("planner") };
       }); })() : null;
       return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, pipeline,
-        progressive: progressive ? { gate: progressive.gate, planUsable: progressive.plan.usable, planReason: progressive.plan.usable ? null : progressive.plan.reason, requiredAnchors: progressive.required, anchorsInScope: progressive.anchors.length, routing: await routing } : null, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
+        progressive: progressive ? { gate: progressive.gate, planRequirement: requireApprovedPlan(progressive.plan), planUsable: progressive.plan.usable, planReason: progressive.plan.usable ? null : progressive.plan.reason, requiredAnchors: progressive.required, anchorsInScope: progressive.anchors.length, routing: await routing } : null, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -694,6 +705,7 @@ serve(async (req) => {
     try {
       first = await chunks.next();
     } catch (e) {
+      heartbeat?.stop();
       if (lease) await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
       const status = statusForAIError(e);
       console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
@@ -735,13 +747,22 @@ serve(async (req) => {
 
     async function* all(): AsyncGenerator<string> {
       if (!first.done) yield first.value;
-      yield* chunks;
+      for await (const c of chunks) {
+        // A worker that lost its lease stops writing immediately; nothing it produced is saved.
+        if (heartbeat?.lost()) throw new Error("STALE_GENERATION_LEASE_REJECTED: this section is now being written elsewhere");
+        yield c;
+      }
     }
     const stream = toChatSSE(all(), async (full) => {
       const u = aiMeta.usage as { cachedInputTokens?: number | null; inputTokens?: number | null } | undefined;
       if (u) console.log(`[cache] cached=${u.cachedInputTokens ?? "unknown"} input=${u.inputTokens ?? "unknown"}`);
       const cleaned = stripMetaLabels(full).trim();
       if (cleaned && lease && book.id) {
+        // Last renewal just before the write; a lost worker never attempts the commit.
+        const alive = heartbeat ? await heartbeat.beat() : true;
+        heartbeat?.stop();
+        if (!alive) { runMetrics.error = "commit: lease lost before save"; console.warn("[phase-f] commit skipped: lease lost"); }
+        else {
         // Fence check + manuscript write + acceptance record + lease release: one transaction.
         const { data: c, error: ce } = await adminSupabase.rpc("commit_fenced_section", {
           p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: lease.worker, p_token: lease.fencing_token,
@@ -749,7 +770,9 @@ serve(async (req) => {
         });
         if (ce) { console.warn("[phase-f] commit rejected:", ce.message); runMetrics.error = `commit: ${ce.message.slice(0, 200)}`; }
         else { for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k); console.log("[phase-f] commit", JSON.stringify(c)); }
+        }
       } else if (cleaned && !progressive) await finalizeFullText(cleaned);
+      if (lease && !cleaned) { heartbeat?.stop(); await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); }
       // Phase 2D measurement: one row per generated section, both engines. Never blocks the writer.
       if (book.id) {
         try {
@@ -765,7 +788,7 @@ serve(async (req) => {
           });
         } catch (e) { console.warn("[context-engine] metrics skipped:", e instanceof Error ? e.message : e); }
       }
-    }, (e) => console.error("[generate-content] stream error:", e instanceof Error ? e.message : e));
+    }, (e) => { heartbeat?.stop(); if (lease) adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); console.error("[generate-content] stream error:", e instanceof Error ? e.message : e); });
 
     return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {

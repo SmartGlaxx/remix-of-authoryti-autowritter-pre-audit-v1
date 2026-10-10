@@ -74,9 +74,11 @@
 - [x] Phase C: universal planning engine + 8 genre adapters (pure, not wired); 27 tests, 315 total
 - [x] Phase D: AI planning services (alternatives 3/5/7/10, master, chapters, sections, beats), true-story planner, repair + checkpoints, owner approvals — built, not wired to writing
 - [x] Phase E — planning-aware context assembly (pure, not wired)
-- [ ] Phase F — wire into generation with Phase B leases, anchors, reconciliation (needs approval)
+- [x] Phase F — wire into generation with Phase B leases, anchors, reconciliation
 - [ ] Before new workflow goes live: wire leases/fencing, anchors, reconciliation gate (blockingDiscrepancies) into generation
 
 - [x] Phase F: opt-in progressive pipeline (gate, lease/fence commit, plan-aware Standard+Adaptive, actionable foreshadowing, exact-anchor enforcement, contradiction gate, staged acceptance) — 355 tests, free live preview verified
+- [x] Phase F safeguards: lease heartbeat + fenced revisions, PLAN_REQUIRED in progressive mode, durable extraction-failure recovery — 365 tests
+- [ ] Phase G — Unified Validation (architecture under review, not built)
 - [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
 - [ ] Browser UI for opt-in toggle, contradiction decisions and 'regenerate accepted section' (not built)

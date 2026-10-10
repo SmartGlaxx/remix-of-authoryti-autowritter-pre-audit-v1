@@ -2480,6 +2480,20 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_request_logs: { Args: never; Returns: undefined }
+      commit_fenced_revision: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_hash: string
+          p_original: string
+          p_sub: number
+          p_text: string
+          p_token: number
+          p_user_id: string
+          p_worker: string
+        }
+        Returns: Json
+      }
       commit_fenced_section: {
         Args: {
           p_book_id: string
