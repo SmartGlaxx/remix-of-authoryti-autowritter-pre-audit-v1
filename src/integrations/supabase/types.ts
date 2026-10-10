@@ -303,6 +303,48 @@ export type Database = {
           },
         ]
       }
+      book_identity_roles: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          identity_id: string
+          narrative_role: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          identity_id: string
+          narrative_role: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          identity_id?: string
+          narrative_role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_identity_roles_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_identity_roles_identity_id_user_id_fkey"
+            columns: ["identity_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       book_master_plans: {
         Row: {
           approved_at: string | null

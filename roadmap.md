@@ -92,3 +92,7 @@
 - [ ] Book Setup story options → narrator → character resolution (awaiting approval)
 - [ ] Wire chronology/knowledge checks into pre-acceptance validation (awaiting approval)
 - [ ] Comic-book & magazine layouts, then consolidated Phase I paid testing (postponed)
+
+- [x] Phase 2: Persona Studio, pen names, universes, promotion, relationships, server identity resolution, AI contract (mock)
+- [ ] Phase 2: live security run of server-side checks (waits on function deployment)
+- [ ] Phase 3: chronology + knowledge into extraction and pre-acceptance validation
