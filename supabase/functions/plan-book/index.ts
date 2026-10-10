@@ -180,10 +180,11 @@ Deno.serve(async (req) => {
     const call: ModelCall = async (p) => {
       prompts.push(p);
       if (dryRun) throw new DryRunStop();
-      if (p.mock !== undefined) return p.mock;
       const { text } = await generateAIText({ role: "planner", config, userId, bookId, request: { system: p.system, user: p.user, json: true } }, deps);
       return text;
     };
+    // Free deterministic engine for story services (same prompts, parsers and repair loop as live).
+    const storyCall = (mockOut: string): ModelCall => storyLive() ? call : async (p) => { prompts.push(p); if (dryRun) throw new DryRunStop(); return mockOut; };
     const brief: BookBrief = {
       title: book.title, bookType: book.book_type, genre: book.genre, audience: book.audience,
       premise: s(body.premise, 6000) || book.theme, guidance: s(body.guidance, 6000) || null,
@@ -198,8 +199,8 @@ Deno.serve(async (req) => {
         try { assertAlternativesEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const fixed = normalizeSetup(book.story_setup).fixedRequirements;
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
-        const pr = { ...buildAlternativesPrompt(brief, count), mock: storyLive() ? undefined : mockAlternativesOutput(brief, count, fixed) };
-        const r = await runWithRepair(call, pr, (t) => parseAlternatives(t, count));
+        const pr = buildAlternativesPrompt(brief, count);
+        const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count));
         return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
@@ -207,8 +208,8 @@ Deno.serve(async (req) => {
       if (action === "concepts") {
         const count = Number(body.count) as AlternativeCount;
         try { assertConceptsEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
-        const pr = { ...buildConceptsPrompt(brief, count), mock: storyLive() ? undefined : mockConceptsOutput(brief, count) };
-        const r = await runWithRepair(call, pr, (t) => parseConcepts(t, count));
+        const pr = buildConceptsPrompt(brief, count);
+        const r = await runWithRepair(storyCall(mockConceptsOutput(brief, count)), pr, (t) => parseConcepts(t, count));
         return r.ok ? json({ concepts: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
@@ -217,8 +218,8 @@ Deno.serve(async (req) => {
         const st = normalizeSetup(book.story_setup);
         const alt = st.selectedIndex !== null ? st.alternatives[st.selectedIndex] ?? null : null;
         const n = Math.min(6, Math.max(1, Number(body.count) || 3));
-        const pr = { ...buildTwistPrompt(brief, alt, n), mock: storyLive() ? undefined : mockTwistsOutput(brief, n) };
-        const r = await runWithRepair(call, pr, (t) => parseTwists(t, brief.chapterCount));
+        const pr = buildTwistPrompt(brief, alt, n);
+        const r = await runWithRepair(storyCall(mockTwistsOutput(brief, n)), pr, (t) => parseTwists(t, brief.chapterCount));
         return r.ok ? json({ twists: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
