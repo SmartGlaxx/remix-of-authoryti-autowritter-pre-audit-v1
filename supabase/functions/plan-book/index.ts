@@ -4,7 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
-import { statusForAIError } from "../_shared/ai/client.ts";
+import { statusForAIError, failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { adapterForBookType } from "../_shared/narrative/planning/adapters.ts";
 import type { ChapterPlan, MasterPlanSkeleton } from "../_shared/narrative/planning/engine.ts";
@@ -29,6 +29,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTIONS = ["alternatives", "concepts", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
 // Phase 4: story alternatives, concepts and twists use the free deterministic engine unless STORY_AI_ENGINE=live is set.
 const storyLive = () => Deno.env.get("STORY_AI_ENGINE") === "live";
+// Deployment handshake: test harnesses must read this BEFORE any AI-capable request and abort on mismatch,
+// so a stale deployment (which would ignore testMode) is never sent a request that could reach a paid model.
+export const PLAN_BOOK_BUILD = "p4-failclosed-1";
 const s = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
 
 Deno.serve(async (req) => {
@@ -47,6 +50,7 @@ Deno.serve(async (req) => {
     let body: Record<string, any>;
     try { body = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
     const action = body.action;
+    if (action === "version") return json({ build: PLAN_BOOK_BUILD, testModeSupported: true });
     if (!ACTIONS.includes(action)) return json({ error: "Invalid action" }, 400);
 
     // Owner checkpoints run as the signed-in user so database ownership checks use auth.uid().
@@ -174,7 +178,9 @@ Deno.serve(async (req) => {
       if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
     }
     const config = await loadBookModelConfig(db, bookId, userId);
-    const deps = createAIDeps(db, userId);
+    // Fail-closed test mode: every model call is answered by a mock or blocked; no key is ever reachable.
+    const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
+    const deps = testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId);
     const prompts: Prompt[] = [];
     const call: ModelCall = async (p) => {
       prompts.push(p);
@@ -183,7 +189,7 @@ Deno.serve(async (req) => {
       return text;
     };
     // Free deterministic engine for story services (same prompts, parsers and repair loop as live).
-    const storyCall = (mockOut: string): ModelCall => storyLive() ? call : async (p) => { prompts.push(p); if (dryRun) throw new DryRunStop(); return mockOut; };
+    const storyCall = (mockOut: string): ModelCall => storyLive() && !testMode ? call : async (p) => { prompts.push(p); if (dryRun) throw new DryRunStop(); return mockOut; };
     const brief: BookBrief = {
       title: book.title, bookType: book.book_type, genre: book.genre, audience: book.audience,
       premise: s(body.premise, 6000) || book.theme, guidance: s(body.guidance, 6000) || null,
@@ -200,7 +206,7 @@ Deno.serve(async (req) => {
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
         const pr = buildAlternativesPrompt(brief, count);
         const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count));
-        return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+        return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
       // Nonfiction concepts: a separate, genre-appropriate service (no twists, no plot).
@@ -209,7 +215,7 @@ Deno.serve(async (req) => {
         try { assertConceptsEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const pr = buildConceptsPrompt(brief, count);
         const r = await runWithRepair(storyCall(mockConceptsOutput(brief, count)), pr, (t) => parseConcepts(t, count));
-        return r.ok ? json({ concepts: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+        return r.ok ? json({ concepts: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
       if (action === "twists") {
@@ -219,7 +225,7 @@ Deno.serve(async (req) => {
         const n = Math.min(6, Math.max(1, Number(body.count) || 3));
         const pr = buildTwistPrompt(brief, alt, n);
         const r = await runWithRepair(storyCall(mockTwistsOutput(brief, n)), pr, (t) => parseTwists(t, brief.chapterCount));
-        return r.ok ? json({ twists: r.value, attempts: r.attempts, engine: storyLive() ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+        return r.ok ? json({ twists: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
       if (action === "master") {
