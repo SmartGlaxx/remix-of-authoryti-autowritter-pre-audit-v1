@@ -190,9 +190,22 @@ Deno.serve(async (req) => {
     };
     // Free deterministic engine for story services (same prompts, parsers and repair loop as live).
     const storyCall = (mockOut: string): ModelCall => storyLive() && !testMode ? call : async (p) => { prompts.push(p); if (dryRun) throw new DryRunStop(); return mockOut; };
+    // Optional idea-explorer overrides (alternatives/concepts only): any known book type + sub-category and extra preferences.
+    let ovType = book.book_type;
+    if ((action === "alternatives" || action === "concepts") && typeof body.bookType === "string") {
+      try { adapterForBookType(body.bookType); ovType = body.bookType; } catch { return json({ error: "Unknown book type" }, 400); }
+    }
+    const ex = (body.explore && typeof body.explore === "object") ? body.explore as Record<string, unknown> : {};
+    const extra = [
+      s(ex.tone, 80) && `Tone: ${s(ex.tone, 80)}`,
+      s(ex.setting, 300) && `Setting / time period: ${s(ex.setting, 300)}`,
+      s(ex.comparables, 300) && `Similar in spirit to: ${s(ex.comparables, 300)} (do not copy them)`,
+      s(ex.avoid, 300) && `Avoid: ${s(ex.avoid, 300)}`,
+      s(ex.originality, 20) && `Originality: ${s(ex.originality, 20) === "bold" ? "bold, unexpected, high-concept options" : s(ex.originality, 20) === "safe" ? "familiar, market-proven options" : "a balanced mix of familiar and fresh"}`,
+    ].filter(Boolean).join("\n");
     const brief: BookBrief = {
-      title: book.title, bookType: book.book_type, genre: book.genre, audience: book.audience,
-      premise: s(body.premise, 6000) || book.theme, guidance: s(body.guidance, 6000) || null,
+      title: book.title, bookType: ovType, genre: s(body.genre, 120) || book.genre, audience: s(body.audience, 120) || book.audience,
+      premise: s(body.premise, 6000) || book.theme, guidance: [s(body.guidance, 6000), extra].filter(Boolean).join("\n") || null,
       targetWords: Math.min(400_000, Math.max(1000, Number(body.targetWords) || 50_000)),
       chapterCount: Math.min(80, Math.max(1, Number(body.chapterCount) || 12)),
       series: null,
