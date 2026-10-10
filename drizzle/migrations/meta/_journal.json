@@ -99,6 +99,13 @@
       "when": 1791654116262,
       "tag": "0013_persona_universe_chronology_phase1",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791656121758,
+      "tag": "0014_persona_studio_phase2",
+      "breakpoints": true
     }
   ]
 }
