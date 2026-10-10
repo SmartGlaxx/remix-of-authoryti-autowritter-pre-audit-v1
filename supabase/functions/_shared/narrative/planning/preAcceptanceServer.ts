@@ -46,9 +46,9 @@ export async function persistOutcome(r: PreAcceptanceResult, a: PersistArgs): Pr
   }
   if (r.decision === "accept") return { candidateId: null };
   const { data, error } = await a.db.rpc("save_candidate_draft", {
-    p_book_id: a.bookId, p_user_id: a.userId, p_chapter: a.chapter, p_sub: a.sub, p_master_plan_id: a.masterPlanId, p_text: r.heldForApproval?.text ?? r.text,
+    p_book_id: a.bookId, p_user_id: a.userId, p_chapter: a.chapter, p_sub: a.sub, p_master_plan_id: a.masterPlanId, p_text: r.text,
     p_hash: a.hash, p_status: r.decision === "blocked_material" ? "BLOCKED_MATERIAL" : "NEEDS_AUTHOR_REVIEW",
-    p_findings: r.findings, p_usage: r.usage, p_origin: a.origin, p_parent: a.parentId ?? null, p_dedup_keys: dedupKeys,
+    p_findings: r.heldForApproval ? [...r.findings, { code: "BROAD_REWRITE_PROPOSED", stage: 5, severity: "moderate", message: `A correction would change ${Math.round(r.heldForApproval.ratio * 100)}% of paragraphs; review it before use.`, proposed_text: r.heldForApproval.text }] : r.findings, p_usage: r.usage, p_origin: a.origin, p_parent: a.parentId ?? null, p_dedup_keys: dedupKeys,
   });
   if (error) throw new Error(error.message);
   return { candidateId: data?.candidate_id ?? null };
