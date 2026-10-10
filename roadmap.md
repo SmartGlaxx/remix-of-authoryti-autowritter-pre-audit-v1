@@ -71,4 +71,6 @@
 # Progressive planning
 - [x] Phase B: plan tables, immutability triggers, acceptance/extraction tracking, lifecycle tests
 - [x] Phase B completion (0005): generation leases + fencing, exact-detail anchors, reconciliation logs; 14 unit + 28 live checks
-- [ ] Phase C: planning modules per genre adapter — awaiting go-ahead
+- [x] Phase C: universal planning engine + 8 genre adapters (pure, not wired); 27 tests, 315 total
+- [ ] Phase D: AI plan generation — awaiting approval
+- [ ] Before new workflow goes live: wire leases/fencing, anchors, reconciliation gate (blockingDiscrepancies) into generation
