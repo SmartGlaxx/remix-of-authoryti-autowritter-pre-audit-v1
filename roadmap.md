@@ -76,3 +76,7 @@
 - [x] Phase E — planning-aware context assembly (pure, not wired)
 - [ ] Phase F — wire into generation with Phase B leases, anchors, reconciliation (needs approval)
 - [ ] Before new workflow goes live: wire leases/fencing, anchors, reconciliation gate (blockingDiscrepancies) into generation
+
+- [x] Phase F: opt-in progressive pipeline (gate, lease/fence commit, plan-aware Standard+Adaptive, actionable foreshadowing, exact-anchor enforcement, contradiction gate, staged acceptance) — 355 tests, free live preview verified
+- [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
+- [ ] Browser UI for opt-in toggle, contradiction decisions and 'regenerate accepted section' (not built)
