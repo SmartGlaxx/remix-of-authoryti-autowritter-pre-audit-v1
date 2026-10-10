@@ -81,6 +81,7 @@
 - [x] Phase F safeguards: lease heartbeat + fenced revisions, PLAN_REQUIRED in progressive mode, durable extraction-failure recovery — 365 tests
 - [x] Phase G — Unified Validation (configurable vocab, contextual repetition, editorial vs canon routing, author-approved broad rewrites, validate-before-accept) — 385 tests
 - [x] Phase G runtime completion + Phase H workflow (Planning Studio, held drafts, deferred canon activation, memory flagging) — 400 tests
-- [ ] Phase I — live end-to-end verification with paid generation (awaits approval)
+- [x] Phase I zero-cost step: progressive-only opening diversity, configured-only bans, genre rubrics (advisory), timeout/no-duplicate guard — 408 tests
+- [ ] Phase I Scale 2 — single paid section on a test copy (awaits approval)
 - [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
 - [x] Browser UI for opt-in toggle and contradiction decisions (Planning Studio); a one-click 'regenerate accepted section' button is still not built
