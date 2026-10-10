@@ -57,6 +57,13 @@
       "when": 1791604711188,
       "tag": "0007_phase_f_fenced_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791615472622,
+      "tag": "0008_phase_g_editorial_validation",
+      "breakpoints": true
     }
   ]
 }
