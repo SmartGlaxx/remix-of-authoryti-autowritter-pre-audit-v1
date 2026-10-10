@@ -677,7 +677,7 @@ serve(async (req) => {
         return { mode: cfg.mode, writer: r("writer"), continuity_checker: r("continuity_checker"), continuity_reviser: r("continuity_reviser"), narrative_extractor: r("narrative_extractor"), planner: r("planner") };
       }); })() : null;
       return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, pipeline,
-        progressive: progressive ? { gate: progressive.gate, planUsable: progressive.plan.usable, planReason: progressive.plan.usable ? null : progressive.plan.reason, requiredAnchors: progressive.required, anchorsInScope: progressive.anchors.length, routing: await routing } : null, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
+        progressive: progressive ? { gate: progressive.gate, planRequirement: requireApprovedPlan(progressive.plan), planUsable: progressive.plan.usable, planReason: progressive.plan.usable ? null : progressive.plan.reason, requiredAnchors: progressive.required, anchorsInScope: progressive.anchors.length, routing: await routing } : null, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -788,7 +788,7 @@ serve(async (req) => {
           });
         } catch (e) { console.warn("[context-engine] metrics skipped:", e instanceof Error ? e.message : e); }
       }
-    }, (e) => console.error("[generate-content] stream error:", e instanceof Error ? e.message : e));
+    }, (e) => { heartbeat?.stop(); if (lease) adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); console.error("[generate-content] stream error:", e instanceof Error ? e.message : e); });
 
     return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {
