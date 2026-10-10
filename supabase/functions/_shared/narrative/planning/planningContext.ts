@@ -117,7 +117,7 @@ export function buildPlanningAwareContext(input: PlanningContextInput): Planning
   const objective = plan.usable ? `${plan.section.objective}${input.objective ? ` | ${input.objective}` : ""}` : input.objective;
   const context = assembleAdaptiveContext({ bookType: input.bookType, position: input.position, objective, candidates: safe, historicalNeedIds: base.needIds });
   return {
-    mode: plan.usable ? "planned" : "legacy", fallbackReason: plan.usable ? undefined : (plan as { reason?: string }).reason, context,
+    mode: plan.usable ? "planned" : "legacy", fallbackReason: plan.usable ? undefined : (plan as { reason?: PlanFallbackReason }).reason, context,
     metrics: { candidates: all.length, planCandidates: planC.length, anchorCandidates: anchorC.length, spoilerBlocked: all.length - safe.length, words: countContextWords(context.text), hardLimitWords: context.hardLimitWords },
   };
 }
