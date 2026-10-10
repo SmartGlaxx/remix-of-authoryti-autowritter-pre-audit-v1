@@ -145,6 +145,18 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
     setEditingChapterIdx(null);
   }, [onUpdateBook, book.outline, book.id, editChapterTitle]);
 
+  // Persist an author-set (or cleared) planned first appearance for one character.
+  // NOTE: must stay above every conditional return (Rules of Hooks).
+  const handleSetFirstAppearance = useCallback((characterId: string, value: { chapterIndex: number; subsectionIndex?: number } | null) => {
+    if (!onUpdateBook || !book.outline?.characters) return;
+    const updatedOutline = JSON.parse(JSON.stringify(book.outline));
+    const c = updatedOutline.characters.find((x: any) => x.id === characterId);
+    if (!c) return;
+    if (value) c.firstAppearance = value; else delete c.firstAppearance;
+    onUpdateBook(book.id, { outline: updatedOutline });
+  }, [onUpdateBook, book.outline, book.id]);
+
+
   if (!book.outline || chapters.length === 0) {
     return (
       <Card className="h-full flex items-center justify-center">
