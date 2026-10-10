@@ -112,3 +112,22 @@ export function mockPersonaModel(req: PersonaGenerationRequest): string {
     ],
   });
 }
+
+import { checkOrder, validateMilestones, type Milestone } from "./chronology.ts";
+
+export interface LifeMilestone { key: string; label?: string; date: ApproximateDate | null; requires?: string[] }
+export interface LifeFinding { key: string; against: string; verdict: "violation" | "uncertain" }
+
+/** Back-check a persona's life: birth ≤ every milestone ≤ death, plus declared prerequisites.
+ *  Violations block saving; uncertain overlaps are returned for the author to review. */
+export function checkLifeChronology(birth: ApproximateDate | null | undefined, death: ApproximateDate | null | undefined, milestones: LifeMilestone[] = []): LifeFinding[] {
+  const out: LifeFinding[] = [];
+  const push = (key: string, against: string, v: string) => { if (v === "violation" || v === "uncertain") out.push({ key, against, verdict: v }); };
+  if (birth && death) push("death", "birth", checkOrder(birth, death));
+  for (const m of milestones) {
+    if (birth) push(m.key, "birth", checkOrder(birth, m.date));
+    if (death) push(m.key, "death", checkOrder(m.date, death));
+  }
+  for (const f of validateMilestones(milestones as Milestone[])) out.push({ key: f.key, against: f.requires, verdict: f.verdict });
+  return out;
+}
