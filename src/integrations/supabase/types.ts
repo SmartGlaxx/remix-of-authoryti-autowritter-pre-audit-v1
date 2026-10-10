@@ -136,6 +136,78 @@ export type Database = {
         }
         Relationships: []
       }
+      book_master_plans: {
+        Row: {
+          approved_at: string | null
+          book_id: string
+          created_at: string
+          genre_adapter_type: string
+          genre_data: Json
+          id: string
+          intended_ending: string
+          major_reveals: Json
+          master_synopsis: string
+          premise: string
+          status: string
+          supersedes_id: string | null
+          twist_alternatives: Json
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          book_id: string
+          created_at?: string
+          genre_adapter_type?: string
+          genre_data?: Json
+          id?: string
+          intended_ending?: string
+          major_reveals?: Json
+          master_synopsis?: string
+          premise?: string
+          status?: string
+          supersedes_id?: string | null
+          twist_alternatives?: Json
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          book_id?: string
+          created_at?: string
+          genre_adapter_type?: string
+          genre_data?: Json
+          id?: string
+          intended_ending?: string
+          major_reveals?: Json
+          master_synopsis?: string
+          premise?: string
+          status?: string
+          supersedes_id?: string | null
+          twist_alternatives?: Json
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_master_plans_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_master_plans_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "book_master_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_model_configs: {
         Row: {
           book_id: string
@@ -183,6 +255,152 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "books"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_progressive_plans: {
+        Row: {
+          book_id: string
+          chapter_index: number
+          content: Json
+          created_at: string
+          dependencies: Json
+          id: string
+          master_plan_id: string
+          parent_plan_id: string | null
+          plan_level: string
+          plan_status: string
+          subsection_index: number | null
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          book_id: string
+          chapter_index: number
+          content?: Json
+          created_at?: string
+          dependencies?: Json
+          id?: string
+          master_plan_id: string
+          parent_plan_id?: string | null
+          plan_level: string
+          plan_status?: string
+          subsection_index?: number | null
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          book_id?: string
+          chapter_index?: number
+          content?: Json
+          created_at?: string
+          dependencies?: Json
+          id?: string
+          master_plan_id?: string
+          parent_plan_id?: string | null
+          plan_level?: string
+          plan_status?: string
+          subsection_index?: number | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_progressive_plans_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_progressive_plans_master_plan_id_book_id_fkey"
+            columns: ["master_plan_id", "book_id"]
+            isOneToOne: false
+            referencedRelation: "book_master_plans"
+            referencedColumns: ["id", "book_id"]
+          },
+          {
+            foreignKeyName: "book_progressive_plans_parent_fk"
+            columns: ["parent_plan_id", "book_id"]
+            isOneToOne: false
+            referencedRelation: "book_progressive_plans"
+            referencedColumns: ["id", "book_id"]
+          },
+        ]
+      }
+      book_section_acceptances: {
+        Row: {
+          attempts: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at: string
+          error: string | null
+          extraction_status: string
+          id: string
+          manuscript_status: string
+          master_plan_id: string | null
+          section_plan_id: string | null
+          subsection_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at?: string
+          error?: string | null
+          extraction_status?: string
+          id?: string
+          manuscript_status?: string
+          master_plan_id?: string | null
+          section_plan_id?: string | null
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          book_id?: string
+          chapter_index?: number
+          content_hash?: string
+          created_at?: string
+          error?: string | null
+          extraction_status?: string
+          id?: string
+          manuscript_status?: string
+          master_plan_id?: string | null
+          section_plan_id?: string | null
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_section_acceptances_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_section_acceptances_master_plan_id_book_id_fkey"
+            columns: ["master_plan_id", "book_id"]
+            isOneToOne: false
+            referencedRelation: "book_master_plans"
+            referencedColumns: ["id", "book_id"]
+          },
+          {
+            foreignKeyName: "book_section_acceptances_section_plan_id_book_id_fkey"
+            columns: ["section_plan_id", "book_id"]
+            isOneToOne: false
+            referencedRelation: "book_progressive_plans"
+            referencedColumns: ["id", "book_id"]
           },
         ]
       }

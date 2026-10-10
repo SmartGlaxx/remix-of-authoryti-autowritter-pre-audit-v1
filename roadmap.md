@@ -67,3 +67,7 @@
 - Books: [2D-V standard/adaptive] full copies; same manuscript, Daniel/Balanced, matched tasks.
 - Record: context words, raw+cached input tokens, output tokens, provider cost, latency, retries, continuity outcomes, identity errors per matched section.
 - Report continuity/identity separately from cost (manuscript uses Ruth et al. vs outline Mara — known mismatch).
+
+# Progressive planning
+- [x] Phase B: plan tables, immutability triggers, acceptance/extraction tracking, lifecycle tests
+- [ ] Phase C: planning modules per genre adapter — awaiting go-ahead
