@@ -85,3 +85,10 @@
 - [ ] Phase I Scale 2 — single paid section on a test copy (awaits approval)
 - [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
 - [x] Browser UI for opt-in toggle and contradiction decisions (Planning Studio); a one-click 'regenerate accepted section' button is still not built
+
+## Persona Studio
+- [x] Phase 1: stable identities, pen names, universes, relationships, chronology engine, temporal knowledge, narrative vantage setting, tests
+- [ ] Phase 2: Persona Studio UI + identity resolution (awaiting approval)
+- [ ] Book Setup story options → narrator → character resolution (awaiting approval)
+- [ ] Wire chronology/knowledge checks into pre-acceptance validation (awaiting approval)
+- [ ] Comic-book & magazine layouts, then consolidated Phase I paid testing (postponed)
