@@ -33,7 +33,7 @@ describe("Phase 4 — story alternatives (free engine, real parsers)", () => {
     expect(r.ok).toBe(true); expect(calls).toBe(1);
   });
   it("nonfiction gets approaches, not plots", () => {
-    const r = parseConcepts(mockConceptsOutput({ ...brief, bookType: "self_help" }, 3), 3);
+    const r = parseConcepts(mockConceptsOutput({ ...brief, bookType: "self-help" }, 3), 3);
     expect(r.ok).toBe(true);
   });
   it("skipping stories leaves no chosen alternative for the planner", () => {
@@ -65,7 +65,7 @@ describe("Phase 4 — plot twists", () => {
     expect(validateSetup(st, { bookType: "novel", chapterCount: 12 }).some((i) => i.code === "TWIST_CHAPTER_RANGE" && i.blocking)).toBe(true);
   });
   it("nonfiction cannot use twists or multiple viewpoints", () => {
-    const codes = validateSetup({ ...emptySetup(), twistsEnabled: true, perspective: "multiple" }, { bookType: "self_help" }).map((i) => i.code);
+    const codes = validateSetup({ ...emptySetup(), twistsEnabled: true, perspective: "multiple" }, { bookType: "self-help" }).map((i) => i.code);
     expect(codes).toContain("NONFICTION_TWISTS"); expect(codes).toContain("NONFICTION_MULTI_POV");
   });
 });
