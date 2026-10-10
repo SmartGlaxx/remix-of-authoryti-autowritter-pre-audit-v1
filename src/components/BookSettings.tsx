@@ -199,6 +199,20 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                     {povOption && (
                       <p className="text-xs text-muted-foreground mt-1">{povOption.description}</p>
                     )}
+                    {book.pov === "first-person" && (
+                      <div className="mt-3 space-y-1.5">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">When is the story told?</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {NARRATIVE_VANTAGE_OPTIONS.map((o) => (
+                            <Button key={o.value} size="sm" variant={vantage === o.value ? "default" : "outline"}
+                              disabled={vantageLocked} onClick={() => saveVantage(o.value)} title={o.description}>
+                              {o.label}
+                            </Button>
+                          ))}
+                        </div>
+                        {vantageLocked && <p className="text-xs text-muted-foreground">Locked once writing has started.</p>}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Primary Tone</p>
