@@ -124,6 +124,46 @@ export function progressiveGate(prior: PriorSection | null, logs: Row[], positio
   return { ok: true };
 }
 
+// ---------- Progressive mode never silently downgrades ----------
+/** Progressive books require a usable approved plan; legacy books never reach this check. */
+export function requireApprovedPlan(plan: { usable: boolean; reason?: string }): { ok: true } | { ok: false; code: "PLAN_REQUIRED"; reason: string } {
+  if (plan.usable) return { ok: true };
+  return { ok: false, code: "PLAN_REQUIRED", reason: `Progressive Planning is on for this book, but no usable approved plan covers this section (${plan.reason ?? "unknown"}). Approve a plan or switch the book back to standard writing.` };
+}
+
+// ---------- Lease heartbeat ----------
+export const LEASE_TTL_SECONDS = 120;
+export const LEASE_HEARTBEAT_MS = 30_000;
+export interface Heartbeat { lost(): boolean; stop(): void; beat(): Promise<boolean> }
+/**
+ * Renews the lease while work is active. One failed renewal (stale, expired, superseded or
+ * error) marks the worker as lost for good; a lost worker must not commit.
+ */
+export function createLeaseHeartbeat(renew: () => Promise<boolean>, opts: { intervalMs?: number; setInterval?: typeof setInterval; clearInterval?: typeof clearInterval; onLost?: () => void } = {}): Heartbeat {
+  let lost = false; let stopped = false;
+  const si = opts.setInterval ?? setInterval, ci = opts.clearInterval ?? clearInterval;
+  const beat = async () => {
+    if (lost || stopped) return !lost;
+    let ok = false;
+    try { ok = await renew(); } catch { ok = false; }
+    if (!ok && !stopped) { lost = true; opts.onLost?.(); ci(id); }
+    return !lost;
+  };
+  const id = si(() => { void beat(); }, opts.intervalMs ?? LEASE_HEARTBEAT_MS);
+  return { lost: () => lost, stop: () => { stopped = true; ci(id); }, beat };
+}
+
+// ---------- Extraction outcome → staged acceptance ----------
+/** null = leave the acceptance untouched (it stays PENDING and keeps blocking the next section). */
+export function extractionStatusFor(outcome: { status: string; reason?: string } | null): "EXTRACTED" | "FAILED" | null {
+  if (!outcome) return "FAILED";
+  if (outcome.status === "completed") return "EXTRACTED";
+  if (outcome.status === "skipped" && outcome.reason === "already_processed") return "EXTRACTED";
+  if (outcome.status === "failed") return "FAILED";
+  return null;
+}
+
+
 /** The section just before (ch, sub) in the outline; null for the very first section. */
 export function previousPosition(outline: Row | null | undefined, ch: number, sub: number): { chapterIndex: number; subsectionIndex: number } | null {
   if (sub > 0) return { chapterIndex: ch, subsectionIndex: sub - 1 };
