@@ -40,16 +40,16 @@ export function intentForKind(kind: string): BeatIntent {
  */
 export const QUALITY_RUBRICS: Record<string, string[]> = {
   fiction: ["beat execution through action", "POV and voice discipline", "dialogue with subtext", "pacing and tension", "sensory grounding", "character motivation"],
-  childrens: ["age-appropriate vocabulary and syntax", "narrative momentum", "emotional resonance", "sensory wonder", "read-aloud rhythm"],
+  children: ["age-appropriate vocabulary and syntax", "narrative momentum", "emotional resonance", "sensory wonder", "read-aloud rhythm"],
   narrative_nonfiction: ["scenes grounded in the provided record", "perspective integrity", "clarity of chronology", "no invented detail presented as fact"],
-  practical: ["actionable usefulness", "logical instructional progression", "concrete examples", "clarity without platitudes"],
+  self_help: ["actionable usefulness", "logical instructional progression", "concrete examples", "clarity without platitudes"],
   business: ["actionable usefulness", "evidence and concrete cases", "logical argument progression", "authority without filler"],
+  finance: ["accuracy and stated assumptions", "actionable usefulness", "worked examples", "no invented figures"],
   technical: ["conceptual accuracy", "step-by-step clarity", "precise terminology", "worked examples", "no invented figures"],
-  modular: ["step and quantity precision", "scannable structure", "practical usability", "consistent unit format"],
-  poetry: ["rhythm and line control", "image density", "metaphor cohesion", "intentional repetition respected"],
-  screenplay: ["format discipline", "performable dialogue", "character objectives", "visual storytelling"],
+  cookbook: ["ingredient, quantity and timing precision", "technique clarity", "sensory description of results", "kitchen practicality"],
+  magazine: ["strong lede", "editorial flow", "balanced depth and readability", "clear takeaway"],
 };
-export const qualityRubric = (adapter: string): string[] => QUALITY_RUBRICS[adapter] ?? QUALITY_RUBRICS.practical;
+export const qualityRubric = (adapter: string): string[] => QUALITY_RUBRICS[adapter] ?? QUALITY_RUBRICS.technical;
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
