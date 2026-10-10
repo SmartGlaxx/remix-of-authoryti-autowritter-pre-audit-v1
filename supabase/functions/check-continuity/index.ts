@@ -10,7 +10,7 @@ import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrative/context.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
-import { buildAnchorRepairPrompt, discrepanciesFor, resolvePipeline, runAnchorRepair } from "../_shared/narrative/planning/pipeline.ts";
+import { buildAnchorRepairPrompt, discrepanciesFor, LEASE_TTL_SECONDS, resolvePipeline, runAnchorRepair } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import {
   buildCheckerPrompt, buildRevisionPrompt, isNonfiction, maxSeverity, parseCheckerOutput, resolutionFor, runContinuityLoop,
@@ -123,8 +123,19 @@ Deno.serve(async (req) => {
     }
 
     const finalHash = contentHash(result.finalText);
-    // Persist the final text only when it actually changed. Re-read to avoid clobbering concurrent edits.
-    if (result.revised && result.finalText !== original) {
+    const progressiveBook = resolvePipeline(bookRow?.controls) === "progressive";
+    // Progressive books: the revised text is a protected write — lease + fence in one transaction.
+    if (progressiveBook && result.revised && result.finalText !== original) {
+      const worker = `cc_${crypto.randomUUID()}`;
+      const { data: acq } = await db.rpc("acquire_generation_lease", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_worker: worker, p_ttl_seconds: LEASE_TTL_SECONDS });
+      if (!acq?.acquired) console.warn("[phase-f] revision not saved: section is being written elsewhere");
+      else {
+        const { data: c, error } = await db.rpc("commit_fenced_revision", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_worker: worker, p_token: Number(acq.fencing_token), p_original: original, p_text: result.finalText, p_hash: finalHash });
+        if (error) { console.warn("[phase-f] revision rejected:", error.message); await db.rpc("release_generation_lease", { p_lease_id: acq.lease_id, p_worker: worker, p_token: Number(acq.fencing_token) }).then(() => {}, () => {}); }
+        else console.log("[phase-f] revision", JSON.stringify(c));
+      }
+    } else if (result.revised && result.finalText !== original) {
+      // Persist the final text only when it actually changed. Re-read to avoid clobbering concurrent edits.
       const { data: fresh } = await db.from("books").select("outline, full_text").eq("id", bookId).maybeSingle();
       const target = fresh?.outline?.chapters?.[ch]?.subsections?.[sub];
       if (target && target.content === original) {
