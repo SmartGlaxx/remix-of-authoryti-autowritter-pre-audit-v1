@@ -11,7 +11,11 @@ import { buildAdaptiveContext, resolveContextEngine, type ContextEngine } from "
 import { estimateCostUSD } from "../_shared/ai/registry.ts";
 import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
-import { LEGACY_PICKER_MAP } from "../_shared/ai/roles.ts";
+import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
+import { resolvePipeline, renderPlanBlock, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
+import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
+import { buildPlanningAwareContext } from "../_shared/narrative/planning/planningContext.ts";
+import { contentHash } from "../_shared/narrative/extraction.ts";
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 200_000;
@@ -505,11 +509,33 @@ serve(async (req) => {
     // ── Phase 2D A/B switch: read from the saved book (never trusted from the client). Default legacy. ──
     const startedAt = Date.now();
     let engine: ContextEngine = "legacy";
+    let pipeline: Pipeline = "current";
+    let serverOutline: any = null;
     if (book.id) {
       try {
-        const { data: eb } = await adminSupabase.from("books").select("controls, user_id").eq("id", book.id).maybeSingle();
-        if (eb && eb.user_id === auth.user.id) engine = resolveContextEngine(eb.controls);
+        const { data: eb } = await adminSupabase.from("books").select("controls, user_id, outline").eq("id", book.id).maybeSingle();
+        if (eb && eb.user_id === auth.user.id) { engine = resolveContextEngine(eb.controls); pipeline = resolvePipeline(eb.controls); serverOutline = eb.outline; }
       } catch (e) { console.warn("[context-engine] lookup failed, using legacy:", e instanceof Error ? e.message : e); }
+    }
+
+    // ── Phase F: opt-in progressive pipeline (books.controls.planning_pipeline = "progressive"). ──
+    // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
+    // then a generation lease. Books without the flag never reach this block.
+    let progressive: ProgressiveState | null = null;
+    let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
+    if (pipeline === "progressive" && book.id) {
+      progressive = await loadProgressiveState(adminSupabase, book.id, auth.user.id, book.bookType, serverOutline, absChapter, subsectionIndex);
+      if (!progressive.gate.ok && !dryRun) {
+        return new Response(JSON.stringify({ error: progressive.gate.reason, code: progressive.gate.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (!dryRun) {
+        const worker = `gc_${crypto.randomUUID()}`;
+        const { data: acq, error: acqErr } = await adminSupabase.rpc("acquire_generation_lease", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: worker, p_ttl_seconds: 900 });
+        if (acqErr || !acq?.acquired) {
+          return new Response(JSON.stringify({ error: "This section is already being written elsewhere. Try again shortly.", code: "LEASE_HELD" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        lease = { lease_id: acq.lease_id, fencing_token: Number(acq.fencing_token), worker };
+      }
     }
     const runMetrics: Record<string, unknown> = { engine, profile_id: null, context_words: 0, candidates: 0, included: 0, omitted: {}, fell_back: false };
 
@@ -578,7 +604,15 @@ serve(async (req) => {
           adminSupabase.from("identity_entities").select("id, kind, name, aliases, introduced_position").eq("book_id", book.id).limit(2000),
         ]);
         const objective = [subsection.title, subsection.description ?? subsection.summary].filter(Boolean).join(": ") || chapter.title || "Continue the book";
-        const { context, candidateCount } = buildAdaptiveContext({ bookType: book.bookType, position: { chapterIndex: absChapter, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] });
+        const adaptiveInput = { bookType: book.bookType, position: { chapterIndex: absChapter, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] };
+        let context, candidateCount: number;
+        if (progressive) {
+          const pr = buildPlanningAwareContext({ ...adaptiveInput, master: progressive.master, readyPlans: progressive.readyPlans, anchors: progressive.anchorRows });
+          context = pr.context; candidateCount = pr.metrics.candidates;
+          Object.assign(runMetrics, { plan_mode: pr.mode, plan_fallback: pr.fallbackReason ?? null, spoiler_blocked: pr.metrics.spoilerBlocked });
+        } else {
+          ({ context, candidateCount } = buildAdaptiveContext(adaptiveInput));
+        }
         userPrompt = userPrompt.replace(/\n\n/, () => `\n\n${context.text}\n\n`);
         const omittedCounts: Record<string, number> = {};
         for (const o of context.omitted) omittedCounts[o.reason] = (omittedCounts[o.reason] ?? 0) + 1;
@@ -608,6 +642,14 @@ serve(async (req) => {
       }
     }
 
+    // ── Phase F, Standard mode: keep the manuscript window, add the writer-safe plan + exact details. ──
+    if (progressive && (engine === "legacy" || runMetrics.fell_back) && progressive.plan.usable) {
+      userPrompt = `${userPrompt}\n\n${renderPlanBlock(progressive.plan, absChapter, progressive.anchors, progressive.required)}`;
+      runMetrics.plan_mode = "planned";
+    } else if (progressive && !progressive.plan.usable) {
+      runMetrics.plan_mode = "legacy"; runMetrics.plan_fallback = progressive.plan.reason;
+    }
+
     // ── Style Diversity: planned opening strategy (dynamic tail only; cached prefix untouched) ──
     try {
       const ledger = buildLedger(book.outline, { chapterIndex, subsectionIndex });
@@ -618,7 +660,13 @@ serve(async (req) => {
 
 
     if (dryRun) {
-      return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
+      // Routing is resolved, never called, in a dry run.
+      const routing = progressive ? (() => { return loadBookModelConfig(adminSupabase, book.id, auth.user.id).then((cfg) => {
+        const r = (role: any) => { try { const m = resolveModelForRole(cfg, role); return { model: m.model, source: m.source, fallback: m.fallback ?? null }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; } };
+        return { mode: cfg.mode, writer: r("writer"), continuity_checker: r("continuity_checker"), continuity_reviser: r("continuity_reviser"), narrative_extractor: r("narrative_extractor"), planner: r("planner") };
+      }); })() : null;
+      return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, pipeline,
+        progressive: progressive ? { gate: progressive.gate, planUsable: progressive.plan.usable, planReason: progressive.plan.usable ? null : progressive.plan.reason, requiredAnchors: progressive.required, anchorsInScope: progressive.anchors.length, routing: await routing } : null, previousNovelTextChars: previousNovelText?.length ?? 0, systemPromptChars: systemPrompt.length, userPrompt }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -646,6 +694,7 @@ serve(async (req) => {
     try {
       first = await chunks.next();
     } catch (e) {
+      if (lease) await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
       const status = statusForAIError(e);
       console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
       return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "AI error" }), {
@@ -692,7 +741,15 @@ serve(async (req) => {
       const u = aiMeta.usage as { cachedInputTokens?: number | null; inputTokens?: number | null } | undefined;
       if (u) console.log(`[cache] cached=${u.cachedInputTokens ?? "unknown"} input=${u.inputTokens ?? "unknown"}`);
       const cleaned = stripMetaLabels(full).trim();
-      if (cleaned) await finalizeFullText(cleaned);
+      if (cleaned && lease && book.id) {
+        // Fence check + manuscript write + acceptance record + lease release: one transaction.
+        const { data: c, error: ce } = await adminSupabase.rpc("commit_fenced_section", {
+          p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: lease.worker, p_token: lease.fencing_token,
+          p_text: cleaned, p_hash: contentHash(cleaned), p_master_plan_id: progressive?.plan.usable ? progressive.master?.id ?? null : null, p_replace: body.replaceAccepted === true,
+        });
+        if (ce) { console.warn("[phase-f] commit rejected:", ce.message); runMetrics.error = `commit: ${ce.message.slice(0, 200)}`; }
+        else { for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k); console.log("[phase-f] commit", JSON.stringify(c)); }
+      } else if (cleaned && !progressive) await finalizeFullText(cleaned);
       // Phase 2D measurement: one row per generated section, both engines. Never blocks the writer.
       if (book.id) {
         try {

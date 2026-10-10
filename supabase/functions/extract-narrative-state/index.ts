@@ -64,6 +64,14 @@ Deno.serve(async (req) => {
         console.log("[identity-sync]", JSON.stringify(identity));
       } catch (e) { console.warn("[identity-sync] skipped:", e instanceof Error ? e.message : e); }
     }
+    // Phase F: staged acceptance — only a completed extraction promotes the section to established memory.
+    try {
+      const { data: ctl } = await db.from("books").select("controls").eq("id", bookId).maybeSingle();
+      if ((ctl?.controls as Record<string, unknown> | null)?.planning_pipeline === "progressive" && (outcome.status === "completed" || outcome.status === "failed" || (outcome.status === "skipped" && (outcome as any).reason === "already_processed"))) {
+        const st = outcome.status === "failed" ? "FAILED" : "EXTRACTED";
+        await db.rpc("mark_section_extraction", { p_book_id: bookId, p_user_id: userId, p_chapter: chapterIndex, p_sub: subsectionIndex, p_status: st, p_error: st === "FAILED" ? String((outcome as any).error ?? "").slice(0, 500) : null });
+      }
+    } catch (e) { console.warn("[phase-f] acceptance update skipped:", e instanceof Error ? e.message : e); }
     // no_prose = section not saved yet → 409 so the client can retry shortly.
     const denied = outcome.status === "failed" && /credit_limit_reached|denied access/i.test(String((outcome as any).error ?? ""));
     const status = outcome.status === "no_prose" ? 409 : denied ? 403 : outcome.status === "failed" ? 500 : 200;

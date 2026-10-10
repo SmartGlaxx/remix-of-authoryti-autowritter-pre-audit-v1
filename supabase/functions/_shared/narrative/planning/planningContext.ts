@@ -7,6 +7,7 @@ import { PLAN_SCHEMA_VERSION, revealsVisibleAt, type MasterPlanSkeleton, type Pl
 import { buildAdaptiveCandidates, type AdaptiveInput } from "../adaptiveCandidates.ts";
 import { assembleAdaptiveContext, countContextWords, type AssembledContext, type ContextCandidate } from "../adaptiveContext.ts";
 import type { StoryPosition } from "../rules.ts";
+import { foreshadowFor } from "./pipeline.ts";
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -72,9 +73,10 @@ export function planCandidates(plan: ResolvedPlan, position: StoryPosition): Con
   out.push({ id: `plan:chapter:${ch}`, tier: "canon", text: `This chapter's goal [${chapter.objectiveKind}]: ${chapter.objective}`, source: src, authority: "OUTLINE_CANON", establishedAt: null, relevance: 0.99 });
   const beats = [...(section.beats ?? [])].sort((a, b) => a.order - b.order).map((b) => b.kind.replace(/_/g, " "));
   out.push({ id: `plan:section:${section.id}`, tier: "canon", text: `This section's goal: ${section.objective}${beats.length ? ` — beats, in order: ${beats.join(" → ")}` : ""}. Length is an estimate (~${section.targetWords} words), never pad or cut to hit it.`, source: `${src} (${plan.sectionSource})`, authority: "OUTLINE_CANON", establishedAt: null, relevance: 1 });
-  const { revealed, foreshadow } = revealsVisibleAt(master, ch);
+  const { revealed } = revealsVisibleAt(master, ch);
   for (const r of revealed) out.push({ id: `plan:revealed:${r.id}`, tier: "canon", text: `Already revealed${r.revealChapter === ch ? " IN THIS CHAPTER" : ""}: ${r.summary}`, source: src, authority: "OUTLINE_CANON", establishedAt: null, relevance: r.revealChapter === ch ? 0.98 : 0.8 });
-  if (foreshadow.length) out.push({ id: "plan:foreshadow", tier: "canon", text: `Plant ${foreshadow.length} subtle setup detail(s) here for a later development; do not explain, resolve or hint at what it is.`, source: src, authority: "OUTLINE_CANON", establishedAt: null, relevance: 0.85 });
+  // Phase F: actionable, spoiler-safe setup instructions (writer knowledge ≠ reader/character knowledge).
+  foreshadowFor(master, ch).forEach((f, i) => out.push({ id: `plan:foreshadow:${f.revealId}:${i}`, tier: "canon", text: f.text, source: src, authority: "OUTLINE_CANON", establishedAt: null, relevance: f.specific ? 0.95 : 0.85 }));
   return out;
 }
 

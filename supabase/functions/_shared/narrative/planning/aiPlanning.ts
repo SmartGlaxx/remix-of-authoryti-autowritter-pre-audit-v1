@@ -126,7 +126,7 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +
       `JSON: {"premise":"","synopsis":"(whole book, 300-600 words)","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
-      (a.isFiction ? ',"reveals":[{"summary":"","revealChapter":0,"setupChapters":[0]}]' : "") +
+      (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
   };
 }
@@ -174,6 +174,8 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
     chapters.forEach((c, i) => { if (!c.objective) issues.push(`Chapter ${i + 1} has no objective`); });
     const reveals: PlannedReveal[] = a.isFiction ? (Array.isArray(o?.reveals) ? o.reveals : []).map((r: any, i: number) => ({
       id: `r${i + 1}`, summary: str(r?.summary), revealChapter: Number(r?.revealChapter), setupChapters: (Array.isArray(r?.setupChapters) ? r.setupChapters : []).map(Number),
+      secretTerms: (Array.isArray(r?.secretTerms) ? r.secretTerms : []).map(str).filter(Boolean),
+      setupDirectives: (Array.isArray(r?.setupDirectives) ? r.setupDirectives : []).map((d: any) => ({ chapterIndex: Number(d?.chapterIndex), writerInstruction: str(d?.writerInstruction), viewpointKnows: str(d?.viewpointKnows) || undefined, readerSees: str(d?.readerSees) || undefined })).filter((d: any) => Number.isInteger(d.chapterIndex) && d.writerInstruction),
     })) : [];
     if (a.isFiction) genreData.reveals = reveals;
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");
