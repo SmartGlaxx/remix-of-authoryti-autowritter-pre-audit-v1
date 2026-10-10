@@ -16,3 +16,4 @@
 - Book Ideas saves to `saved_book_ideas` (owner-only); `book-ideas` mode "light" returns only title/description/type/genre/audience, mode "details" builds the full setup for one idea at save time — AI credit is spent only on ideas the author keeps.
 - Both writer preview entry points share a single WriterStudio UI while `try-writer` remains preview-only — the page and creation dialog must show the same locked profile modes and bounded expression controls.
 - Anthropic static system prompt uses ephemeral caching; below 1,024 tokens it skips silently. Benchmark: 2,146-token prefix cached, warm and cross-book reads confirmed.
+- Progressive planning (Phase B) lives in `book_master_plans`, `book_progressive_plans` and `book_section_acceptances` (owner read-only, server writes); approved/ready plan content is frozen by DB triggers mirrored in `_shared/narrative/planning/lifecycle.ts` — plans never count as canon, only accepted + extracted prose does.
