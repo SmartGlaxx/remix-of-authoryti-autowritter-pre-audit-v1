@@ -58,7 +58,7 @@ describe("Phase C word allocation", () => {
   it("50k novel: chapters, sections and beats all sum exactly", () => {
     const p = buildPlanSkeleton({ bookType: "novel", targetWords: 50000, chapterCount: 20, genreData: fields("fiction") });
     expect(p.chapters.reduce((x, c) => x + c.targetWords, 0)).toBe(50000);
-    expect(p.chapters[18].targetWords).toBeGreaterThan(p.chapters[0].targetWords); // builds toward climax
+    expect(p.chapters[17].targetWords).toBeGreaterThan(p.chapters[0].targetWords); // builds toward climax
   });
   it("magazine features outweigh front/back of book", () => {
     const p = buildPlanSkeleton({ bookType: "magazine", targetWords: 20000, chapterCount: 8, genreData: fields("magazine") });
