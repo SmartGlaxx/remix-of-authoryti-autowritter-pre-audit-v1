@@ -662,7 +662,7 @@ serve(async (req) => {
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.
       const routing = progressive ? (() => { return loadBookModelConfig(adminSupabase, book.id, auth.user.id).then((cfg) => {
-        const r = (role: any) => { try { const m = resolveModelForRole(cfg, role); return { model: m.model, provider: (m as any).provider ?? null }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; } };
+        const r = (role: any) => { try { const m = resolveModelForRole(cfg, role); return { model: m.model, source: m.source, fallback: m.fallback ?? null }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; } };
         return { mode: cfg.mode, writer: r("writer"), continuity_checker: r("continuity_checker"), continuity_reviser: r("continuity_reviser"), narrative_extractor: r("narrative_extractor"), planner: r("planner") };
       }); })() : null;
       return new Response(JSON.stringify({ dryRun: true, absChapter, subsectionIndex, engine, runMetrics, pipeline,
