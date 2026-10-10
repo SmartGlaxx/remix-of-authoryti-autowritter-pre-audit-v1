@@ -705,6 +705,7 @@ serve(async (req) => {
     try {
       first = await chunks.next();
     } catch (e) {
+      heartbeat?.stop();
       if (lease) await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
       const status = statusForAIError(e);
       console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
@@ -746,13 +747,22 @@ serve(async (req) => {
 
     async function* all(): AsyncGenerator<string> {
       if (!first.done) yield first.value;
-      yield* chunks;
+      for await (const c of chunks) {
+        // A worker that lost its lease stops writing immediately; nothing it produced is saved.
+        if (heartbeat?.lost()) throw new Error("STALE_GENERATION_LEASE_REJECTED: this section is now being written elsewhere");
+        yield c;
+      }
     }
     const stream = toChatSSE(all(), async (full) => {
       const u = aiMeta.usage as { cachedInputTokens?: number | null; inputTokens?: number | null } | undefined;
       if (u) console.log(`[cache] cached=${u.cachedInputTokens ?? "unknown"} input=${u.inputTokens ?? "unknown"}`);
       const cleaned = stripMetaLabels(full).trim();
       if (cleaned && lease && book.id) {
+        // Last renewal just before the write; a lost worker never attempts the commit.
+        const alive = heartbeat ? await heartbeat.beat() : true;
+        heartbeat?.stop();
+        if (!alive) { runMetrics.error = "commit: lease lost before save"; console.warn("[phase-f] commit skipped: lease lost"); }
+        else {
         // Fence check + manuscript write + acceptance record + lease release: one transaction.
         const { data: c, error: ce } = await adminSupabase.rpc("commit_fenced_section", {
           p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: lease.worker, p_token: lease.fencing_token,
@@ -760,7 +770,9 @@ serve(async (req) => {
         });
         if (ce) { console.warn("[phase-f] commit rejected:", ce.message); runMetrics.error = `commit: ${ce.message.slice(0, 200)}`; }
         else { for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k); console.log("[phase-f] commit", JSON.stringify(c)); }
+        }
       } else if (cleaned && !progressive) await finalizeFullText(cleaned);
+      if (lease && !cleaned) { heartbeat?.stop(); await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); }
       // Phase 2D measurement: one row per generated section, both engines. Never blocks the writer.
       if (book.id) {
         try {
