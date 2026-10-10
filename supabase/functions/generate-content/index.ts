@@ -14,7 +14,8 @@ import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
 import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
-import { buildPlanningAwareContext } from "../_shared/narrative/planning/planningContext.ts";
+import { buildPlanningAwareContext, futureSecrets } from "../_shared/narrative/planning/planningContext.ts";
+import { blocksAcceptance, deterministicValidation, routeFinding } from "../_shared/narrative/planning/validation.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 
 // ── Security Config ──
@@ -763,13 +764,37 @@ serve(async (req) => {
         heartbeat?.stop();
         if (!alive) { runMetrics.error = "commit: lease lost before save"; console.warn("[phase-f] commit skipped: lease lost"); }
         else {
+        // Phase G: free validation runs BEFORE acceptance. A material breach means this draft is
+        // not accepted at all — the previously accepted manuscript stays exactly as it was.
+        const hash = contentHash(cleaned);
+        let rejected = false;
+        try {
+          const pm = progressive?.plan.usable ? (progressive.plan as { master?: unknown }).master : null;
+          const secrets = pm ? futureSecrets(pm as never, absChapter) : [];
+          const findings = deterministicValidation(cleaned, { controls: book.controls, secrets, adapter: isChildrensBook ? "childrens" : undefined });
+          for (const f of findings) {
+            const route = routeFinding(f);
+            const dk = `pg_${book.id}_${absChapter}_${subsectionIndex}_${hash.slice(0, 16)}_${f.code}`.slice(0, 400);
+            if (route === "canon_reconciliation") {
+              await adminSupabase.rpc("record_canon_discrepancy", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_severity: "CRITICAL", p_type: f.code, p_description: f.message, p_excerpt: f.excerpt ?? "", p_canon_ref: { source: "phase_g" }, p_content_hash: hash, p_dedup_key: dk });
+            } else if (route !== "none") {
+              await adminSupabase.from("editorial_validation_findings").upsert({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, content_hash: hash, code: f.code, category: f.category, severity: f.severity, route, message: f.message, excerpt: f.excerpt ?? null, dedup_key: dk }, { onConflict: "dedup_key", ignoreDuplicates: true });
+            }
+          }
+          rejected = blocksAcceptance(findings);
+        } catch (e) { console.warn("[phase-g] validation step failed:", e instanceof Error ? e.message : e); }
+        if (rejected) {
+          runMetrics.error = "phase-g: draft not accepted (material finding sent to author)";
+          await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
+        } else {
         // Fence check + manuscript write + acceptance record + lease release: one transaction.
         const { data: c, error: ce } = await adminSupabase.rpc("commit_fenced_section", {
           p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_worker: lease.worker, p_token: lease.fencing_token,
-          p_text: cleaned, p_hash: contentHash(cleaned), p_master_plan_id: progressive?.plan.usable ? progressive.master?.id ?? null : null, p_replace: body.replaceAccepted === true,
+          p_text: cleaned, p_hash: hash, p_master_plan_id: progressive?.plan.usable ? progressive.master?.id ?? null : null, p_replace: body.replaceAccepted === true,
         });
         if (ce) { console.warn("[phase-f] commit rejected:", ce.message); runMetrics.error = `commit: ${ce.message.slice(0, 200)}`; }
         else { for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k); console.log("[phase-f] commit", JSON.stringify(c)); }
+        }
         }
       } else if (cleaned && !progressive) await finalizeFullText(cleaned);
       if (lease && !cleaned) { heartbeat?.stop(); await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); }

@@ -1036,6 +1036,77 @@ export type Database = {
           },
         ]
       }
+      editorial_validation_findings: {
+        Row: {
+          author_notes: string | null
+          book_id: string
+          category: string
+          chapter_index: number
+          code: string
+          content_hash: string
+          created_at: string
+          dedup_key: string
+          details: Json
+          excerpt: string | null
+          id: string
+          message: string
+          route: string
+          severity: string
+          status: string
+          subsection_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_notes?: string | null
+          book_id: string
+          category: string
+          chapter_index: number
+          code: string
+          content_hash: string
+          created_at?: string
+          dedup_key: string
+          details?: Json
+          excerpt?: string | null
+          id?: string
+          message: string
+          route: string
+          severity: string
+          status?: string
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_notes?: string | null
+          book_id?: string
+          category?: string
+          chapter_index?: number
+          code?: string
+          content_hash?: string
+          created_at?: string
+          dedup_key?: string
+          details?: Json
+          excerpt?: string | null
+          id?: string
+          message?: string
+          route?: string
+          severity?: string
+          status?: string
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_validation_findings_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       error_logs: {
         Row: {
           context: Json | null

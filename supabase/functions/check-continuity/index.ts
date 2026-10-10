@@ -12,6 +12,7 @@ import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrati
 import { contentHash } from "../_shared/narrative/extraction.ts";
 import { buildAnchorRepairPrompt, discrepanciesFor, LEASE_TTL_SECONDS, resolvePipeline, runAnchorRepair } from "../_shared/narrative/planning/pipeline.ts";
 import { loadProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
+import { decideRevision } from "../_shared/narrative/planning/validation.ts";
 import {
   buildCheckerPrompt, buildRevisionPrompt, isNonfiction, maxSeverity, parseCheckerOutput, resolutionFor, runContinuityLoop,
   type ContinuityIssue,
@@ -122,8 +123,23 @@ Deno.serve(async (req) => {
       } catch (e) { console.warn("[phase-f] anchor/contradiction step skipped:", e instanceof Error ? e.message : e); }
     }
 
-    const finalHash = contentHash(result.finalText);
     const progressiveBook = resolvePipeline(bookRow?.controls) === "progressive";
+    // Phase G: automatic repairs never overwrite prose already in story memory, and broad
+    // rewrites above the book's warning ratio wait for explicit author approval.
+    if (progressiveBook && result.revised && result.finalText !== original) {
+      const { data: acc } = await db.from("book_section_acceptances").select("extraction_status").eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).maybeSingle();
+      const warnRatio = Number((bookRow?.controls as Record<string, unknown> | null)?.revisionWarnRatio) || undefined;
+      const d = decideRevision({ original, revised: result.finalText, draftInCanon: acc?.extraction_status === "EXTRACTED", warnRatio });
+      if (!d.apply) {
+        const h = contentHash(original);
+        await db.from("editorial_validation_findings").upsert({ book_id: bookId, user_id: userId, chapter_index: ch, subsection_index: sub, content_hash: h,
+          code: d.reason.toUpperCase(), category: "continuity", severity: "moderate", route: d.route === "author_approval" ? "author_approval" : "editorial_review",
+          message: d.route === "author_approval" ? `Suggested correction changes ${Math.round(d.ratio * 100)}% of paragraphs; needs your approval.` : "Suggested correction was not applied automatically.",
+          details: { proposed_text: result.finalText, ratio: d.ratio }, dedup_key: `pgr_${bookId}_${ch}_${sub}_${h.slice(0, 16)}_${d.reason}`.slice(0, 400) }, { onConflict: "dedup_key", ignoreDuplicates: true });
+        result.finalText = original; result.revised = false;
+      }
+    }
+    const finalHash = contentHash(result.finalText);
     // Progressive books: the revised text is a protected write — lease + fence in one transaction.
     if (progressiveBook && result.revised && result.finalText !== original) {
       const worker = `cc_${crypto.randomUUID()}`;
