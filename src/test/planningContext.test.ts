@@ -61,7 +61,7 @@ describe("Phase E context construction + spoiler gating", () => {
     expect(r.context.text).not.toMatch(/Hale ordered the collapse/i);
     expect(r.metrics.spoilerBlocked).toBe(2);
     expect(r.context.text).toContain("the crane log was forged");
-    expect(r.context.text).toContain("subtle setup"); // ch3 is a setup chapter for r2, hint only
+    expect(r.context.text).toContain("setup detail"); // ch3 is a setup chapter for r2, hint only
   });
 
   it("does not expose later chapter objectives", () => {
