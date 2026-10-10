@@ -2913,6 +2913,17 @@ export type Database = {
         }
         Returns: Json
       }
+      write_accepted_outline_text: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_hash: string
+          p_sub: number
+          p_text: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
