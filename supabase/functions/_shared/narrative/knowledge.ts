@@ -91,11 +91,6 @@ export function resolveKnowledgeHolder(name: string, identities: KnownIdentity[]
   if (r.status === "NEW") return { status: "no_identity" };
   const exact = r.matches.filter((m) => m.reason === "same_name" || m.reason === "alias_match");
   if (exact.length === 1 && r.matches.length === 1) return { status: "resolved", identityId: exact[0].id };
-  if (exact.length === 1 && r.matches.every((m) => m === exact[0] || m.reason === "shared_name_token")) {
-    // e.g. "Mara Quell" vs another "Mara ..." with a different surname is already excluded upstream;
-    // a remaining token-only match still means the name is not unique → hold.
-    return { status: "ambiguous", candidates: r.matches.map((m) => m.id) };
-  }
   return { status: "ambiguous", candidates: r.matches.map((m) => m.id) };
 }
 
