@@ -10,8 +10,9 @@ import {
 // All model responses here are mocked fixtures: these tests prove structure, routing of
 // knowledge and persistence logic — not the creative quality of real AI plans.
 const brief = (bookType: string, extra: Partial<BookBrief> = {}): BookBrief => ({ title: "T", bookType, premise: "A lighthouse keeper finds a ledger.", targetWords: 30000, chapterCount: 3, ...extra });
-const words = (n: number, seed: string) => Array.from({ length: n }, (_, i) => `${seed}${i % 97}word`).join(" ");
-const alt = (i: number) => ({ title: `Story ${i}`, logline: "l", summary: words(500, `s${i}x`), twist: "t", ending: "e" });
+const L = (k: number) => Array.from(String(k), (d) => "abcdefghij"[Number(d)]).join("");
+const words = (n: number, seed: string) => Array.from({ length: n }, (_, i) => `${seed}${L(i % 97)}`).join(" ");
+const alt = (i: number) => ({ title: `Story ${i}`, logline: "l", summary: words(500, `story${L(i)}q`), twist: "t", ending: "e" });
 
 const fictionMaster = JSON.stringify({
   premise: "p", synopsis: "s", ending: "The keeper burns the ledger.",
