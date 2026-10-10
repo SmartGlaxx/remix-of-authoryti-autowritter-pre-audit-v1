@@ -136,6 +136,81 @@ export type Database = {
         }
         Relationships: []
       }
+      book_candidate_drafts: {
+        Row: {
+          attempt_count: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at: string
+          draft_text: string
+          findings: Json
+          id: string
+          master_plan_id: string | null
+          origin: string
+          parent_candidate_id: string | null
+          resolved_at: string | null
+          subsection_index: number
+          updated_at: string
+          usage: Json
+          user_id: string
+          validation_status: string
+        }
+        Insert: {
+          attempt_count?: number
+          book_id: string
+          chapter_index: number
+          content_hash: string
+          created_at?: string
+          draft_text: string
+          findings?: Json
+          id?: string
+          master_plan_id?: string | null
+          origin?: string
+          parent_candidate_id?: string | null
+          resolved_at?: string | null
+          subsection_index: number
+          updated_at?: string
+          usage?: Json
+          user_id: string
+          validation_status: string
+        }
+        Update: {
+          attempt_count?: number
+          book_id?: string
+          chapter_index?: number
+          content_hash?: string
+          created_at?: string
+          draft_text?: string
+          findings?: Json
+          id?: string
+          master_plan_id?: string | null
+          origin?: string
+          parent_candidate_id?: string | null
+          resolved_at?: string | null
+          subsection_index?: number
+          updated_at?: string
+          usage?: Json
+          user_id?: string
+          validation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_candidate_drafts_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_candidate_drafts_parent_candidate_id_fkey"
+            columns: ["parent_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "book_candidate_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_generation_leases: {
         Row: {
           book_id: string
@@ -555,7 +630,10 @@ export type Database = {
       }
       canon_reconciliation_logs: {
         Row: {
+          application_status: string
+          applied_at: string | null
           book_id: string
+          candidate_id: string | null
           canon_reference: Json
           chapter_index: number
           content_hash: string
@@ -577,7 +655,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          application_status?: string
+          applied_at?: string | null
           book_id: string
+          candidate_id?: string | null
           canon_reference?: Json
           chapter_index: number
           content_hash: string
@@ -599,7 +680,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          application_status?: string
+          applied_at?: string | null
           book_id?: string
+          candidate_id?: string | null
           canon_reference?: Json
           chapter_index?: number
           content_hash?: string
@@ -628,12 +712,21 @@ export type Database = {
             referencedRelation: "books"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "canon_reconciliation_logs_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "book_candidate_drafts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       canonical_facts: {
         Row: {
           authority: string
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           category: string
           confidence: number
           conflict_status: string
@@ -658,6 +751,8 @@ export type Database = {
         Insert: {
           authority?: string
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           category?: string
           confidence?: number
           conflict_status?: string
@@ -682,6 +777,8 @@ export type Database = {
         Update: {
           authority?: string
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           category?: string
           confidence?: number
           conflict_status?: string
@@ -746,6 +843,8 @@ export type Database = {
           authority: string
           beliefs: Json
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           chapter_index: number
           character_id: string
           created_at: string
@@ -774,6 +873,8 @@ export type Database = {
           authority?: string
           beliefs?: Json
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           chapter_index: number
           character_id: string
           created_at?: string
@@ -802,6 +903,8 @@ export type Database = {
           authority?: string
           beliefs?: Json
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           chapter_index?: number
           character_id?: string
           created_at?: string
@@ -889,6 +992,11 @@ export type Database = {
           prompt_words: number
           subsection_index: number
           user_id: string
+          validation_cost_usd: number | null
+          validation_input_tokens: number | null
+          validation_output_tokens: number | null
+          validation_rounds: number | null
+          validation_status: string | null
         }
         Insert: {
           book_id: string
@@ -914,6 +1022,11 @@ export type Database = {
           prompt_words?: number
           subsection_index: number
           user_id: string
+          validation_cost_usd?: number | null
+          validation_input_tokens?: number | null
+          validation_output_tokens?: number | null
+          validation_rounds?: number | null
+          validation_status?: string | null
         }
         Update: {
           book_id?: string
@@ -939,6 +1052,11 @@ export type Database = {
           prompt_words?: number
           subsection_index?: number
           user_id?: string
+          validation_cost_usd?: number | null
+          validation_input_tokens?: number | null
+          validation_output_tokens?: number | null
+          validation_rounds?: number | null
+          validation_status?: string | null
         }
         Relationships: [
           {
@@ -1200,6 +1318,8 @@ export type Database = {
           attribute: string
           authority: string
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           commit_id: string | null
           created_at: string
           effective_position: number
@@ -1215,6 +1335,8 @@ export type Database = {
           attribute: string
           authority: string
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           commit_id?: string | null
           created_at?: string
           effective_position: number
@@ -1230,6 +1352,8 @@ export type Database = {
           attribute?: string
           authority?: string
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           commit_id?: string | null
           created_at?: string
           effective_position?: number
@@ -1506,6 +1630,8 @@ export type Database = {
         Row: {
           authority: string
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           causes: string[]
           chapter_index: number
           chronological_order: number | null
@@ -1530,6 +1656,8 @@ export type Database = {
         Insert: {
           authority?: string
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           causes?: string[]
           chapter_index: number
           chronological_order?: number | null
@@ -1554,6 +1682,8 @@ export type Database = {
         Update: {
           authority?: string
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           causes?: string[]
           chapter_index?: number
           chronological_order?: number | null
@@ -1604,6 +1734,8 @@ export type Database = {
           anchor_key: string
           anchor_type: string
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           context_hint: string
           created_at: string
           effective_chapter_index: number
@@ -1623,6 +1755,8 @@ export type Database = {
           anchor_key: string
           anchor_type: string
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           context_hint?: string
           created_at?: string
           effective_chapter_index?: number
@@ -1642,6 +1776,8 @@ export type Database = {
           anchor_key?: string
           anchor_type?: string
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           context_hint?: string
           created_at?: string
           effective_chapter_index?: number
@@ -1832,6 +1968,8 @@ export type Database = {
         Row: {
           authority: string
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           clues: string[]
           created_at: string
           description: string | null
@@ -1856,6 +1994,8 @@ export type Database = {
         Insert: {
           authority?: string
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           clues?: string[]
           created_at?: string
           description?: string | null
@@ -1880,6 +2020,8 @@ export type Database = {
         Update: {
           authority?: string
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           clues?: string[]
           created_at?: string
           description?: string | null
@@ -2174,6 +2316,8 @@ export type Database = {
           aliases: string[]
           attributes: Json
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           created_at: string
           description: string | null
           entity_type: string
@@ -2190,6 +2334,8 @@ export type Database = {
           aliases?: string[]
           attributes?: Json
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           created_at?: string
           description?: string | null
           entity_type: string
@@ -2206,6 +2352,8 @@ export type Database = {
           aliases?: string[]
           attributes?: Json
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           created_at?: string
           description?: string | null
           entity_type?: string
@@ -2284,6 +2432,8 @@ export type Database = {
       story_timeline: {
         Row: {
           book_id: string
+          canon_flag: Json | null
+          canon_status: string
           chapter_index: number | null
           created_at: string
           duration: string | null
@@ -2304,6 +2454,8 @@ export type Database = {
         }
         Insert: {
           book_id: string
+          canon_flag?: Json | null
+          canon_status?: string
           chapter_index?: number | null
           created_at?: string
           duration?: string | null
@@ -2324,6 +2476,8 @@ export type Database = {
         }
         Update: {
           book_id?: string
+          canon_flag?: Json | null
+          canon_status?: string
           chapter_index?: number | null
           created_at?: string
           duration?: string | null
@@ -2533,6 +2687,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      calculate_downstream_blast_radius: {
+        Args: { p_book_id: string; p_chapter: number; p_sub: number }
+        Returns: Json
+      }
       check_and_deduct_word_credits: {
         Args: {
           _estimated_words: number
@@ -2551,6 +2709,18 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_request_logs: { Args: never; Returns: undefined }
+      commit_candidate_draft: {
+        Args: {
+          p_candidate_id: string
+          p_hash: string
+          p_replace?: boolean
+          p_text: string
+          p_token: number
+          p_user_id: string
+          p_worker: string
+        }
+        Returns: Json
+      }
       commit_fenced_revision: {
         Args: {
           p_book_id: string
@@ -2593,6 +2763,10 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_section_memory: {
+        Args: { p_book_id: string; p_chapter: number; p_sub: number }
+        Returns: Json
+      }
       decide_canon_reconciliation: {
         Args: {
           p_decision: string
@@ -2600,6 +2774,29 @@ export type Database = {
           p_rationale: string
           p_replan?: boolean
           p_resulting_changes?: Json
+        }
+        Returns: Json
+      }
+      discard_candidate_draft: {
+        Args: { p_candidate_id: string }
+        Returns: Json
+      }
+      finalize_canon_application: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_sub: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      flag_downstream_memory: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_reason: string
+          p_sub: number
+          p_user_id: string
         }
         Returns: Json
       }
@@ -2655,6 +2852,24 @@ export type Database = {
         }
         Returns: Json
       }
+      save_candidate_draft: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_dedup_keys: string[]
+          p_findings: Json
+          p_hash: string
+          p_master_plan_id: string
+          p_origin: string
+          p_parent: string
+          p_status: string
+          p_sub: number
+          p_text: string
+          p_usage: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
       save_master_plan_draft: {
         Args: {
           p_adapter: string
@@ -2694,6 +2909,17 @@ export type Database = {
           p_tags?: string[]
           p_text: string
           p_type: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      write_accepted_outline_text: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_hash: string
+          p_sub: number
+          p_text: string
           p_user_id: string
         }
         Returns: Json
