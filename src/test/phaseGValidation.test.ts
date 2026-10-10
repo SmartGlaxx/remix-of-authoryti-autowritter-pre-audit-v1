@@ -58,8 +58,8 @@ describe("Phase G — routing", () => {
     const f = checkEvidence([{ id: "c", tier: "documented", sourceProvided: false, presentedAsFact: true }], "narrative_nonfiction");
     expect(routeFinding(f[0])).toBe("canon_reconciliation");
   });
-  it("secret leak blocks acceptance of the draft", () => {
-    expect(blocksAcceptance(deterministicValidation("Hollis was her father all along.", { secrets: ["Hollis was her father"] }))).toBe(true);
+  it("a protected term alone does not block (Phase 3: disclosure is judged semantically)", () => {
+    expect(blocksAcceptance(deterministicValidation("Hollis was her father all along.", { secrets: ["Hollis was her father"] }))).toBe(false);
   });
 });
 
