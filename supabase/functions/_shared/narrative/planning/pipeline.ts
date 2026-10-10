@@ -155,3 +155,24 @@ export function renderPlanBlock(plan: ResolvedPlan, ch: number, anchors: AnchorR
   for (const a of anchors) lines.push(`EXACT${req.has(a.anchor_key) ? " (REQUIRED in this section)" : " (if mentioned)"}: ${a.anchor_key} = "${a.exact_text}"`);
   return lines.join("\n");
 }
+
+// ---------- Contradictions → author reconciliation ----------
+export interface DiscrepancyInput { severity: "CRITICAL" | "MAJOR"; type: "CANON_CONFLICT" | "ANCHOR_MISMATCH"; description: string; excerpt: string; canonRef: Row; dedupSuffix: string }
+
+/**
+ * Only serious, unresolved findings go to the author: continuity ERRORs at HIGH/CRITICAL that
+ * survived automatic revision, and required exact details still wrong after bounded repair.
+ * Warnings, ambiguity and minor issues never block writing.
+ */
+export function discrepanciesFor(unresolvedIssues: Row[], anchorViolations: AnchorViolation[]): DiscrepancyInput[] {
+  const out: DiscrepancyInput[] = [];
+  for (const i of unresolvedIssues) {
+    if (i.classification !== "ERROR" || !["CRITICAL", "HIGH"].includes(i.severity)) continue;
+    out.push({ severity: i.severity === "CRITICAL" ? "CRITICAL" : "MAJOR", type: "CANON_CONFLICT", description: String(i.explanation ?? i.type).slice(0, 2000),
+      excerpt: String(i.excerpt ?? "").slice(0, 2000), canonRef: { evidence: i.conflictingEvidence ?? null, authority: i.authority ?? null, entity: i.entity ?? null },
+      dedupSuffix: `${i.type}:${String(i.excerpt ?? "").slice(0, 80)}` });
+  }
+  for (const v of anchorViolations) out.push({ severity: "MAJOR", type: "ANCHOR_MISMATCH", description: `Required exact detail "${v.key}" ${v.kind === "variant" ? "appears in a wrong form" : "is missing"}; expected "${v.expected}".`,
+    excerpt: "", canonRef: { anchor_key: v.key, expected: v.expected }, dedupSuffix: `anchor:${v.key}` });
+  return out;
+}

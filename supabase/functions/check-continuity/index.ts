@@ -10,6 +10,8 @@ import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { loadNarrativeRows, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { renderNarrativeContext, selectNarrativeState } from "../_shared/narrative/context.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
+import { buildAnchorRepairPrompt, discrepanciesFor, resolvePipeline, runAnchorRepair } from "../_shared/narrative/planning/pipeline.ts";
+import { loadProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import {
   buildCheckerPrompt, buildRevisionPrompt, isNonfiction, maxSeverity, parseCheckerOutput, resolutionFor, runContinuityLoop,
   type ContinuityIssue,
@@ -51,7 +53,7 @@ Deno.serve(async (req) => {
     const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "check-continuity", _max_per_hour: 300, _max_per_day: 3000 });
     if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
 
-    const { data: bookRow } = await db.from("books").select("outline, book_type, full_text").eq("id", bookId).maybeSingle();
+    const { data: bookRow } = await db.from("books").select("outline, book_type, full_text, controls").eq("id", bookId).maybeSingle();
     const section = bookRow?.outline?.chapters?.[ch]?.subsections?.[sub];
     if (!section || section.status !== "completed" || typeof section.content !== "string" || !section.content.trim()) {
       return json({ status: "no_prose" }, 409);
@@ -99,6 +101,27 @@ Deno.serve(async (req) => {
       },
     });
 
+    // ── Phase F (opt-in books only): exact-detail enforcement + serious contradictions to the author. ──
+    let anchorReport: Record<string, unknown> | null = null;
+    if (resolvePipeline(bookRow?.controls) === "progressive") {
+      try {
+        const st = await loadProgressiveState(db, bookId, userId, bookRow?.book_type ?? "", bookRow?.outline ?? null, ch, sub);
+        const fix = await runAnchorRepair(result.finalText, st.anchors, st.required, async (t, v) => {
+          const p = buildAnchorRepairPrompt(t, v);
+          const { text: out, meta } = await generateAIText({ role: "continuity_reviser", config, userId, bookId, request: { ...p, temperature: 0.2, reasoning: "low" } }, deps);
+          models.add(meta.model); return out;
+        });
+        if (fix.repaired) { result.finalText = fix.text; result.revised = true; }
+        anchorReport = { required: st.required.length, repaired: fix.repaired, attempts: fix.attempts, remaining: fix.remaining.map((v) => v.key) };
+        const hash2 = contentHash(result.finalText);
+        for (const d of discrepanciesFor(result.issues as never, fix.remaining)) {
+          const { error } = await db.rpc("record_canon_discrepancy", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_severity: d.severity, p_type: d.type,
+            p_description: d.description, p_excerpt: d.excerpt, p_canon_ref: d.canonRef, p_content_hash: hash2, p_dedup_key: `pf_${bookId}_${ch}_${sub}_${hash2.slice(0, 16)}_${d.dedupSuffix}`.slice(0, 400) });
+          if (error) console.warn("[phase-f] discrepancy record failed:", error.message);
+        }
+      } catch (e) { console.warn("[phase-f] anchor/contradiction step skipped:", e instanceof Error ? e.message : e); }
+    }
+
     const finalHash = contentHash(result.finalText);
     // Persist the final text only when it actually changed. Re-read to avoid clobbering concurrent edits.
     if (result.revised && result.finalText !== original) {
@@ -129,7 +152,7 @@ Deno.serve(async (req) => {
     console.log("[check-continuity]", JSON.stringify({ bookId, ch, sub, status: result.status, revisions: result.revisionCount, issues: result.issues.length, warnings: result.warnings.length }));
     return json({
       status: result.status, checkId: rec.id, revised: result.revised, finalText: result.finalText,
-      issueCount: result.issues.length, warningCount: result.warnings.length, revisionCount: result.revisionCount,
+      issueCount: result.issues.length, warningCount: result.warnings.length, revisionCount: result.revisionCount, anchors: anchorReport,
     });
   } catch (e) {
     console.error("[check-continuity] fatal", e);
