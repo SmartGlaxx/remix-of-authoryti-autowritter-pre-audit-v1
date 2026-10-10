@@ -115,7 +115,7 @@ export function findingKey(f: Pick<Finding, "code" | "excerpt">): string {
 }
 
 /** Turn the evaluator's JSON into staged findings. Unknown or malformed parts are dropped, never invented. */
-export function parseEvaluation(raw: string, ctx: EvalContext): StagedFinding[] {
+export function parseEvaluation(raw: string, ctx: EvalContext, draft = ""): StagedFinding[] {
   const o = extractJson(raw);
   const out: StagedFinding[] = [];
   const reported = new Map(arr(o.beats).map((b) => [str(b?.id, 80), b]));
@@ -150,7 +150,7 @@ export function parseEvaluation(raw: string, ctx: EvalContext): StagedFinding[] 
     out.push({ code: "WRITING_QUALITY", category: "writing_quality", severity: sev, message: str(q?.message) || "Quality note.", excerpt: str(q?.excerpt, 300) || undefined, repairable: sev === "minor", stage: 5 });
   }
 
-  if (ctx.secrets.length || ctx.narration) for (const f of parseEpistemic(o, draftOf(ctx))) out.push({ ...f, stage: 3 });
+  if (ctx.secrets.length || ctx.narration) for (const f of parseEpistemic(o, draft)) out.push({ ...f, stage: 3 });
 
   const approved = new Set(ctx.approvedCanonKeys ?? []);
   return out.map((f) => (approved.has(findingKey(f)) && f.stage === 3 ? { ...f, severity: "info", canonKind: undefined, message: `${f.message} (approved canon change)` } : f));
@@ -202,7 +202,7 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
     const s1 = stageOneFindings(t, ctx);
     try {
       const r = await evaluate(buildEvaluatorPrompt(t, ctx)); track(r.usage);
-      return [...s1, ...parseEvaluation(r.text, ctx)];
+      return [...s1, ...parseEvaluation(r.text, ctx, t)];
     } catch {
       unavailable = true;
       return [...s1, { code: "EVALUATOR_UNAVAILABLE", category: "continuity", severity: "moderate", message: "Plan, continuity and fact checks could not run; this draft needs your review before it can be accepted.", repairable: false, stage: 3 }];
