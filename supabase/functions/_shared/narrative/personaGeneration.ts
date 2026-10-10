@@ -13,7 +13,7 @@ export type PersonaDomain = typeof PERSONA_DOMAINS[number];
 /** How a character functions inside one specific book. */
 export const NARRATIVE_ROLES = [
   "protagonist", "antagonist", "primary_narrator", "deuteragonist", "mentor", "foil",
-  "love_interest", "catalyst", "supporting", "minor",
+  "love_interest", "catalyst", "supporting", "minor", "ally", "rival", "viewpoint",
 ] as const;
 export type NarrativeRole = typeof NARRATIVE_ROLES[number];
 
