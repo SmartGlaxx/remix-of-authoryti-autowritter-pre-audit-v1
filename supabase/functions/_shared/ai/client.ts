@@ -68,6 +68,16 @@ export async function selectRoute(modelKey: string, deps: AIDeps): Promise<Route
   return { adapter: "lovable_gateway", apiKey: deps.env.LOVABLE_API_KEY, source: "platform_gateway" };
 }
 
+/**
+ * Fail-closed test mode: no key (user BYOK, platform or gateway) is ever reachable, so any call that
+ * was not answered by a mock throws `test_mode_blocked` instead of reaching a paid provider.
+ */
+export const TEST_MODE_ERROR = "test_mode_blocked";
+export function failClosedDeps(deps: AIDeps): AIDeps {
+  const block = async (): Promise<never> => { throw new AIProviderError(TEST_MODE_ERROR as any, "Test mode: real AI calls are blocked."); };
+  return { ...deps, env: {}, getUserKey: block, fetch: (async () => block()) as typeof fetch };
+}
+
 const FALLBACK_ON = new Set(["missing_key", "auth", "unavailable", "network", "rate_limit"]);
 const emptyUsage = (): Usage => ({ inputTokens: null, outputTokens: null, cachedInputTokens: null, requestId: null });
 
