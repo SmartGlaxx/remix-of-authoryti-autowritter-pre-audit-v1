@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Play, Pause, Square, Download, Settings, BookText, Pencil, Check, X, RefreshCw, FileText, Zap, ChevronDown, Search, Pen, Replace, BookOpen, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Pause, Square, Download, Settings, BookText, Pencil, Check, X, RefreshCw, FileText, Zap, ChevronDown, Search, Pen, Replace, BookOpen, Sparkles, Loader2, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { AutomationLevel } from "@/types/book";
 import { Input } from "@/components/ui/input";
 import BookSettings from "@/components/BookSettings";
@@ -34,6 +35,7 @@ interface BookDetailViewProps {
 
 const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showSettings, setShowSettings] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(book.title);
@@ -357,6 +359,15 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+
+              <Button variant="outline" size="sm" onClick={() => navigate(`/books/${book.id}/plan`)} className="gap-1" title="Planning Studio">
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden md:inline">Planning Studio</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/personas")} className="gap-1" title="Persona Studio">
+                <Users className="w-4 h-4" />
+                <span className="hidden lg:inline">Personas</span>
+              </Button>
 
               {/* User sidebar */}
               <AppSidebar>

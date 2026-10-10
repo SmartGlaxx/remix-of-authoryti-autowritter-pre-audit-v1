@@ -1,4 +1,5 @@
-import { BookOpen, Sparkles, Plus, Flame, Zap, PenTool } from "lucide-react";
+import { BookOpen, Sparkles, Plus, Flame, Zap, PenTool, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTurbo } from "@/hooks/useTurbo";
@@ -10,6 +11,7 @@ interface NavigationProps {
 
 const Navigation = ({ onCreateBook }: NavigationProps) => {
   const turbo = useTurbo();
+  const navigate = useNavigate();
 
   return (
     <nav className="sticky top-0 z-50 glass border-b border-border" style={{ height: 64 }}>
@@ -84,6 +86,11 @@ const Navigation = ({ onCreateBook }: NavigationProps) => {
                 </Tooltip>
               )}
             </TooltipProvider>
+
+            <Button variant="outline" size="sm" onClick={() => navigate("/personas")} className="gap-1" title="Persona Studio">
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Persona Studio</span>
+            </Button>
 
             <Button variant="hero" size="sm" onClick={onCreateBook} className="hidden sm:inline-flex">
               <Sparkles className="w-4 h-4" />
