@@ -80,7 +80,6 @@
 - [x] Phase F: opt-in progressive pipeline (gate, lease/fence commit, plan-aware Standard+Adaptive, actionable foreshadowing, exact-anchor enforcement, contradiction gate, staged acceptance) — 355 tests, free live preview verified
 - [x] Phase F safeguards: lease heartbeat + fenced revisions, PLAN_REQUIRED in progressive mode, durable extraction-failure recovery — 365 tests
 - [x] Phase G — Unified Validation (configurable vocab, contextual repetition, editorial vs canon routing, author-approved broad rewrites, validate-before-accept) — 385 tests
-- [x] Phase G runtime completion + Phase H workflow (Planning Studio, held drafts, deferred canon activation, memory flagging) — 400 tests
-- [ ] Phase I — live end-to-end verification with paid generation (awaits approval)
+- [ ] Phase H — interface (not started; awaits approval)
 - [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
-- [x] Browser UI for opt-in toggle and contradiction decisions (Planning Studio); a one-click 'regenerate accepted section' button is still not built
+- [ ] Browser UI for opt-in toggle, contradiction decisions and 'regenerate accepted section' (not built)

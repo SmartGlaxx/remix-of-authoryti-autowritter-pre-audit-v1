@@ -23,7 +23,6 @@ import Onboarding from "./pages/Onboarding";
 import BookDetail from "./pages/BookDetail";
 import AccountSettings from "./pages/AccountSettings";
 import TryWriter from "./pages/TryWriter";
-import PlanningStudio from "./pages/PlanningStudio";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BookOpen } from "lucide-react";
 import { BOOK_TYPE_INFO } from "@/types/book";
@@ -146,7 +145,6 @@ const App = () => (
             />
             <Route path="/settings" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
             <Route path="/writers" element={<ProtectedRoute><TryWriter /></ProtectedRoute>} />
-            <Route path="/books/:bookId/plan" element={<ProtectedRoute><PlanningStudio /></ProtectedRoute>} />
             <Route path="/dev-docs" element={<DevDocs />} />
             <Route
               path="/admin/feedback"

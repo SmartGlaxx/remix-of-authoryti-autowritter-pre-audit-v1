@@ -17,8 +17,8 @@ export async function loadProgressiveState(db: Db, bookId: string, userId: strin
   const [m, p, a, l, acc] = await Promise.all([
     db.from("book_master_plans").select("id, status, version, plan_skeleton").eq("book_id", bookId).eq("user_id", userId).eq("status", "APPROVED").order("version", { ascending: false }).limit(1),
     db.from("book_progressive_plans").select("id, plan_status, chapter_index, subsection_index, content").eq("book_id", bookId).eq("plan_status", "READY").eq("chapter_index", ch),
-    db.from("narrative_exact_anchors").select("anchor_key, exact_text, match_mode, effective_chapter_index, version, is_active, context_hint, retrieval_tags, source_type, canon_status").eq("book_id", bookId).eq("is_active", true).eq("canon_status", "ESTABLISHED").limit(500),
-    db.from("canon_reconciliation_logs").select("id, decision, dedup_key, severity, chapter_index, subsection_index, application_status").eq("book_id", bookId).eq("decision", "PENDING").limit(200),
+    db.from("narrative_exact_anchors").select("anchor_key, exact_text, match_mode, effective_chapter_index, version, is_active, context_hint, retrieval_tags, source_type").eq("book_id", bookId).eq("is_active", true).limit(500),
+    db.from("canon_reconciliation_logs").select("id, decision, dedup_key, severity, chapter_index, subsection_index").eq("book_id", bookId).eq("decision", "PENDING").limit(200),
     prev ? db.from("book_section_acceptances").select("manuscript_status, extraction_status, updated_at").eq("book_id", bookId).eq("chapter_index", prev.chapterIndex).eq("subsection_index", prev.subsectionIndex) : Promise.resolve({ data: [] }),
   ]);
   for (const r of [m, p, a, l, acc]) if (r?.error) throw new Error(r.error.message);

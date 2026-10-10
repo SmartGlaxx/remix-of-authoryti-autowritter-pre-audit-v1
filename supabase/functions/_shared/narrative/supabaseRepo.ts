@@ -23,23 +23,16 @@ export async function verifyBookOwnership(db: Db, bookId: string, userId: string
 }
 
 /** One coherent read of all narrative tables for a book (parallel, book-scoped). */
-/** Rows without a canon status (older schema) count as established. */
-export function onlyEstablished<T extends Record<string, unknown>>(rows: T[]): T[] {
-  return rows.filter((r) => r.canon_status === undefined || r.canon_status === null || r.canon_status === "ESTABLISHED");
-}
-
 export async function loadNarrativeRows(db: Db, bookId: string): Promise<NarrativeRows> {
   const q = (t: string, cols = "*") => db.from(t).select(cols).eq("book_id", bookId).limit(5000);
   const [characters, states, events, participants, threads, threadEvents, facts, timeline, entities, snapshots] = await Promise.all([
     q("story_characters"), q("character_states"), q("narrative_events"), q("event_participants"), q("plot_threads"),
     q("plot_thread_events"), q("canonical_facts"), q("story_timeline"), q("story_entities"), q("story_state_snapshots"),
   ]);
-  // Uncertain or superseded memory (after an upstream rewrite) is never authoritative writing context.
-  const live = (rows: Row[] | null) => onlyEstablished(rows ?? []);
   return {
-    characters: check(characters) ?? [], states: live(check(states)), events: live(check(events)), participants: check(participants) ?? [],
-    threads: live(check(threads)), threadEvents: check(threadEvents) ?? [], facts: live(check(facts)), timeline: live(check(timeline)),
-    entities: live(check(entities)), snapshots: check(snapshots) ?? [],
+    characters: check(characters) ?? [], states: check(states) ?? [], events: check(events) ?? [], participants: check(participants) ?? [],
+    threads: check(threads) ?? [], threadEvents: check(threadEvents) ?? [], facts: check(facts) ?? [], timeline: check(timeline) ?? [],
+    entities: check(entities) ?? [], snapshots: check(snapshots) ?? [],
   };
 }
 

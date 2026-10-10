@@ -62,8 +62,6 @@ Deno.serve(async (req) => {
       if (!progressiveBook || !st) return;
       try {
         await db.rpc("mark_section_extraction", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_status: st, p_error: st === "FAILED" ? String(err ?? "").slice(0, 500) : null });
-        // Author-approved canon changes become authoritative only once the accepted prose is in story memory.
-        if (st === "EXTRACTED") await db.rpc("finalize_canon_application", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub });
       } catch (e) { console.warn("[phase-f] acceptance update skipped:", e instanceof Error ? e.message : e); }
     };
 
