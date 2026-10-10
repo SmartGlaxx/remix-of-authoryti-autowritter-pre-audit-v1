@@ -71,6 +71,13 @@
       "when": 1791617930075,
       "tag": "0009_phase_h_candidates_canon_activation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791618109220,
+      "tag": "0010_commit_fenced_section_flags_memory",
+      "breakpoints": true
     }
   ]
 }
