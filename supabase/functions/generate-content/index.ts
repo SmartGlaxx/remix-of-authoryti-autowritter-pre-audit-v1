@@ -694,6 +694,7 @@ serve(async (req) => {
     try {
       first = await chunks.next();
     } catch (e) {
+      if (lease) await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
       const status = statusForAIError(e);
       console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
       return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "AI error" }), {

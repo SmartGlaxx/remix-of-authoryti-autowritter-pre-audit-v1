@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     // Phase F: staged acceptance — only a completed extraction promotes the section to established memory.
     try {
       const { data: ctl } = await db.from("books").select("controls").eq("id", bookId).maybeSingle();
-      if ((ctl?.controls as Record<string, unknown> | null)?.planning_pipeline === "progressive" && (outcome.status === "completed" || outcome.status === "failed" || (outcome.status as string) === "skipped")) {
+      if ((ctl?.controls as Record<string, unknown> | null)?.planning_pipeline === "progressive" && (outcome.status === "completed" || outcome.status === "failed" || (outcome.status === "skipped" && (outcome as any).reason === "already_processed"))) {
         const st = outcome.status === "failed" ? "FAILED" : "EXTRACTED";
         await db.rpc("mark_section_extraction", { p_book_id: bookId, p_user_id: userId, p_chapter: chapterIndex, p_sub: subsectionIndex, p_status: st, p_error: st === "FAILED" ? String((outcome as any).error ?? "").slice(0, 500) : null });
       }
