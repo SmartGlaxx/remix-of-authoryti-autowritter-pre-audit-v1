@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
+import { awaitSectionOutcome, isProgressiveBook } from "@/lib/candidateReview";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
 function applyContinuityResult(outline: BookOutline, chIdx: number, subIdx: number, r: ContinuityResult): BookOutline {
@@ -495,7 +496,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         subsectionCounter++;
 
         try {
-          const content = await retryWithBackoff(
+          const startedAt = new Date(Date.now() - 5000).toISOString();
+          let content = await retryWithBackoff(
             () => streamContent(
               { ...currentBook, outline, tonalAnchors },
               chIdx,
@@ -508,6 +510,13 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
               toast.warning(`Content generation failed (attempt ${attempt}/${MAX_RETRIES}), retrying...`);
             }
           );
+          // Progressive Planning: only the server-accepted text is kept; a held draft waits for the author.
+          if (isProgressiveBook(book.controls)) {
+            const outcome = await awaitSectionOutcome(book.id, chIdx, subIdx, startedAt);
+            if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+            if (outcome.state === "pending") throw new Error("checks on this section did not finish; open Planning Studio to review");
+            if (outcome.text) content = outcome.text;
+          }
 
           chapterContent += content + "\n\n";
           const wordCount = content.split(/\s+/).length;
