@@ -83,4 +83,4 @@
 - [x] Phase G runtime completion + Phase H workflow (Planning Studio, held drafts, deferred canon activation, memory flagging) — 400 tests
 - [ ] Phase I — live end-to-end verification with paid generation (awaits approval)
 - [ ] Controlled paid test of plan + prose quality on a [2D-V] copy (awaiting approval)
-- [ ] Browser UI for opt-in toggle, contradiction decisions and 'regenerate accepted section' (not built)
+- [x] Browser UI for opt-in toggle and contradiction decisions (Planning Studio); a one-click 'regenerate accepted section' button is still not built
