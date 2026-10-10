@@ -85,6 +85,13 @@
       "when": 1791618165949,
       "tag": "0011_accepted_outline_text",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791618387736,
+      "tag": "0012_discard_candidate_abandons_all_links",
+      "breakpoints": true
     }
   ]
 }
