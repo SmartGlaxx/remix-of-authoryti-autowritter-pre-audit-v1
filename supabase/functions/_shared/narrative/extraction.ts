@@ -1,6 +1,7 @@
 // Post-generation story-state extraction (pure logic + orchestrator with injected I/O).
 // The model call and the database are injected, so the model can be swapped in
 // Pass 3 without touching this module, and the whole flow is unit-testable.
+import { parseKnowledge, type ExtractedKnowledge } from "./knowledge.ts";
 import { normText, validateThreadTransition, type Authority, type StoryPosition } from "./rules.ts";
 
 export const EXTRACTION_AUTHORITY: Authority = "AI_INFERENCE"; // generated prose never gets USER/OUTLINE canon
@@ -35,12 +36,14 @@ export interface ExtractionPlan {
   newThreads: ExtractedNewThread[];
   entities: ExtractedEntity[];
   dropped: { kind: string; reason: string; item: string }[];
+  /** Phase 3: only when knowledge extraction is enabled for the book. */
+  knowledge?: ExtractedKnowledge[];
 }
 
 export const ENTITY_TYPES = ["location", "organization", "object", "faction", "artifact", "framework", "definition", "other"];
 
 // ---------- Prompt ----------
-export function buildExtractionPrompt(args: { text: string; position: StoryPosition; characters: KnownCharacter[]; threads: KnownThread[] }): { system: string; user: string } {
+export function buildExtractionPrompt(args: { text: string; position: StoryPosition; characters: KnownCharacter[]; threads: KnownThread[]; knowledge?: boolean }): { system: string; user: string } {
   const system = `You are a strict story-state extraction engine. You read ONE newly written section of a book and record ONLY what that text explicitly establishes.
 Rules:
 - Never invent, infer beyond the text, or use outside knowledge. If the text does not establish something, omit it.
@@ -61,7 +64,12 @@ thread_updates[]: {thread_id, change ("develops"|"complicates"|"clue"|"resolves"
 new_threads[]: {title, description, setup_promise, importance ("major"|"minor"), evidence}
 entities[]: {name, entity_type ("location"|"organization"|"object"|"faction"|"artifact"|"framework"|"definition"|"other"), description, evidence}
 - Use "artifact" for named functions, APIs, endpoints, classes, libraries and versions; "framework" for named models/methods/pillars; "definition" for defined terms.
-- When the text says a newer artifact or term replaces an older one (e.g. "v1 used X; v2 uses Y instead"), record the NEW one with a description that contains the exact words "replaces <old name>".`;
+- When the text says a newer artifact or term replaces an older one (e.g. "v1 used X; v2 uses Y instead"), record the NEW one with a description that contains the exact words "replaces <old name>".`
+    + (args.knowledge ? `
+ALSO return key "knowledge": what each character knows, believes, suspects, misunderstands or conceals, as established by THIS section only.
+knowledge[]: {character, claim, kind ("knows"|"believes"|"suspects"|"misunderstands"|"conceals"), source ("direct_witness"|"testimony"|"deduction"|"document"|"misinformation"|"false_memory"), truth ("true"|"false"|"disputed"|"unverified" — objective truth in the story, "unverified" when the text does not settle it), from_character (who told them, or null), story_date (explicit in-story date of learning, or null — never guess), supersedes (the earlier belief this corrects, or null), evidence}
+- A character mentioning something does not mean they understand it. Record only what the text shows they grasp.
+- Speculation, lies and mistakes are recorded as such, never as knowledge.` : "");
   const chars = args.characters.map((c) => `- ${c.name}${c.aliases?.length ? ` (aka ${c.aliases.join(", ")})` : ""}`).join("\n") || "(none recorded)";
   const threads = args.threads.map((t) => `- id=${t.id} [${t.status}] ${t.title}${t.setup_promise && t.setup_promise !== t.title ? ` — ${t.setup_promise}` : ""}`).join("\n") || "(none)";
   const user = `POSITION: chapter ${args.position.chapterIndex + 1}, section ${args.position.subsectionIndex + 1}
@@ -112,7 +120,7 @@ function matchCharacter(name: string, known: KnownCharacter[]): KnownCharacter |
   return known.find((c) => normText(c.name) === n || (c.aliases ?? []).some((a) => normText(a) === n)) ?? null;
 }
 
-export function planExtraction(raw: Record<string, unknown>, ctx: { text: string; characters: KnownCharacter[]; threads: KnownThread[] }): ExtractionPlan {
+export function planExtraction(raw: Record<string, unknown>, ctx: { text: string; characters: KnownCharacter[]; threads: KnownThread[]; knowledge?: boolean }): ExtractionPlan {
   const plan: ExtractionPlan = { events: [], characterChanges: [], facts: [], threadUpdates: [], newThreads: [], entities: [], dropped: [] };
   const drop = (kind: string, reason: string, item: unknown) => plan.dropped.push({ kind, reason, item: JSON.stringify(item).slice(0, 200) });
   const ok = (ev: string | null) => evidenceSupported(ctx.text, ev);
@@ -187,6 +195,11 @@ export function planExtraction(raw: Record<string, unknown>, ctx: { text: string
     const t = ENTITY_TYPES.includes(String(en.entity_type)) ? String(en.entity_type) : "other";
     if (!plan.entities.some((x) => normText(x.name) === normText(name))) plan.entities.push({ name, entity_type: t, description: str(en.description, 400), evidence: evidence! });
   }
+  if (ctx.knowledge) {
+    const k = parseKnowledge(raw.knowledge, ctx.text, (t, e) => evidenceSupported(t, e));
+    plan.knowledge = k.items;
+    for (let i = 0; i < k.dropped; i++) drop("knowledge", "missing fields or evidence not found", {});
+  }
   return plan;
 }
 
@@ -235,13 +248,14 @@ export type ModelCaller = (prompt: { system: string; user: string }) => Promise<
 export type ExtractionOutcome =
   | { status: "no_prose" }
   | { status: "skipped"; reason: "already_processed" | "in_progress"; extractionId: string }
-  | { status: "completed"; extractionId: string; counts: Record<string, number>; replacedPrevious: boolean }
+  | { status: "completed"; extractionId: string; counts: Record<string, number>; replacedPrevious: boolean;
+      knowledge?: ExtractedKnowledge[]; contentHash?: string; sectionDate?: string | null; nonLinear?: boolean }
   | { status: "failed"; extractionId?: string; error: string };
 
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 /** Never throws. Prose is only read, never written. */
-export async function processSectionExtraction(repo: NarrativeRepo, callModel: ModelCaller, bookId: string, pos: StoryPosition, opts: { now?: number } = {}): Promise<ExtractionOutcome> {
+export async function processSectionExtraction(repo: NarrativeRepo, callModel: ModelCaller, bookId: string, pos: StoryPosition, opts: { now?: number; knowledge?: boolean } = {}): Promise<ExtractionOutcome> {
   let extractionId: string | undefined;
   try {
     const section = await repo.getSectionText(bookId, pos);
@@ -264,13 +278,14 @@ export async function processSectionExtraction(repo: NarrativeRepo, callModel: M
     await repo.seedFromOutline(bookId);
     const known = await repo.loadKnown(bookId);
     const openThreads = known.threads.filter((t) => t.status === "OPEN" || t.status === "DEVELOPING");
-    const { content, model } = await callModel(buildExtractionPrompt({ text: section.text, position: pos, characters: known.characters, threads: openThreads }));
-    const plan = planExtraction(parseModelJson(content), { text: section.text, characters: known.characters, threads: openThreads });
+    const { content, model } = await callModel(buildExtractionPrompt({ text: section.text, position: pos, characters: known.characters, threads: openThreads, knowledge: opts.knowledge }));
+    const plan = planExtraction(parseModelJson(content), { text: section.text, characters: known.characters, threads: openThreads, knowledge: opts.knowledge });
     const applied = await repo.applyPlan(bookId, pos, rec.id, plan);
     await repo.saveSnapshot(bookId, pos, rec.id);
     await repo.completeExtraction(rec.id, { ...applied, dropped: plan.dropped.slice(0, 40) }, model);
     return {
       status: "completed", extractionId: rec.id, replacedPrevious,
+      ...(opts.knowledge ? { knowledge: plan.knowledge ?? [], contentHash: hash, sectionDate: plan.events.find((e) => e.story_date)?.story_date ?? null, nonLinear: plan.events.some((e) => e.is_flashback) } : {}),
       counts: { events: plan.events.length, characterChanges: plan.characterChanges.length, facts: plan.facts.length, threadUpdates: plan.threadUpdates.length, newThreads: plan.newThreads.length, entities: plan.entities.length, dropped: plan.dropped.length },
     };
   } catch (e) {
