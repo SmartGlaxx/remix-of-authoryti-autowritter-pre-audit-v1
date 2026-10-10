@@ -72,5 +72,6 @@
 - [x] Phase B: plan tables, immutability triggers, acceptance/extraction tracking, lifecycle tests
 - [x] Phase B completion (0005): generation leases + fencing, exact-detail anchors, reconciliation logs; 14 unit + 28 live checks
 - [x] Phase C: universal planning engine + 8 genre adapters (pure, not wired); 27 tests, 315 total
-- [ ] Phase D: AI plan generation — awaiting approval
+- [x] Phase D: AI planning services (alternatives 3/5/7/10, master, chapters, sections, beats), true-story planner, repair + checkpoints, owner approvals — built, not wired to writing
+- [ ] Phase E: connect plans to the writing context engine (spoiler-gated view, Phase B leases) — awaiting approval
 - [ ] Before new workflow goes live: wire leases/fencing, anchors, reconciliation gate (blockingDiscrepancies) into generation

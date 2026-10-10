@@ -5,11 +5,11 @@ import { blockingDiscrepancies } from "../../supabase/functions/_shared/narrativ
 import { CONTEXT_PROFILES } from "../../supabase/functions/_shared/narrative/adaptiveContext";
 
 const fields = (id: AdapterId) => Object.fromEntries(getAdapter(id).masterFields.map((f) => [f, f === "reveals" ? [] : "x"]));
-const sample: Record<AdapterId, string> = { fiction: "novel", self_help: "self-help", business: "business", finance: "finance", children: "children", cookbook: "cookbook", magazine: "magazine", technical: "programming" };
+const sample: Record<AdapterId, string> = { fiction: "novel", self_help: "self-help", business: "business", finance: "finance", children: "children", cookbook: "cookbook", magazine: "magazine", technical: "programming", narrative_nonfiction: "memoir" };
 
 describe("Phase C adapters", () => {
-  it("has exactly eight adapters", () => {
-    expect(GENRE_ADAPTERS.map((a) => a.id).sort()).toEqual(["business", "children", "cookbook", "fiction", "finance", "magazine", "self_help", "technical"]);
+  it("has exactly nine adapters", () => {
+    expect(GENRE_ADAPTERS.map((a) => a.id).sort()).toEqual(["business", "children", "cookbook", "fiction", "finance", "magazine", "narrative_nonfiction", "self_help", "technical"]);
   });
   it("every app book type maps to exactly one adapter", () => {
     const types = CONTEXT_PROFILES.flatMap((p) => p.bookTypes);
