@@ -26,7 +26,7 @@ const fictionMaster = JSON.stringify({
 });
 const master = (): MasterContext => {
   const r = parseMaster(fictionMaster, brief("novel"), null);
-  if (!r.ok) throw new Error(r.issues.join(";"));
+  if (!r.ok) throw new Error((r as { issues: string[] }).issues.join(";"));
   return { premise: r.value.premise, synopsis: r.value.synopsis, ending: r.value.ending, skeleton: r.value.skeleton };
 };
 
@@ -46,7 +46,7 @@ describe("Phase D story alternatives", () => {
     const dup = [alt(1), { ...alt(1), title: "Other" }, alt(3)];
     const r = parseAlternatives(JSON.stringify({ alternatives: dup }), 3);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.join()).toMatch(/too similar/);
+    if (!r.ok) expect((r as { issues: string[] }).issues.join()).toMatch(/too similar/);
   });
   it("prompt does not force fixed twist categories", () => {
     expect(buildAlternativesPrompt(brief("novel"), 7).user).toMatch(/not drawn from a fixed list/);

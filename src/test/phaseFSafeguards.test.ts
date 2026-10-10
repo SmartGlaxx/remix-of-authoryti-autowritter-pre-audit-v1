@@ -60,7 +60,7 @@ describe("Safeguard 2: progressive mode never silently downgrades", () => {
     for (const reason of ["no_master", "not_approved", "schema_incompatible", "book_type_mismatch", "no_section"]) {
       const r = requireApprovedPlan({ usable: false, reason });
       expect(r).toMatchObject({ ok: false, code: "PLAN_REQUIRED" });
-      if (!r.ok) expect(r.reason).toContain(reason);
+      if (!r.ok) expect((r as { reason: string }).reason).toContain(reason);
     }
   });
   it("proceeds only with a usable approved plan", () => {

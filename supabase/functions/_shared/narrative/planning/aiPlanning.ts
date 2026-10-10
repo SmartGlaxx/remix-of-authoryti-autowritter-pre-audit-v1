@@ -385,11 +385,11 @@ export async function runWithRepair<T>(call: ModelCall, prompt: Prompt, parse: (
   let r = parse(raw);
   let attempts = 1;
   while (!r.ok && attempts <= maxRepairs) {
-    raw = await call({ system: prompt.system, user: `${prompt.user}\n\nYour previous reply was rejected:\n- ${r.issues.slice(0, 20).join("\n- ")}\n\nPrevious reply:\n${raw.slice(0, 12000)}\n\nReturn the corrected full JSON object only.` });
+    raw = await call({ system: prompt.system, user: `${prompt.user}\n\nYour previous reply was rejected:\n- ${(r as { issues: string[] }).issues.slice(0, 20).join("\n- ")}\n\nPrevious reply:\n${raw.slice(0, 12000)}\n\nReturn the corrected full JSON object only.` });
     r = parse(raw);
     attempts++;
   }
-  return r.ok ? { ok: true, value: r.value, attempts, issues: [] } : { ok: false, attempts, issues: r.issues };
+  return r.ok ? { ok: true, value: r.value, attempts, issues: [] } : { ok: false, attempts, issues: (r as { issues: string[] }).issues };
 }
 
 // ── checkpointed batch (chapter by chapter) ─────────────────────────────────
@@ -405,7 +405,7 @@ export async function runChapterBatch(chapters: number[], isDone: (ch: number) =
     if (isDone(ch)) { res.reused.push(ch); continue; }
     let r: { ok: boolean; issues: string[] };
     try { r = await runOne(ch); } catch (e) { r = { ok: false, issues: [(e as Error).message] }; }
-    if (!r.ok) { res.failed = { chapter: ch, issues: r.issues }; break; }
+    if (!r.ok) { res.failed = { chapter: ch, issues: (r as { issues: string[] }).issues }; break; }
     res.completed.push(ch);
   }
   return res;
