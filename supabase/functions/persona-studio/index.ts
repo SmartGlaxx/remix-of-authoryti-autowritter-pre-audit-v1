@@ -121,11 +121,13 @@ Deno.serve(async (req) => {
     if (action === "promote_character") {
       const scId = uuidOrNull(body.storyCharacterId);
       if (!scId) return json({ error: "Invalid storyCharacterId" }, 400);
-      const { data: sc } = await db.from("story_characters").select("id, book_id, name, aliases, narrative_identity_id, books!inner(user_id, universe_id)").eq("id", scId).maybeSingle();
-      if (!sc || (sc as any).books.user_id !== userId) return json({ error: "Not found" }, 404);
+      const { data: sc } = await db.from("story_characters").select("id, book_id, name, aliases, narrative_identity_id").eq("id", scId).eq("user_id", userId).maybeSingle();
+      if (!sc) return json({ error: "Not found" }, 404);
+      const { data: book } = await db.from("books").select("universe_id").eq("id", sc.book_id).eq("user_id", userId).maybeSingle();
+      if (!book) return json({ error: "Not found" }, 404);
       let identityId = sc.narrative_identity_id as string | null;
       if (!identityId) {
-        const r = await resolveAndCreate({ displayName: sc.name, aliases: (sc as any).aliases ?? [], universeId: (sc as any).books.universe_id ?? null, level: "independent_persona", originBookId: sc.book_id });
+        const r = await resolveAndCreate({ displayName: sc.name, aliases: sc.aliases ?? [], universeId: book.universe_id ?? null, level: "independent_persona", originBookId: sc.book_id });
         if ("needsConfirmation" in r) return json({ status: "needs_confirmation", resolution: r.resolution }, 409);
         identityId = r.identityId;
         await db.from("story_characters").update({ narrative_identity_id: identityId }).eq("id", scId);

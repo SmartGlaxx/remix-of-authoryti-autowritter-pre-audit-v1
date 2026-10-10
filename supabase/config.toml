@@ -4,3 +4,6 @@ verify_jwt = false
 
 [functions.book-ideas]
 verify_jwt = false
+
+[functions.persona-studio]
+verify_jwt = false
