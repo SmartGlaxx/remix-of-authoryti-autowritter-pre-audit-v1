@@ -200,9 +200,11 @@ export type Database = {
           genre_adapter_type: string
           genre_data: Json
           id: string
+          idempotency_key: string | null
           intended_ending: string
           major_reveals: Json
           master_synopsis: string
+          plan_skeleton: Json | null
           premise: string
           status: string
           supersedes_id: string | null
@@ -218,9 +220,11 @@ export type Database = {
           genre_adapter_type?: string
           genre_data?: Json
           id?: string
+          idempotency_key?: string | null
           intended_ending?: string
           major_reveals?: Json
           master_synopsis?: string
+          plan_skeleton?: Json | null
           premise?: string
           status?: string
           supersedes_id?: string | null
@@ -236,9 +240,11 @@ export type Database = {
           genre_adapter_type?: string
           genre_data?: Json
           id?: string
+          idempotency_key?: string | null
           intended_ending?: string
           major_reveals?: Json
           master_synopsis?: string
+          plan_skeleton?: Json | null
           premise?: string
           status?: string
           supersedes_id?: string | null
@@ -322,6 +328,7 @@ export type Database = {
           created_at: string
           dependencies: Json
           id: string
+          idempotency_key: string | null
           master_plan_id: string
           parent_plan_id: string | null
           plan_level: string
@@ -338,6 +345,7 @@ export type Database = {
           created_at?: string
           dependencies?: Json
           id?: string
+          idempotency_key?: string | null
           master_plan_id: string
           parent_plan_id?: string | null
           plan_level: string
@@ -354,6 +362,7 @@ export type Database = {
           created_at?: string
           dependencies?: Json
           id?: string
+          idempotency_key?: string | null
           master_plan_id?: string
           parent_plan_id?: string | null
           plan_level?: string
@@ -2441,6 +2450,8 @@ export type Database = {
         }
         Returns: Json
       }
+      approve_master_plan: { Args: { p_plan_id: string }; Returns: Json }
+      approve_progressive_plans: { Args: { p_ids: string[] }; Returns: Json }
       assert_generation_fence: {
         Args: {
           p_book_id: string
@@ -2530,6 +2541,32 @@ export type Database = {
           p_token: number
           p_ttl_seconds?: number
           p_worker: string
+        }
+        Returns: Json
+      }
+      save_master_plan_draft: {
+        Args: {
+          p_adapter: string
+          p_alternatives: Json
+          p_book_id: string
+          p_ending: string
+          p_genre_data: Json
+          p_idem: string
+          p_premise: string
+          p_reveals: Json
+          p_skeleton: Json
+          p_synopsis: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      save_progressive_plan_batch: {
+        Args: {
+          p_book_id: string
+          p_idem: string
+          p_items: Json
+          p_master_plan_id: string
+          p_user_id: string
         }
         Returns: Json
       }
