@@ -56,7 +56,7 @@ export function normalizeSetup(raw: any): BookSetup {
   }));
   const cast: SetupCastMember[] = (Array.isArray(raw.cast) ? raw.cast : []).slice(0, 60).map((c: any, i: number) => ({
     key: s(c?.key, 60) || `c${i + 1}`, name: s(c?.name, 120), role: (BOOK_ROLES as readonly string[]).includes(c?.role) ? c.role : "supporting",
-    identityId: uuid(c?.identityId), lightweight: c?.identityId ? false : c?.lightweight !== false, note: s(c?.note, 500) || undefined,
+    identityId: uuid(c?.identityId), lightweight: uuid(c?.identityId) ? false : c?.lightweight !== false, note: s(c?.note, 500) || undefined,
   })).filter((c: SetupCastMember) => c.name);
   const n = raw.narration ?? {};
   return {
