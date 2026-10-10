@@ -174,6 +174,8 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
     chapters.forEach((c, i) => { if (!c.objective) issues.push(`Chapter ${i + 1} has no objective`); });
     const reveals: PlannedReveal[] = a.isFiction ? (Array.isArray(o?.reveals) ? o.reveals : []).map((r: any, i: number) => ({
       id: `r${i + 1}`, summary: str(r?.summary), revealChapter: Number(r?.revealChapter), setupChapters: (Array.isArray(r?.setupChapters) ? r.setupChapters : []).map(Number),
+      secretTerms: (Array.isArray(r?.secretTerms) ? r.secretTerms : []).map(str).filter(Boolean),
+      setupDirectives: (Array.isArray(r?.setupDirectives) ? r.setupDirectives : []).map((d: any) => ({ chapterIndex: Number(d?.chapterIndex), writerInstruction: str(d?.writerInstruction), viewpointKnows: str(d?.viewpointKnows) || undefined, readerSees: str(d?.readerSees) || undefined })).filter((d: any) => Number.isInteger(d.chapterIndex) && d.writerInstruction),
     })) : [];
     if (a.isFiction) genreData.reveals = reveals;
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");
