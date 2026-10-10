@@ -1,0 +1,53 @@
+// Phase 3: persists character knowledge for one accepted, freshly extracted section (service client).
+// Rollback: rows from an older text of the same section are removed first. Retries are idempotent
+// through deterministic dedup keys. Ambiguous holders go to knowledge_identity_reviews, never guessed.
+import { planKnowledgeWrites, type ExtractedKnowledge } from "./knowledge.ts";
+import type { KnownIdentity } from "./identityResolution.ts";
+import type { StoryPosition } from "./rules.ts";
+
+// deno-lint-ignore no-explicit-any
+type Db = any;
+
+/** Knowledge tracking is on only for books tied to a universe, a narrator persona or the progressive pipeline. */
+// deno-lint-ignore no-explicit-any
+export function knowledgeEnabled(book: { universe_id?: string | null; narrator_identity_id?: string | null; controls?: any } | null | undefined): boolean {
+  return !!book && (!!book.universe_id || !!book.narrator_identity_id || book.controls?.planning_pipeline === "progressive");
+}
+
+export async function loadIdentitiesFor(db: Db, userId: string, universeId: string | null): Promise<KnownIdentity[]> {
+  let q = db.from("narrative_identities").select("id, display_name, aliases, universe_id").eq("user_id", userId).is("merged_into_id", null).limit(5000);
+  q = universeId ? q.eq("universe_id", universeId) : q.is("universe_id", null);
+  const { data } = await q;
+  return (data ?? []).map((r: Record<string, any>) => ({ id: r.id, displayName: r.display_name, aliases: r.aliases ?? [], universeId: r.universe_id }));
+}
+
+export async function syncKnowledgeForSection(db: Db, o: {
+  bookId: string; userId: string; universeId: string | null; pos: StoryPosition; extractionId: string; contentHash: string;
+  items: ExtractedKnowledge[]; sectionDate?: string | null; nonLinear?: boolean;
+}) {
+  const sectionKey = `${o.pos.chapterIndex}:${o.pos.subsectionIndex}`;
+  // Rollback derived knowledge from older texts of this section (accepted prose itself is never touched).
+  await db.from("knowledge_acquisitions").delete().eq("book_id", o.bookId).eq("source_section_key", sectionKey).neq("content_hash", o.contentHash);
+  await db.from("knowledge_identity_reviews").delete().eq("book_id", o.bookId).eq("source_section_key", sectionKey).eq("status", "PENDING").neq("content_hash", o.contentHash);
+
+  const identities = await loadIdentitiesFor(db, o.userId, o.universeId);
+  const plan = planKnowledgeWrites(o.items, { identities, universeId: o.universeId, bookId: o.bookId, chapterIndex: o.pos.chapterIndex, subsectionIndex: o.pos.subsectionIndex, contentHash: o.contentHash, sectionDate: o.sectionDate, nonLinear: o.nonLinear });
+
+  if (plan.rows.length) {
+    const { error } = await db.from("knowledge_acquisitions").upsert(plan.rows.map((r) => ({
+      user_id: o.userId, book_id: o.bookId, universe_id: o.universeId, identity_id: r.identity_id, claim: r.claim, source: r.source,
+      source_identity_id: r.source_identity_id, certainty: r.certainty, learned_date: r.learned_date, learned_chapter_index: r.learned_chapter_index,
+      learned_subsection_index: r.learned_subsection_index, knowledge_kind: r.knowledge_kind, truth_status: r.truth_status, evidence: r.evidence,
+      scene_point: r.scene_point, extraction_id: o.extractionId, source_section_key: sectionKey, content_hash: o.contentHash, dedup_key: r.dedup_key,
+    })), { onConflict: "dedup_key", ignoreDuplicates: true });
+    if (error) throw new Error(`knowledge write failed: ${error.message}`);
+  }
+  if (plan.reviews.length) {
+    const { error } = await db.from("knowledge_identity_reviews").upsert(plan.reviews.map((r) => ({
+      user_id: o.userId, book_id: o.bookId, source_section_key: sectionKey, content_hash: o.contentHash, character_name: r.character_name,
+      reason: r.reason, candidate_identity_ids: r.candidate_identity_ids, payload: r.payload, dedup_key: r.dedup_key,
+    })), { onConflict: "dedup_key", ignoreDuplicates: true });
+    if (error) throw new Error(`knowledge review write failed: ${error.message}`);
+  }
+  return { status: "ok", recorded: plan.rows.length, heldForReview: plan.reviews.length };
+}
