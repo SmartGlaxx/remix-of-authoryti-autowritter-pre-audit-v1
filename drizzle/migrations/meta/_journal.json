@@ -36,6 +36,13 @@
       "when": 1791597108880,
       "tag": "0004_progressive_planning_phase_b",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791597670690,
+      "tag": "0005_phase_b_locks_anchors_reconciliation",
+      "breakpoints": true
     }
   ]
 }

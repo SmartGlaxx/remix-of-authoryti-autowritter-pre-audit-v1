@@ -136,6 +136,62 @@ export type Database = {
         }
         Relationships: []
       }
+      book_generation_leases: {
+        Row: {
+          book_id: string
+          chapter_index: number
+          created_at: string
+          expires_at: string
+          fencing_token: number
+          heartbeat_at: string
+          id: string
+          leased_at: string
+          status: string
+          subsection_index: number
+          updated_at: string
+          user_id: string
+          worker_id: string
+        }
+        Insert: {
+          book_id: string
+          chapter_index: number
+          created_at?: string
+          expires_at: string
+          fencing_token?: number
+          heartbeat_at?: string
+          id?: string
+          leased_at?: string
+          status?: string
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+          worker_id: string
+        }
+        Update: {
+          book_id?: string
+          chapter_index?: number
+          created_at?: string
+          expires_at?: string
+          fencing_token?: number
+          heartbeat_at?: string
+          id?: string
+          leased_at?: string
+          status?: string
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_generation_leases_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_master_plans: {
         Row: {
           approved_at: string | null
@@ -487,6 +543,83 @@ export type Database = {
           word_count?: number
         }
         Relationships: []
+      }
+      canon_reconciliation_logs: {
+        Row: {
+          book_id: string
+          canon_reference: Json
+          chapter_index: number
+          content_hash: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string
+          dedup_key: string
+          description: string
+          discrepancy_type: string
+          id: string
+          prose_excerpt: string
+          rationale: string | null
+          replan_required: boolean
+          resulting_changes: Json
+          severity: string
+          subsection_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          canon_reference?: Json
+          chapter_index: number
+          content_hash: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
+          dedup_key: string
+          description: string
+          discrepancy_type: string
+          id?: string
+          prose_excerpt?: string
+          rationale?: string | null
+          replan_required?: boolean
+          resulting_changes?: Json
+          severity: string
+          subsection_index: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          canon_reference?: Json
+          chapter_index?: number
+          content_hash?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
+          dedup_key?: string
+          description?: string
+          discrepancy_type?: string
+          id?: string
+          prose_excerpt?: string
+          rationale?: string | null
+          replan_required?: boolean
+          resulting_changes?: Json
+          severity?: string
+          subsection_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canon_reconciliation_logs_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       canonical_facts: {
         Row: {
@@ -1386,6 +1519,81 @@ export type Database = {
           },
         ]
       }
+      narrative_exact_anchors: {
+        Row: {
+          anchor_key: string
+          anchor_type: string
+          book_id: string
+          context_hint: string
+          created_at: string
+          effective_chapter_index: number
+          exact_text: string
+          id: string
+          is_active: boolean
+          match_mode: string
+          retrieval_tags: string[]
+          source_ref: Json
+          source_type: string
+          supersedes_id: string | null
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          anchor_key: string
+          anchor_type: string
+          book_id: string
+          context_hint?: string
+          created_at?: string
+          effective_chapter_index?: number
+          exact_text: string
+          id?: string
+          is_active?: boolean
+          match_mode?: string
+          retrieval_tags?: string[]
+          source_ref?: Json
+          source_type: string
+          supersedes_id?: string | null
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          anchor_key?: string
+          anchor_type?: string
+          book_id?: string
+          context_hint?: string
+          created_at?: string
+          effective_chapter_index?: number
+          exact_text?: string
+          id?: string
+          is_active?: boolean
+          match_mode?: string
+          retrieval_tags?: string[]
+          source_ref?: Json
+          source_type?: string
+          supersedes_id?: string | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrative_exact_anchors_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "narrative_exact_anchors_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_exact_anchors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       narrative_extractions: {
         Row: {
           applied: Json
@@ -2222,6 +2430,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_generation_lease: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_sub: number
+          p_ttl_seconds?: number
+          p_user_id: string
+          p_worker: string
+        }
+        Returns: Json
+      }
+      assert_generation_fence: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_sub: number
+          p_token: number
+          p_worker: string
+        }
+        Returns: undefined
+      }
       check_and_deduct_word_credits: {
         Args: {
           _estimated_words: number
@@ -2253,6 +2482,16 @@ export type Database = {
         }
         Returns: Json
       }
+      decide_canon_reconciliation: {
+        Args: {
+          p_decision: string
+          p_log_id: string
+          p_rationale: string
+          p_replan?: boolean
+          p_resulting_changes?: Json
+        }
+        Returns: Json
+      }
       mark_first_chapter_completed: {
         Args: { _user_id: string }
         Returns: undefined
@@ -2261,11 +2500,56 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      record_canon_discrepancy: {
+        Args: {
+          p_book_id: string
+          p_canon_ref: Json
+          p_chapter: number
+          p_content_hash: string
+          p_dedup_key: string
+          p_description: string
+          p_excerpt: string
+          p_severity: string
+          p_sub: number
+          p_type: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       record_writing_activity: {
         Args: { _credits: number; _user_id: string; _words: number }
         Returns: Json
       }
+      release_generation_lease: {
+        Args: { p_lease_id: string; p_token: number; p_worker: string }
+        Returns: boolean
+      }
+      renew_generation_lease: {
+        Args: {
+          p_lease_id: string
+          p_token: number
+          p_ttl_seconds?: number
+          p_worker: string
+        }
+        Returns: Json
+      }
       story_position: { Args: { _ch: number; _sub: number }; Returns: number }
+      upsert_exact_anchor: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_context?: string
+          p_key: string
+          p_match: string
+          p_source_ref: Json
+          p_source_type: string
+          p_tags?: string[]
+          p_text: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

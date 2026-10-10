@@ -70,4 +70,5 @@
 
 # Progressive planning
 - [x] Phase B: plan tables, immutability triggers, acceptance/extraction tracking, lifecycle tests
+- [x] Phase B completion (0005): generation leases + fencing, exact-detail anchors, reconciliation logs; 14 unit + 28 live checks
 - [ ] Phase C: planning modules per genre adapter — awaiting go-ahead
