@@ -807,6 +807,7 @@ serve(async (req) => {
           for (const k of NOVEL_TEXT_CACHE.keys()) if (k.includes(`_${book.id}_`)) NOVEL_TEXT_CACHE.delete(k);
           console.log("[phase-f] commit", JSON.stringify(c));
           // Replacing an accepted section flags derived/later memory inside commit_fenced_section itself.
+          await adminSupabase.rpc("write_accepted_outline_text", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_text: finalText, p_hash: hash }).then(() => {}, () => {});
         }
         }
         }
