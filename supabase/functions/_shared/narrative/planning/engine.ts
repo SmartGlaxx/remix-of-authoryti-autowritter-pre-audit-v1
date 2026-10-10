@@ -19,7 +19,13 @@ export interface ChapterPlan {
   targetWords: number; dependsOn: string[]; sections: SectionPlan[];
 }
 /** Fiction-only reveal schedule; nonfiction plans keep it empty. */
-export interface PlannedReveal { id: string; summary: string; revealChapter: number; setupChapters: number[] }
+export interface PlannedReveal {
+  id: string; summary: string; revealChapter: number; setupChapters: number[];
+  /** Planner-only words that would give the reveal away; never reach the writer early. */
+  secretTerms?: string[];
+  /** Writer-safe, concrete setup instructions per chapter (Phase F). */
+  setupDirectives?: { chapterIndex: number; writerInstruction: string; viewpointKnows?: string; readerSees?: string }[];
+}
 export interface MasterPlanSkeleton {
   schemaVersion: number; adapter: AdapterId; bookType: string; targetWords: number;
   genreData: Record<string, unknown>; reveals: PlannedReveal[]; series: SeriesRef | null;
