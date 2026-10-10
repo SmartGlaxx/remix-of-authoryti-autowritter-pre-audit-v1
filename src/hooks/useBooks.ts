@@ -28,6 +28,7 @@ const transformDbToBook = (row: any): Book => ({
   entities: row.entities || [],
   concepts: row.concepts || [],
   coverUrl: row.cover_url || undefined,
+  narrativeVantage: row.narrative_vantage === "retrospective" ? "retrospective" : "immediate",
 });
 
 // Transform Book to database row format
@@ -90,6 +91,7 @@ export const useBooks = () => {
         pov: input.pov,
         tone_profile: JSON.parse(JSON.stringify(input.toneProfile)) as Json,
         controls: JSON.parse(JSON.stringify(input.controls)) as Json,
+        narrative_vantage: input.narrativeVantage ?? "immediate",
         status: "planning",
         current_chapter_index: 0,
         current_subsection_index: 0,

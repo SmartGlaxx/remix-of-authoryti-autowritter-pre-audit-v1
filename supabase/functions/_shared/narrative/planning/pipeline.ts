@@ -116,7 +116,10 @@ export type GateResult = { ok: true } | { ok: false; code: "AWAIT_ACCEPTANCE" | 
 /** Previous section must be accepted + extracted; real undecided serious contradictions block. */
 export function progressiveGate(prior: PriorSection | null, logs: Row[], position: { chapterIndex: number; subsectionIndex: number }): GateResult {
   const g = generationGate(prior);
-  if (!g.ok) return { ok: false, code: g.action === "await_acceptance" ? "AWAIT_ACCEPTANCE" : "RECOVER_EXTRACTION", reason: g.reason };
+  if (!g.ok) {
+    const f = g as { action: "await_acceptance" | "recover_extraction"; reason: string };
+    return { ok: false, code: f.action === "await_acceptance" ? "AWAIT_ACCEPTANCE" : "RECOVER_EXTRACTION", reason: f.reason };
+  }
   const pos = (c: number, s: number) => c * 1000 + s;
   const here = pos(position.chapterIndex, position.subsectionIndex);
   const blocking = blockingDiscrepancies(logs as never).filter((l: Row) => pos(Number(l.chapter_index ?? l.chapterIndex ?? 0), Number(l.subsection_index ?? l.subsectionIndex ?? 0)) < here);

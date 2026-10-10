@@ -434,7 +434,16 @@ export interface Book {
   entities: string[];
   concepts: string[];
   coverUrl?: string;
+  narrativeVantage?: NarrativeVantage;
 }
+
+/** First-person telling position. Immediate = narrated as it happens; Retrospective = told later with hindsight. */
+export type NarrativeVantage = "immediate" | "retrospective";
+
+export const NARRATIVE_VANTAGE_OPTIONS: { value: NarrativeVantage; label: string; description: string }[] = [
+  { value: "immediate", label: "In the moment", description: "The narrator knows only what they know as events happen" },
+  { value: "retrospective", label: "Looking back", description: "The narrator tells it later and may add hindsight" },
+];
 
 export interface CreateBookInput {
   title: string;
@@ -446,6 +455,7 @@ export interface CreateBookInput {
   pov: POV;
   toneProfile: ToneProfile;
   controls: BookControls;
+  narrativeVantage?: NarrativeVantage;
 }
 
 // ============= BOOK TYPE CATEGORIES =============

@@ -19,6 +19,8 @@ import {
   Book,
   BOOK_TYPE_INFO,
   POV_OPTIONS,
+  NARRATIVE_VANTAGE_OPTIONS,
+  type NarrativeVantage,
   TONE_OPTIONS,
   AUTOMATION_OPTIONS,
   DEPTH_OPTIONS,
@@ -52,6 +54,17 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     if (error) { setContextEngine(prev); toast.error("Couldn't change memory mode."); return; }
     (book.controls as { context_engine?: string }).context_engine = m;
     toast.success(m === "adaptive" ? "Adaptive memory on" : "Standard memory on");
+  };
+  const [vantage, setVantage] = useState<NarrativeVantage>(book.narrativeVantage ?? "immediate");
+  const vantageLocked = (book.wordCount ?? 0) > 0;
+  const saveVantage = async (v: NarrativeVantage) => {
+    if (vantageLocked || v === vantage) return;
+    const prev = vantage;
+    setVantage(v);
+    const { error } = await supabase.from("books").update({ narrative_vantage: v }).eq("id", book.id);
+    if (error) { setVantage(prev); toast.error("This can only change before writing starts."); return; }
+    book.narrativeVantage = v;
+    toast.success("Storytelling moment updated");
   };
   const sliders = effectiveSlidersFor({ bookType: book.bookType, toneProfile: book.toneProfile, controls: book.controls });
   const divergence = resolveDivergence(book.controls as never);
@@ -185,6 +198,20 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                     </Badge>
                     {povOption && (
                       <p className="text-xs text-muted-foreground mt-1">{povOption.description}</p>
+                    )}
+                    {book.pov === "first-person" && (
+                      <div className="mt-3 space-y-1.5">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">When is the story told?</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {NARRATIVE_VANTAGE_OPTIONS.map((o) => (
+                            <Button key={o.value} size="sm" variant={vantage === o.value ? "default" : "outline"}
+                              disabled={vantageLocked} onClick={() => saveVantage(o.value)} title={o.description}>
+                              {o.label}
+                            </Button>
+                          ))}
+                        </div>
+                        {vantageLocked && <p className="text-xs text-muted-foreground">Locked once writing has started.</p>}
+                      </div>
                     )}
                   </div>
                   <div>

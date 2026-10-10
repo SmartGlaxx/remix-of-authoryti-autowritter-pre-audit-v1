@@ -36,6 +36,7 @@ import {
   BOOK_TYPE_INFO,
   BOOK_CATEGORIES,
   POV_OPTIONS,
+  NARRATIVE_VANTAGE_OPTIONS,
   TONE_OPTIONS,
   AUTOMATION_OPTIONS,
   DEPTH_OPTIONS,
@@ -505,6 +506,28 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                       ))}
                     </div>
                   </div>
+
+                  {formData.pov === "first-person" && (
+                    <div className="space-y-2.5">
+                      <SectionLabel label="When is the story told?" tooltip="You can change this until writing starts." />
+                      <div className="grid grid-cols-2 gap-2">
+                        {NARRATIVE_VANTAGE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => updateForm("narrativeVantage", option.value)}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              (formData.narrativeVantage ?? "immediate") === option.value
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                : "border-border hover:border-primary/40"
+                            }`}
+                          >
+                            <div className="font-medium text-xs">{option.label}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{option.description}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2.5">
                     <Label className="text-xs">Primary Tone</Label>

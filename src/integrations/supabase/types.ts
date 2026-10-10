@@ -136,6 +136,42 @@ export type Database = {
         }
         Relationships: []
       }
+      author_identities: {
+        Row: {
+          bio: string | null
+          created_at: string
+          genres: string[]
+          id: string
+          is_archived: boolean
+          pen_name: string
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          genres?: string[]
+          id?: string
+          is_archived?: boolean
+          pen_name: string
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          genres?: string[]
+          id?: string
+          is_archived?: boolean
+          pen_name?: string
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       book_candidate_drafts: {
         Row: {
           attempt_count: number
@@ -547,6 +583,7 @@ export type Database = {
       books: {
         Row: {
           audience: string
+          author_identity_id: string | null
           book_type: string
           concepts: string[] | null
           controls: Json
@@ -558,6 +595,9 @@ export type Database = {
           full_text: string
           genre: string | null
           id: string
+          narrative_vantage: string
+          narrator_identity_id: string | null
+          narrator_telling_date: Json | null
           outline: Json | null
           pov: string
           status: string
@@ -567,6 +607,7 @@ export type Database = {
           tonal_anchors: string[] | null
           tone_profile: Json
           total_char_count: number
+          universe_id: string | null
           updated_at: string
           user_id: string
           voice_manifest: Json | null
@@ -574,6 +615,7 @@ export type Database = {
         }
         Insert: {
           audience: string
+          author_identity_id?: string | null
           book_type: string
           concepts?: string[] | null
           controls: Json
@@ -585,6 +627,9 @@ export type Database = {
           full_text?: string
           genre?: string | null
           id?: string
+          narrative_vantage?: string
+          narrator_identity_id?: string | null
+          narrator_telling_date?: Json | null
           outline?: Json | null
           pov: string
           status?: string
@@ -594,6 +639,7 @@ export type Database = {
           tonal_anchors?: string[] | null
           tone_profile: Json
           total_char_count?: number
+          universe_id?: string | null
           updated_at?: string
           user_id: string
           voice_manifest?: Json | null
@@ -601,6 +647,7 @@ export type Database = {
         }
         Update: {
           audience?: string
+          author_identity_id?: string | null
           book_type?: string
           concepts?: string[] | null
           controls?: Json
@@ -612,6 +659,9 @@ export type Database = {
           full_text?: string
           genre?: string | null
           id?: string
+          narrative_vantage?: string
+          narrator_identity_id?: string | null
+          narrator_telling_date?: Json | null
           outline?: Json | null
           pov?: string
           status?: string
@@ -621,12 +671,35 @@ export type Database = {
           tonal_anchors?: string[] | null
           tone_profile?: Json
           total_char_count?: number
+          universe_id?: string | null
           updated_at?: string
           user_id?: string
           voice_manifest?: Json | null
           word_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "books_author_identity_id_fkey"
+            columns: ["author_identity_id"]
+            isOneToOne: false
+            referencedRelation: "author_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_narrator_identity_id_fkey"
+            columns: ["narrator_identity_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_universe_id_fkey"
+            columns: ["universe_id"]
+            isOneToOne: false
+            referencedRelation: "fictional_universes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       canon_reconciliation_logs: {
         Row: {
@@ -736,6 +809,7 @@ export type Database = {
           id: string
           is_canonical: boolean
           notes: string | null
+          occurrence_date: Json | null
           predicate: string
           source_chapter_index: number | null
           source_excerpt: string | null
@@ -744,6 +818,7 @@ export type Database = {
           subject: string
           subject_character_id: string | null
           subject_entity_id: string | null
+          universe_id: string | null
           updated_at: string
           user_id: string
           value: string
@@ -762,6 +837,7 @@ export type Database = {
           id?: string
           is_canonical?: boolean
           notes?: string | null
+          occurrence_date?: Json | null
           predicate: string
           source_chapter_index?: number | null
           source_excerpt?: string | null
@@ -770,6 +846,7 @@ export type Database = {
           subject: string
           subject_character_id?: string | null
           subject_entity_id?: string | null
+          universe_id?: string | null
           updated_at?: string
           user_id: string
           value: string
@@ -788,6 +865,7 @@ export type Database = {
           id?: string
           is_canonical?: boolean
           notes?: string | null
+          occurrence_date?: Json | null
           predicate?: string
           source_chapter_index?: number | null
           source_excerpt?: string | null
@@ -796,6 +874,7 @@ export type Database = {
           subject?: string
           subject_character_id?: string | null
           subject_entity_id?: string | null
+          universe_id?: string | null
           updated_at?: string
           user_id?: string
           value?: string
@@ -834,6 +913,13 @@ export type Database = {
             columns: ["subject_entity_id"]
             isOneToOne: false
             referencedRelation: "story_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canonical_facts_universe_id_fkey"
+            columns: ["universe_id"]
+            isOneToOne: false
+            referencedRelation: "fictional_universes"
             referencedColumns: ["id"]
           },
         ]
@@ -1313,6 +1399,42 @@ export type Database = {
           },
         ]
       }
+      fictional_universes: {
+        Row: {
+          chronology_settings: Json
+          created_at: string
+          description: string | null
+          genre: string | null
+          id: string
+          is_archived: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chronology_settings?: Json
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_archived?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chronology_settings?: Json
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_archived?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       identity_attribute_versions: {
         Row: {
           attribute: string
@@ -1420,6 +1542,7 @@ export type Database = {
           introduced_position: number
           kind: string
           name: string
+          narrative_identity_id: string | null
           user_id: string
         }
         Insert: {
@@ -1430,6 +1553,7 @@ export type Database = {
           introduced_position?: number
           kind: string
           name: string
+          narrative_identity_id?: string | null
           user_id: string
         }
         Update: {
@@ -1440,9 +1564,124 @@ export type Database = {
           introduced_position?: number
           kind?: string
           name?: string
+          narrative_identity_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "identity_entities_narrative_identity_id_fkey"
+            columns: ["narrative_identity_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_acquisitions: {
+        Row: {
+          book_id: string | null
+          certainty: string
+          claim: string
+          created_at: string
+          event_id: string | null
+          fact_id: string | null
+          id: string
+          identity_id: string
+          learned_chapter_index: number | null
+          learned_date: Json | null
+          learned_subsection_index: number | null
+          source: string
+          source_identity_id: string | null
+          superseded_by: string | null
+          superseded_chapter_index: number | null
+          superseded_date: Json | null
+          universe_id: string | null
+          user_id: string
+        }
+        Insert: {
+          book_id?: string | null
+          certainty: string
+          claim: string
+          created_at?: string
+          event_id?: string | null
+          fact_id?: string | null
+          id?: string
+          identity_id: string
+          learned_chapter_index?: number | null
+          learned_date?: Json | null
+          learned_subsection_index?: number | null
+          source: string
+          source_identity_id?: string | null
+          superseded_by?: string | null
+          superseded_chapter_index?: number | null
+          superseded_date?: Json | null
+          universe_id?: string | null
+          user_id: string
+        }
+        Update: {
+          book_id?: string | null
+          certainty?: string
+          claim?: string
+          created_at?: string
+          event_id?: string | null
+          fact_id?: string | null
+          id?: string
+          identity_id?: string
+          learned_chapter_index?: number | null
+          learned_date?: Json | null
+          learned_subsection_index?: number | null
+          source?: string
+          source_identity_id?: string | null
+          superseded_by?: string | null
+          superseded_chapter_index?: number | null
+          superseded_date?: Json | null
+          universe_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_acquisitions_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_acquisitions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_acquisitions_fact_id_fkey"
+            columns: ["fact_id"]
+            isOneToOne: false
+            referencedRelation: "canonical_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_acquisitions_identity_id_user_id_fkey"
+            columns: ["identity_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "knowledge_acquisitions_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "knowledge_acquisitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_acquisitions_universe_id_user_id_fkey"
+            columns: ["universe_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "fictional_universes"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
       }
       manuscript_audit_findings: {
         Row: {
@@ -1644,6 +1883,7 @@ export type Database = {
           is_canonical: boolean
           location_entity_id: string | null
           location_text: string | null
+          occurrence_date: Json | null
           position: number | null
           prose_excerpt: string | null
           source_subsection_id: string | null
@@ -1670,6 +1910,7 @@ export type Database = {
           is_canonical?: boolean
           location_entity_id?: string | null
           location_text?: string | null
+          occurrence_date?: Json | null
           position?: number | null
           prose_excerpt?: string | null
           source_subsection_id?: string | null
@@ -1696,6 +1937,7 @@ export type Database = {
           is_canonical?: boolean
           location_entity_id?: string | null
           location_text?: string | null
+          occurrence_date?: Json | null
           position?: number | null
           prose_excerpt?: string | null
           source_subsection_id?: string | null
@@ -1866,6 +2108,211 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "books"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      narrative_identities: {
+        Row: {
+          aliases: string[]
+          created_at: string
+          display_name: string
+          id: string
+          kind: string
+          level: string
+          merged_into_id: string | null
+          origin_book_id: string | null
+          seed_details: Json
+          universe_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aliases?: string[]
+          created_at?: string
+          display_name: string
+          id?: string
+          kind?: string
+          level?: string
+          merged_into_id?: string | null
+          origin_book_id?: string | null
+          seed_details?: Json
+          universe_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aliases?: string[]
+          created_at?: string
+          display_name?: string
+          id?: string
+          kind?: string
+          level?: string
+          merged_into_id?: string | null
+          origin_book_id?: string | null
+          seed_details?: Json
+          universe_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrative_identities_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "narrative_identities_origin_book_id_fkey"
+            columns: ["origin_book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "narrative_identities_universe_id_user_id_fkey"
+            columns: ["universe_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "fictional_universes"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      narrative_relationships: {
+        Row: {
+          created_at: string
+          emotional_quality: string | null
+          ended_date: Json | null
+          established_date: Json | null
+          id: string
+          is_symmetrical: boolean
+          notes: string | null
+          relationship_type: string
+          shared_secrets: string[]
+          status: string | null
+          subject_identity_id: string
+          target_identity_id: string
+          universe_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emotional_quality?: string | null
+          ended_date?: Json | null
+          established_date?: Json | null
+          id?: string
+          is_symmetrical?: boolean
+          notes?: string | null
+          relationship_type: string
+          shared_secrets?: string[]
+          status?: string | null
+          subject_identity_id: string
+          target_identity_id: string
+          universe_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emotional_quality?: string | null
+          ended_date?: Json | null
+          established_date?: Json | null
+          id?: string
+          is_symmetrical?: boolean
+          notes?: string | null
+          relationship_type?: string
+          shared_secrets?: string[]
+          status?: string | null
+          subject_identity_id?: string
+          target_identity_id?: string
+          universe_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrative_relationships_subject_identity_id_user_id_fkey"
+            columns: ["subject_identity_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "narrative_relationships_target_identity_id_user_id_fkey"
+            columns: ["target_identity_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "narrative_relationships_universe_id_user_id_fkey"
+            columns: ["universe_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "fictional_universes"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      personas: {
+        Row: {
+          ai_expansions: Json
+          birth_date: Json | null
+          category: string
+          created_at: string
+          creation_mode: string
+          death_date: Json | null
+          id: string
+          identity_id: string
+          is_archived: boolean
+          milestones: Json
+          psychology: Json
+          updated_at: string
+          user_facts: Json
+          user_id: string
+          voice_sample: string | null
+        }
+        Insert: {
+          ai_expansions?: Json
+          birth_date?: Json | null
+          category?: string
+          created_at?: string
+          creation_mode?: string
+          death_date?: Json | null
+          id?: string
+          identity_id: string
+          is_archived?: boolean
+          milestones?: Json
+          psychology?: Json
+          updated_at?: string
+          user_facts?: Json
+          user_id: string
+          voice_sample?: string | null
+        }
+        Update: {
+          ai_expansions?: Json
+          birth_date?: Json | null
+          category?: string
+          created_at?: string
+          creation_mode?: string
+          death_date?: Json | null
+          id?: string
+          identity_id?: string
+          is_archived?: boolean
+          milestones?: Json
+          psychology?: Json
+          updated_at?: string
+          user_facts?: Json
+          user_id?: string
+          voice_sample?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_identity_id_user_id_fkey"
+            columns: ["identity_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -2263,6 +2710,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          narrative_identity_id: string | null
           role: string | null
           source_key: string | null
           updated_at: string
@@ -2276,6 +2724,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          narrative_identity_id?: string | null
           role?: string | null
           source_key?: string | null
           updated_at?: string
@@ -2289,6 +2738,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          narrative_identity_id?: string | null
           role?: string | null
           source_key?: string | null
           updated_at?: string
@@ -2307,6 +2757,13 @@ export type Database = {
             columns: ["extraction_id"]
             isOneToOne: false
             referencedRelation: "narrative_extractions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_characters_narrative_identity_id_fkey"
+            columns: ["narrative_identity_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_identities"
             referencedColumns: ["id"]
           },
         ]
@@ -2431,6 +2888,7 @@ export type Database = {
       }
       story_timeline: {
         Row: {
+          approximate_date: Json | null
           book_id: string
           canon_flag: Json | null
           canon_status: string
@@ -2453,6 +2911,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approximate_date?: Json | null
           book_id: string
           canon_flag?: Json | null
           canon_status?: string
@@ -2475,6 +2934,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approximate_date?: Json | null
           book_id?: string
           canon_flag?: Json | null
           canon_status?: string
