@@ -2480,6 +2480,21 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_request_logs: { Args: never; Returns: undefined }
+      commit_fenced_section: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_hash: string
+          p_master_plan_id: string
+          p_replace?: boolean
+          p_sub: number
+          p_text: string
+          p_token: number
+          p_user_id: string
+          p_worker: string
+        }
+        Returns: Json
+      }
       commit_identity_batch: {
         Args: {
           p_book_id: string
@@ -2506,6 +2521,17 @@ export type Database = {
       mark_first_chapter_completed: {
         Args: { _user_id: string }
         Returns: undefined
+      }
+      mark_section_extraction: {
+        Args: {
+          p_book_id: string
+          p_chapter: number
+          p_error?: string
+          p_status: string
+          p_sub: number
+          p_user_id: string
+        }
+        Returns: Json
       }
       mark_testimonial_prompted: {
         Args: { _user_id: string }
