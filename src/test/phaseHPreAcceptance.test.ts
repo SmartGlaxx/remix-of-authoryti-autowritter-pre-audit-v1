@@ -59,8 +59,12 @@ describe("Phase G runtime: combined evaluator", () => {
     expect(f.some((x) => x.code === "DEFERRAL_RESOLVED_EARLY" && x.severity === "material")).toBe(true);
   });
 
-  it("future-reveal leaks are caught by the free stage even when the evaluator says clean", async () => {
-    const r = await runPreAcceptance("The butler was her father all along, she realised.", ctx({ secrets: ["her father all along"] }), reply(clean), reply({ replacements: [] }));
+  it("a protected term alone is a note; a definite semantic disclosure blocks", async () => {
+    const draft = "The butler was her father all along, she realised.";
+    const noted = await runPreAcceptance(draft, ctx({ secrets: ["her father all along"] }), reply(clean), reply({ replacements: [] }));
+    expect(noted.decision).toBe("accept");
+    const leak = { ...clean, disclosures: [{ secret: 1, disclosed: true, certainty: "definite", excerpt: "The butler was her father all along" }] };
+    const r = await runPreAcceptance(draft, ctx({ secrets: ["her father all along"] }), reply(leak), reply({ replacements: [] }));
     expect(r.decision).toBe("blocked_material");
   });
 

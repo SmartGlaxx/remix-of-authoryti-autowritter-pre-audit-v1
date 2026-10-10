@@ -8,6 +8,7 @@ import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import type { BookModelConfig } from "../_shared/ai/roles.ts";
 import { syncIdentityForSection } from "../_shared/narrative/identityRepo.ts";
 import { createSupabaseNarrativeRepo, verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
+import { knowledgeEnabled, syncKnowledgeForSection } from "../_shared/narrative/knowledgeRepo.ts";
 import { extractionStatusFor, resolvePipeline } from "../_shared/narrative/planning/pipeline.ts";
 
 const corsHeaders = {
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
     if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
 
     const ch = chapterIndex as number, sub = subsectionIndex as number;
-    const { data: ctl } = await db.from("books").select("controls").eq("id", bookId).maybeSingle();
+    const { data: ctl } = await db.from("books").select("controls, universe_id, narrator_identity_id").eq("id", bookId).maybeSingle();
     const progressiveBook = resolvePipeline(ctl?.controls) === "progressive";
     // Phase F staged acceptance: accepted prose is never touched here. Memory sync is recorded as
     // EXTRACTED or FAILED; anything else leaves it PENDING, which keeps blocking the next section.
@@ -67,11 +68,12 @@ Deno.serve(async (req) => {
       } catch (e) { console.warn("[phase-f] acceptance update skipped:", e instanceof Error ? e.message : e); }
     };
 
+    const trackKnowledge = knowledgeEnabled(ctl as never);
     let outcome: Awaited<ReturnType<typeof processSectionExtraction>>;
     try {
       const repo = createSupabaseNarrativeRepo(db, userId);
       const config = await loadBookModelConfig(db, bookId, userId);
-      outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: ch, subsectionIndex: sub });
+      outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: ch, subsectionIndex: sub }, { knowledge: trackKnowledge });
     } catch (e) {
       await markSync("FAILED", e instanceof Error ? e.message : e);
       throw e;
@@ -84,6 +86,15 @@ Deno.serve(async (req) => {
         (outcome as Record<string, unknown>).identity = identity;
         console.log("[identity-sync]", JSON.stringify(identity));
       } catch (e) { console.warn("[identity-sync] skipped:", e instanceof Error ? e.message : e); }
+      // Phase 3: character knowledge from accepted text only; never fails the extraction.
+      if (trackKnowledge && outcome.knowledge) {
+        try {
+          const k = await syncKnowledgeForSection(db, { bookId, userId, universeId: (ctl as any)?.universe_id ?? null, pos: { chapterIndex: ch, subsectionIndex: sub },
+            extractionId: outcome.extractionId, contentHash: outcome.contentHash!, items: outcome.knowledge, sectionDate: outcome.sectionDate, nonLinear: outcome.nonLinear });
+          (outcome as Record<string, unknown>).knowledgeSync = k;
+          delete (outcome as Record<string, unknown>).knowledge;
+        } catch (e) { console.warn("[knowledge-sync] skipped:", e instanceof Error ? e.message : e); }
+      }
     }
     await markSync(extractionStatusFor(outcome as never), (outcome as any).error);
     // no_prose = section not saved yet → 409 so the client can retry shortly.

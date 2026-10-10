@@ -17,6 +17,7 @@ import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprov
 import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext, futureSecrets } from "../_shared/narrative/planning/planningContext.ts";
 import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
+import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/knowledgeRepo.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 
@@ -608,6 +609,7 @@ serve(async (req) => {
     // ── Pass 2: structured narrative memory (point-in-time, strictly before this section) ──
     // Supplements (never replaces) the linear manuscript context. Any failure here is
     // non-fatal: the section is written exactly as before.
+    let narratorCtx: NarratorContext | null = null;
     if (engine === "adaptive" && book.id) {
       try {
         const owned = await verifyBookOwnership(adminSupabase, book.id, auth.user.id);
@@ -620,7 +622,10 @@ serve(async (req) => {
         const adaptiveInput = { bookType: book.bookType, position: { chapterIndex: absChapter, subsectionIndex }, objective, outline: owned.outline, rows, identityEntities: idRes.data ?? [] };
         let context, candidateCount: number;
         if (progressive) {
-          const pr = buildPlanningAwareContext({ ...adaptiveInput, master: progressive.master, readyPlans: progressive.readyPlans, anchors: progressive.anchorRows });
+          // Phase 3: narrator knowledge filtered by scene chronology + vantage (books with a narrator identity only).
+          try { narratorCtx = await loadNarratorContext(adminSupabase, book.id, auth.user.id, { chapterIndex: absChapter, subsectionIndex }, progressive.plan?.usable ? progressive.plan.section : null); }
+          catch (e) { console.warn("[phase-3] narrator context skipped:", e instanceof Error ? e.message : e); narratorCtx = null; }
+          const pr = buildPlanningAwareContext({ ...adaptiveInput, master: progressive.master, readyPlans: progressive.readyPlans, anchors: progressive.anchorRows, extraCandidates: narratorCtx?.candidates });
           context = pr.context; candidateCount = pr.metrics.candidates;
           Object.assign(runMetrics, { plan_mode: pr.mode, plan_fallback: pr.fallbackReason ?? null, spoiler_blocked: pr.metrics.spoilerBlocked });
         } else {
@@ -774,6 +779,8 @@ serve(async (req) => {
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
           const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes });
           if (isChildrensBook) ctx.adapter = "childrens";
+          if (!narratorCtx) { try { narratorCtx = await loadNarratorContext(adminSupabase, book.id, auth.user.id, { chapterIndex: absChapter, subsectionIndex }, progressive?.plan?.usable ? progressive.plan.section : null); } catch { narratorCtx = null; } }
+          if (narratorCtx) Object.assign(ctx, { narration: narratorCtx.narration, lifeRecords: narratorCtx.lifeRecords, sceneDate: narratorCtx.sceneDate });
           const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
           const { evaluate, repair } = modelCallers(cfg, auth.user.id, book.id, createAIDeps(adminSupabase, auth.user.id));
           const warnRatio = Number((book.controls as Record<string, unknown> | null)?.revisionWarnRatio) || undefined;
