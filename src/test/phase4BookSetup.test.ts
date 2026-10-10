@@ -84,11 +84,25 @@ describe("Phase 4 — narrator, perspective, roles", () => {
     st.cast[0].role = "primary_narrator";
     expect(validateSetup(st, { bookType: "novel" }).some((i) => i.code === "PERSONA_LED_SINGLE_NARRATOR" && i.blocking)).toBe(true);
   });
-  it("multiple perspectives forbid two viewpoints in one chapter (head-hopping)", () => {
-    const st = withCast({ perspective: "multiple", viewpoints: [{ castKey: "a", purpose: "", chapters: [0, 2] }, { castKey: "b", purpose: "", chapters: [1, 2] }] });
-    expect(validateSetup(st, { bookType: "novel" }).some((i) => i.code === "HEAD_HOPPING")).toBe(true);
-    st.viewpoints[1].chapters = [1, 3];
-    expect(validateSetup(st, { bookType: "novel" }).filter((i) => i.blocking)).toEqual([]);
+  it("two viewpoints may share a chapter in separate sections (advisory only)", () => {
+    const st = withCast({ perspective: "multiple", viewpoints: [{ castKey: "a", purpose: "", chapters: [2], sections: ["2:0"] }, { castKey: "b", purpose: "", chapters: [2], sections: ["2:1"] }] });
+    const issues = validateSetup(st, { bookType: "novel" });
+    expect(issues.filter((i) => i.blocking)).toEqual([]);
+    expect(issues.some((i) => i.code === "VIEWPOINT_SHARED_CHAPTER" && !i.blocking)).toBe(true);
+  });
+  it("two viewpoints in the same section is head-hopping (blocking)", () => {
+    const st = withCast({ perspective: "multiple", viewpoints: [{ castKey: "a", purpose: "", chapters: [2], sections: ["2:1"] }, { castKey: "b", purpose: "", chapters: [2], sections: ["2:1"] }] });
+    expect(validateSetup(st, { bookType: "novel" }).some((i) => i.code === "HEAD_HOPPING" && i.blocking)).toBe(true);
+  });
+  it("test mode blocks every key source so no paid call can happen", async () => {
+    const { failClosedDeps, statusForAIError } = await import("../../supabase/functions/_shared/ai/client");
+    let touched = false;
+    const deps = failClosedDeps({ env: { LOVABLE_API_KEY: "x", DEEPSEEK_API_KEY: "y" }, getUserKey: async () => { touched = true; return "k"; }, recordUsage: async () => {} });
+    expect(deps.env).toEqual({});
+    const err = await deps.getUserKey("google" as any).catch((e) => e);
+    expect(err.code).toBe("test_mode_blocked");
+    expect(statusForAIError(err)).toBe(403);
+    expect(touched).toBe(false);
   });
   it("single perspective allows only one viewpoint", () => {
     const st = withCast({ viewpoints: [{ castKey: "a", purpose: "", chapters: [] }, { castKey: "b", purpose: "", chapters: [] }] });
