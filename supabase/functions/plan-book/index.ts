@@ -134,6 +134,10 @@ Deno.serve(async (req) => {
       if (action === "chapters") {
         const list: number[] = Array.isArray(body.chapters) ? body.chapters.map(chArg).filter((x: number | null): x is number => x !== null) : [...Array(n).keys()];
         const runId = s(body.requestId, 100) || "default";
+        if (dryRun) {
+          const first = list.find((c) => !expanded[c] || body.force === true);
+          return json({ dryRun: true, prompts: first === undefined ? [] : [buildChapterPrompt(m, first, expanded)] });
+        }
         const out = await runChapterBatch(list, (ch) => !!expanded[ch] && body.force !== true, async (ch) => {
           const r = await runWithRepair(call, buildChapterPrompt(m, ch, expanded), (t) => parseChapter(t, m, ch, expanded));
           if (!r.ok) return { ok: false, issues: r.issues };
