@@ -24,7 +24,7 @@ const PLANNER_KNOWLEDGE =
 const ANTI_FORMULA =
   "Avoid formula. Do not give every chapter or section the same shape, length or beat sequence. Vary structure to fit what each part must do. " +
   "Be concrete: name specific choices, objects, evidence, places, methods and consequences. No vague filler such as 'tension rises', 'emotions run high', 'a deep dive'. " +
-  "Never use the words magic or magical. Word counts are planning estimates, not quotas: never pad or trim to hit them.";
+  "Word counts are planning estimates, not quotas: never pad or trim to hit them.";
 const FACTUAL =
   "This is a true story. Never invent biographical facts, events, quotations or participants. Tag every planned claim with an evidence tier: " +
   "documented (from the provided sources, name the source), recollection (the subject's or author's memory), uncertain (disputed or unknown — say so), " +
