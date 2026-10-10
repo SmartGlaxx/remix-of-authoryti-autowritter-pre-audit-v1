@@ -9,7 +9,7 @@ import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { adapterForBookType } from "../_shared/narrative/planning/adapters.ts";
 import type { ChapterPlan, MasterPlanSkeleton } from "../_shared/narrative/planning/engine.ts";
 import {
-  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, buildAlternativesPrompt, buildBeatsPrompt, buildChapterPrompt, buildMasterPrompt,
+  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, assertConceptsEligible, buildConceptsPrompt, parseConcepts, conceptGuidance, type NonfictionConcept, buildAlternativesPrompt, buildBeatsPrompt, buildChapterPrompt, buildMasterPrompt,
   buildSectionPrompt, parseAlternatives, parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, runChapterBatch, runWithRepair,
   type AlternativeCount, type BookBrief, type MasterContext, type ModelCall, type Prompt, type StoryAlternative,
 } from "../_shared/narrative/planning/aiPlanning.ts";
@@ -20,7 +20,7 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ACTIONS = ["alternatives", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status"];
+const ACTIONS = ["alternatives", "concepts", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status"];
 const s = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
 
 Deno.serve(async (req) => {
@@ -100,7 +100,22 @@ Deno.serve(async (req) => {
         return r.ok ? json({ alternatives: r.value, attempts: r.attempts }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
+      // Nonfiction concepts: a separate, genre-appropriate service (no twists, no plot).
+      if (action === "concepts") {
+        const count = Number(body.count) as AlternativeCount;
+        try { assertConceptsEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
+        const r = await runWithRepair(call, buildConceptsPrompt(brief, count), (t) => parseConcepts(t, count));
+        return r.ok ? json({ concepts: r.value, attempts: r.attempts }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+      }
+
       if (action === "master") {
+        // Alternatives are optional: with none chosen the master plan is built from the author's own concept.
+        if (body.concept && typeof body.concept === "object") {
+          const c = body.concept as Partial<NonfictionConcept>;
+          const g = conceptGuidance({ id: "c", title: s(c.title, 300), coreThesis: s(c.coreThesis, 1000), approach: s(c.approach, 2000),
+            pillars: Array.isArray(c.pillars) ? c.pillars.map((x) => s(x, 300)).slice(0, 8) : [], readerOutcome: s(c.readerOutcome, 1000), summary: "" });
+          brief.guidance = [brief.guidance, g].filter(Boolean).join("\n\n").slice(0, 8000);
+        }
         const alts: StoryAlternative[] = Array.isArray(body.alternatives) ? body.alternatives.slice(0, 10).map((a: any, i: number) => ({
           id: `alt${i + 1}`, title: s(a?.title, 300), logline: s(a?.logline, 1000), summary: s(a?.summary, 8000), twist: s(a?.twist, 2000), ending: s(a?.ending, 2000),
         })) : [];
