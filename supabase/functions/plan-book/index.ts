@@ -155,8 +155,7 @@ Deno.serve(async (req) => {
       const [chS, subS] = String(rv.source_section_key).split(":").map(Number);
       const all = await loadIdentitiesFor(db, userId, universeId);
       const chosen = all.find((x) => x.id === identityId);
-      const others = all.filter((x) => x.id !== identityId);
-      const plan = planKnowledgeWrites([rv.payload as ExtractedKnowledge], { identities: [{ ...(chosen ?? { id: identityId, displayName: rv.character_name, aliases: [], universeId }), aliases: [...(chosen?.aliases ?? []), rv.character_name] }, ...others.filter((o) => o.displayName.toLowerCase() !== String(rv.character_name).toLowerCase())], universeId, bookId, chapterIndex: chS, subsectionIndex: subS, contentHash: rv.content_hash });
+      const plan = planKnowledgeWrites([rv.payload as ExtractedKnowledge], { identities: [{ ...(chosen ?? { id: identityId, displayName: rv.character_name, aliases: [], universeId }), aliases: [...(chosen?.aliases ?? []), rv.character_name] }], universeId, bookId, chapterIndex: chS, subsectionIndex: subS, contentHash: rv.content_hash });
       if (plan.rows.length) {
         const r = plan.rows[0];
         const { error } = await db.from("knowledge_acquisitions").upsert([{ user_id: userId, book_id: bookId, universe_id: universeId, identity_id: identityId, claim: r.claim, source: r.source,
