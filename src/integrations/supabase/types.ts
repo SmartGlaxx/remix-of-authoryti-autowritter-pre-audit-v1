@@ -1624,19 +1624,27 @@ export type Database = {
           book_id: string | null
           certainty: string
           claim: string
+          content_hash: string | null
           created_at: string
+          dedup_key: string | null
           event_id: string | null
+          evidence: string | null
+          extraction_id: string | null
           fact_id: string | null
           id: string
           identity_id: string
+          knowledge_kind: string | null
           learned_chapter_index: number | null
           learned_date: Json | null
           learned_subsection_index: number | null
+          scene_point: Json | null
           source: string
           source_identity_id: string | null
+          source_section_key: string | null
           superseded_by: string | null
           superseded_chapter_index: number | null
           superseded_date: Json | null
+          truth_status: string | null
           universe_id: string | null
           user_id: string
         }
@@ -1644,19 +1652,27 @@ export type Database = {
           book_id?: string | null
           certainty: string
           claim: string
+          content_hash?: string | null
           created_at?: string
+          dedup_key?: string | null
           event_id?: string | null
+          evidence?: string | null
+          extraction_id?: string | null
           fact_id?: string | null
           id?: string
           identity_id: string
+          knowledge_kind?: string | null
           learned_chapter_index?: number | null
           learned_date?: Json | null
           learned_subsection_index?: number | null
+          scene_point?: Json | null
           source: string
           source_identity_id?: string | null
+          source_section_key?: string | null
           superseded_by?: string | null
           superseded_chapter_index?: number | null
           superseded_date?: Json | null
+          truth_status?: string | null
           universe_id?: string | null
           user_id: string
         }
@@ -1664,19 +1680,27 @@ export type Database = {
           book_id?: string | null
           certainty?: string
           claim?: string
+          content_hash?: string | null
           created_at?: string
+          dedup_key?: string | null
           event_id?: string | null
+          evidence?: string | null
+          extraction_id?: string | null
           fact_id?: string | null
           id?: string
           identity_id?: string
+          knowledge_kind?: string | null
           learned_chapter_index?: number | null
           learned_date?: Json | null
           learned_subsection_index?: number | null
+          scene_point?: Json | null
           source?: string
           source_identity_id?: string | null
+          source_section_key?: string | null
           superseded_by?: string | null
           superseded_chapter_index?: number | null
           superseded_date?: Json | null
+          truth_status?: string | null
           universe_id?: string | null
           user_id?: string
         }
@@ -1722,6 +1746,65 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "fictional_universes"
             referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      knowledge_identity_reviews: {
+        Row: {
+          book_id: string
+          candidate_identity_ids: string[]
+          character_name: string
+          content_hash: string
+          created_at: string
+          dedup_key: string
+          id: string
+          payload: Json
+          reason: string
+          resolved_identity_id: string | null
+          source_section_key: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          candidate_identity_ids?: string[]
+          character_name: string
+          content_hash: string
+          created_at?: string
+          dedup_key: string
+          id?: string
+          payload?: Json
+          reason: string
+          resolved_identity_id?: string | null
+          source_section_key: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          candidate_identity_ids?: string[]
+          character_name?: string
+          content_hash?: string
+          created_at?: string
+          dedup_key?: string
+          id?: string
+          payload?: Json
+          reason?: string
+          resolved_identity_id?: string | null
+          source_section_key?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_identity_reviews_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
           },
         ]
       }
