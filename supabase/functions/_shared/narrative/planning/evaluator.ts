@@ -174,8 +174,7 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
     try { const r = await repair(buildRepairPrompt(t, targets, ctx)); track(r.usage); return applyReplacements(t, r.text); } catch { return t; }
   };
   const loop = await runValidationLoop(draft, validate, revise, opts);
-  const findings = await (async () => (loop.rounds ? (loop.remaining as StagedFinding[]) : (loop.remaining as StagedFinding[])))();
-  const all = findings.length ? findings : [];
+  const all = loop.remaining as StagedFinding[];
   const material = all.some((f) => routeFinding(f) === "canon_reconciliation");
   const decision = material ? "blocked_material" : (unavailable || loop.heldForApproval) ? "needs_author_review" : "accept";
   return { text: loop.text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, usage };
