@@ -96,3 +96,10 @@
 - [x] Phase 2: Persona Studio, pen names, universes, promotion, relationships, server identity resolution, AI contract (mock)
 - [ ] Phase 2: live security run of server-side checks (waits on function deployment)
 - [ ] Phase 3: chronology + knowledge into extraction and pre-acceptance validation
+
+# Phase 4 — Book Setup & Persona Integration
+- [x] Setup tab: story alternatives (3/5/7/10, regenerate one, skip, must-keep details), twists on/off with approve/edit/reveal chapter, cast (library, book-only, save to library with duplicate check, suggestions), POV/narrator/vantage/persona-led, single/multiple viewpoints, universe, pen name, save & resume, locks after writing
+- [x] Setup feeds the existing master planner (no second pipeline)
+- [x] Characters-to-confirm review in Planning Studio
+- [x] 33 Phase 4 tests (504 total)
+- [ ] Live security checks against the new planning service — blocked until the updated service finishes deploying
