@@ -126,7 +126,7 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +
       `JSON: {"premise":"","synopsis":"(whole book, 300-600 words)","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
-      (a.isFiction ? ',"reveals":[{"summary":"","revealChapter":0,"setupChapters":[0]}]' : "") +
+      (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
   };
 }
