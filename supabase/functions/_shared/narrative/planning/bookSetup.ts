@@ -231,7 +231,7 @@ function mockParagraphs(seed: number, words: number): string {
 
 /** Deterministic mock model output for alternatives (valid JSON for `parseAlternatives`). */
 export function mockAlternativesOutput(b: BookBrief, count: number, fixed: string[] = []): string {
-  const seed = seedOf(`${b.title}|${b.premise}|${count}`);
+  const seed = seedOf(`${b.title}|${b.premise}|${b.guidance ?? ""}|${count}`);
   const fixedLine = fixed.length ? ` Fixed: ${fixed.join("; ")}.` : "";
   const alts = Array.from({ length: count }, (_, i) => {
     const conflict = CONFLICTS[(seed + i) % 10], structure = STRUCTURES[(seed + 3 * i) % 10], ending = ENDINGS[(seed + 7 * i) % 10];
