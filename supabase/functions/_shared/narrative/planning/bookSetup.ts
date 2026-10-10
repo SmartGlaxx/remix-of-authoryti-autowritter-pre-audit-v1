@@ -215,25 +215,38 @@ const CONFLICTS = ["a stolen inheritance", "a disappearance nobody reported", "a
 const STRUCTURES = ["linear countdown", "dual timeline", "braided ensemble", "mystery box", "road journey", "siege", "heist", "coming-of-age arc", "revenge arc", "redemption arc"];
 const ENDINGS = ["bittersweet victory", "tragic sacrifice", "quiet reconciliation", "ambiguous escape", "triumphant reversal", "costly truth", "open door to a sequel", "justice delayed", "love chosen over duty", "the villain was right"];
 
+/** Seeded pseudo-words: each alternative gets its own vocabulary so mocks are genuinely distinct. */
+function wordBank(seed: number, n: number): string[] {
+  const syl = ["ka", "ren", "tho", "mil", "vas", "dor", "eli", "qua", "sev", "lun", "bra", "pex", "zon", "ith", "gal", "fen", "ur", "mos", "tav", "kel"];
+  let x = seed || 1; const out = new Set<string>();
+  while (out.size < n) { let w = ""; for (let k = 0; k < 3; k++) { x = (Math.imul(x, 1103515245) + 12345) >>> 0; w += syl[(x >>> 8) % syl.length]; } out.add(w); }
+  return [...out];
+}
+function mockParagraphs(seed: number, words: number): string {
+  const bank = wordBank(seed, 160); const join = ["the", "and", "of", "in", "to", "but", "for", "as", "by", "at"];
+  const out: string[] = []; let i = 0;
+  while (out.length < words) { out.push(join[i % join.length], bank[i % bank.length], bank[(i * 7 + 3) % bank.length]); i++; if (i % 6 === 0) out[out.length - 1] += "."; }
+  return out.slice(0, words).join(" ");
+}
+
 /** Deterministic mock model output for alternatives (valid JSON for `parseAlternatives`). */
 export function mockAlternativesOutput(b: BookBrief, count: number, fixed: string[] = []): string {
   const seed = seedOf(`${b.title}|${b.premise}|${count}`);
   const fixedLine = fixed.length ? ` Fixed: ${fixed.join("; ")}.` : "";
   const alts = Array.from({ length: count }, (_, i) => {
-    const k = (seed + i * 7) % 10;
-    const conflict = CONFLICTS[(k + i) % 10], structure = STRUCTURES[(k + 3 * i) % 10], ending = ENDINGS[(k + 5 * i) % 10];
-    const para = `Built as a ${structure}, this version of "${b.title}" turns on ${conflict}.${fixedLine} It opens as the protagonist is pulled into the conflict, escalates through rising stakes and shifting loyalties, and reaches a turn that reframes what came before. `;
-    const summary = (para + `The central tension comes from ${conflict}; the cost of failure is personal and public. ` + "Each act deepens the stakes while planting clues for the final turn. ").repeat(6).trim();
-    return { title: `${b.title}: ${structure.replace(/\b\w/g, (c) => c.toUpperCase())}`, logline: `A ${structure} about ${conflict}, ending in ${ending}.`, summary, twist: `What seemed to be ${conflict} was engineered by someone close to the protagonist.`, ending: `A ${ending}.` };
+    const conflict = CONFLICTS[(seed + i) % 10], structure = STRUCTURES[(seed + 3 * i) % 10], ending = ENDINGS[(seed + 7 * i) % 10];
+    const summary = `A ${structure} turning on ${conflict}.${fixedLine} ` + mockParagraphs(seed + i * 104729, 470);
+    return { title: `${b.title}: ${structure.replace(/\b\w/g, (c) => c.toUpperCase())} ${i + 1}`, logline: `A ${structure} about ${conflict}, ending in ${ending}.`, summary, twist: `What seemed to be ${conflict} was engineered by someone close to the protagonist.`, ending: `A ${ending}.` };
   });
   return JSON.stringify({ alternatives: alts });
 }
 export function mockConceptsOutput(b: BookBrief, count: number): string {
-  const approaches = ["step-by-step method", "case-study driven", "myth-busting", "workbook", "narrative journey", "research synthesis", "framework-first", "Q&A", "habit-based", "contrarian"];
-  return JSON.stringify({ concepts: Array.from({ length: count }, (_, i) => ({
-    title: `${b.title} — ${approaches[i % 10]}`, coreThesis: `A ${approaches[i % 10]} take on ${b.premise.slice(0, 120)}`, approach: approaches[i % 10],
-    pillars: ["Foundation", "Practice", "Mastery"], readerOutcome: "The reader can apply the ideas immediately.", summary: `A ${approaches[i % 10]} book. `.repeat(20),
-  })) });
+  const seed = seedOf(`${b.title}|${b.premise}|c${count}`);
+  return JSON.stringify({ concepts: Array.from({ length: count }, (_, i) => {
+    const bank = wordBank(seed + i * 7919, 12);
+    return { title: `${b.title} — Approach ${i + 1}`, coreThesis: `${bank.slice(0, 5).join(" ")}.`, approach: `${bank.slice(5, 10).join(" ")}.`,
+      pillars: [bank[10], bank[11], "practice"], readerOutcome: "The reader can apply the ideas immediately.", summary: mockParagraphs(seed + i * 31, 300) };
+  }) });
 }
 export function mockTwistsOutput(b: BookBrief, count: number): string {
   const kinds = ["The trusted mentor has been steering events from the start", "The victim staged their own disappearance", "The rival was protecting the protagonist all along", "The opening event was misread: it was a rescue, not an attack", "The ally's loyalty shifts when the true prize is revealed", "The protagonist caused the original wound without knowing it"];
