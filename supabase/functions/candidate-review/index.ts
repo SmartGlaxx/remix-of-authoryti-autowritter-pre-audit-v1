@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       const [{ data: candidates }, { data: logs }, { data: findings }] = await Promise.all([
         db.from("book_candidate_drafts").select("*").eq("book_id", bookId).in("validation_status", ["BLOCKED_MATERIAL", "NEEDS_AUTHOR_REVIEW"]).order("created_at", { ascending: false }).limit(50),
         db.from("canon_reconciliation_logs").select("id, chapter_index, subsection_index, severity, discrepancy_type, description, prose_excerpt, canon_reference, decision, rationale, application_status, candidate_id, created_at").eq("book_id", bookId).not("dedup_key", "like", "selftest_%").order("created_at", { ascending: false }).limit(200),
-        db.from("editorial_validation_findings").select("*").eq("book_id", bookId).eq("status", "open").order("created_at", { ascending: false }).limit(200),
+        db.from("editorial_validation_findings").select("*").eq("book_id", bookId).eq("status", "OPEN").order("created_at", { ascending: false }).limit(200),
       ]);
       return json({ candidates: candidates ?? [], logs: logs ?? [], findings: findings ?? [] });
     }

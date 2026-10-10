@@ -289,7 +289,7 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
               <div className="flex-1"><p>{f.message}</p>{f.excerpt && <p className="text-xs italic text-muted-foreground">“{f.excerpt}”</p>}
                 {f.details?.proposed_text && <details className="text-xs mt-1"><summary className="cursor-pointer text-primary">Proposed correction</summary><p className="whitespace-pre-line mt-1">{f.details.proposed_text}</p></details>}
               </div>
-              <Button size="sm" variant="ghost" onClick={() => run(`f-${f.id}`, async () => { const { error } = await supabase.from("editorial_validation_findings").update({ status: "dismissed" }).eq("id", f.id); if (error) throw error; await refresh(); })}>Dismiss</Button>
+              <Button size="sm" variant="ghost" onClick={() => run(`f-${f.id}`, async () => { const { error } = await supabase.from("editorial_validation_findings").update({ status: "DISMISSED" }).eq("id", f.id); if (error) throw error; await refresh(); })}>Dismiss</Button>
             </div>
           ))}
         </CardContent>
