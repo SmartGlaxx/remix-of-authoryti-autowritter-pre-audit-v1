@@ -779,6 +779,7 @@ serve(async (req) => {
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
           const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes });
           if (isChildrensBook) ctx.adapter = "childrens";
+          if (!narratorCtx) { try { narratorCtx = await loadNarratorContext(adminSupabase, book.id, auth.user.id, { chapterIndex: absChapter, subsectionIndex }, progressive?.plan?.usable ? progressive.plan.section : null); } catch { narratorCtx = null; } }
           if (narratorCtx) Object.assign(ctx, { narration: narratorCtx.narration, lifeRecords: narratorCtx.lifeRecords, sceneDate: narratorCtx.sceneDate });
           const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
           const { evaluate, repair } = modelCallers(cfg, auth.user.id, book.id, createAIDeps(adminSupabase, auth.user.id));
