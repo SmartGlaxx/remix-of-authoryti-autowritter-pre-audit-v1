@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { callPlanBook, callReview } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
+import BookSetupTab from "@/components/BookSetupTab";
+import IdentityReviewPanel from "@/components/IdentityReviewPanel";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 
 type Row = Record<string, any>;
@@ -65,18 +67,20 @@ export default function PlanningStudio() {
 
       <main className="max-w-5xl mx-auto px-4 md:px-8 py-6">
         <ol className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-6">
-          {["Concept", "Master plan", "Chapters → sections → beats", "Approve", "Write & check", "Review"].map((s, i) => (
+          {["Book setup (optional)", "Master plan", "Chapters → sections → beats", "Approve", "Write & check", "Review"].map((s, i) => (
             <li key={s} className="px-3 py-1 rounded-full border border-border">{i + 1}. {s}</li>
           ))}
         </ol>
-        <Tabs defaultValue="plan">
+        <Tabs defaultValue="setup">
           <TabsList>
+            <TabsTrigger value="setup">Setup</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="review">Review {openCount > 0 && <Badge variant="destructive" className="ml-2">{openCount}</Badge>}</TabsTrigger>
             <TabsTrigger value="memory">Story memory</TabsTrigger>
           </TabsList>
+          <TabsContent value="setup"><BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} /></TabsContent>
           <TabsContent value="plan"><PlanTab book={book} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} /></TabsContent>
-          <TabsContent value="review"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /></TabsContent>
+          <TabsContent value="review"><div className="space-y-6"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /><IdentityReviewPanel bookId={bookId} /></div></TabsContent>
           <TabsContent value="memory"><MemoryTab bookId={bookId} busy={busy} run={run} /></TabsContent>
         </Tabs>
       </main>

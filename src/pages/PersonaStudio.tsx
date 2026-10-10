@@ -254,7 +254,7 @@ export default function PersonaStudio() {
   const uniById = useMemo(() => Object.fromEntries(universes.map((u) => [u.id, u])), [universes]);
   const bookById = useMemo(() => Object.fromEntries(books.map((b) => [b.id, b])), [books]);
   const library = personas
-    .map((p) => ({ ...p, identity: idById[p.identity_id] }))
+    .map((p: any) => ({ ...p, identity: idById[p.identity_id] }) as any)
     .filter((p) => p.identity)
     .filter((p) => domainFilter === "all" || p.category === domainFilter)
     .filter((p) => uniFilter === "all" || (p.identity.universe_id ?? NONE) === uniFilter)

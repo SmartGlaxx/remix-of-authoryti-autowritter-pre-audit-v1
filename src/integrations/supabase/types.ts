@@ -643,6 +643,7 @@ export type Database = {
           outline: Json | null
           pov: string
           status: string
+          story_setup: Json
           subtitle: string | null
           theme: string
           title: string
@@ -675,6 +676,7 @@ export type Database = {
           outline?: Json | null
           pov: string
           status?: string
+          story_setup?: Json
           subtitle?: string | null
           theme: string
           title: string
@@ -707,6 +709,7 @@ export type Database = {
           outline?: Json | null
           pov?: string
           status?: string
+          story_setup?: Json
           subtitle?: string | null
           theme?: string
           title?: string
@@ -1757,9 +1760,11 @@ export type Database = {
           content_hash: string
           created_at: string
           dedup_key: string
+          deferred_at: string | null
           id: string
           payload: Json
           reason: string
+          resolution_note: string | null
           resolved_identity_id: string | null
           source_section_key: string
           status: string
@@ -1773,9 +1778,11 @@ export type Database = {
           content_hash: string
           created_at?: string
           dedup_key: string
+          deferred_at?: string | null
           id?: string
           payload?: Json
           reason: string
+          resolution_note?: string | null
           resolved_identity_id?: string | null
           source_section_key: string
           status?: string
@@ -1789,9 +1796,11 @@ export type Database = {
           content_hash?: string
           created_at?: string
           dedup_key?: string
+          deferred_at?: string | null
           id?: string
           payload?: Json
           reason?: string
+          resolution_note?: string | null
           resolved_identity_id?: string | null
           source_section_key?: string
           status?: string
