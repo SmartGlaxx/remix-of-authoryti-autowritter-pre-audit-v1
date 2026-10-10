@@ -13,11 +13,18 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
+import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, type BookType } from "@/types/book";
+import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
 type Row = Record<string, any>;
 const COUNTS = [3, 5, 7, 10];
 const POV_LABEL: Record<string, string> = { first_person: "First person", third_limited: "Third person (close)", third_omniscient: "Third person (all-knowing)", second_person: "Second person" };
+const AUDIENCES = ["Children (5-8)", "Middle grade (8-12)", "Young adult", "New adult", "Adult", "Professionals", "Beginners", "General readers"];
+const TONES = ["Dark", "Hopeful", "Funny", "Suspenseful", "Romantic", "Literary", "Cozy", "Gritty", "Inspiring", "Practical", "Authoritative", "Conversational"];
+const LENGTHS = [{ v: 20000, l: "Short (~20k words)" }, { v: 50000, l: "Standard (~50k)" }, { v: 80000, l: "Long (~80k)" }, { v: 120000, l: "Epic (~120k)" }];
+const genresFor = (t: string) => BOOK_TYPE_GENRES[t as BookType] ?? GENRE_PRESETS[BOOK_TYPE_INFO[t as BookType]?.category ?? "fiction"] ?? [];
+const fictionType = (t: string) => { try { return adapterForBookType(t).isFiction; } catch { return true; } };
 const nice = (r: string) => r.replace(/_/g, " ");
 
 async function callPersona(body: Row) {
@@ -42,6 +49,17 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
   const [pending, setPending] = useState<{ name: string; matches: Row[] } | null>(null);
   const [recs, setRecs] = useState<Row[]>([]);
   const [newFixed, setNewFixed] = useState("");
+  const [exType, setExType] = useState<string>(book.book_type ?? "novel");
+  const [exGenre, setExGenre] = useState<string>(book.genre ?? "");
+  const [exAudience, setExAudience] = useState<string>(book.audience ?? "");
+  const [exTone, setExTone] = useState("");
+  const [exLength, setExLength] = useState(50000);
+  const [exSetting, setExSetting] = useState("");
+  const [exComparables, setExComparables] = useState("");
+  const [exAvoid, setExAvoid] = useState("");
+  const [exOriginality, setExOriginality] = useState<"safe" | "balanced" | "bold">("balanced");
+  const [showMore, setShowMore] = useState(false);
+  const exFiction = fictionType(exType);
 
   const load = async () => {
     const [r, ids, us, ps] = await Promise.all([
@@ -73,9 +91,9 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
   const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
     // Save fixed requirements first so the server keeps them in every option.
     await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
-    const r = await callPlanBook({ action: isFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
+    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
     if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
-    const list: Row[] = (isFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
+    const list: Row[] = (exFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
     if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
     else { const fresh = list.find((a) => !st.alternatives.some((b) => b.title === a.title)) ?? list[0]; const next = [...st.alternatives]; next[replaceIndex] = { ...(fresh as any), id: `alt${replaceIndex + 1}` }; up({ alternatives: next }); }
   });
@@ -110,8 +128,8 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
 
       {/* 1. Concept & story options */}
       <Card>
-        <CardHeader><CardTitle>1. {isFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
-          <CardDescription>{isFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
+        <CardHeader><CardTitle>1. {exFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
+          <CardDescription>{exFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
         <CardContent className="space-y-3">
           <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise" />
           <div className="space-y-2">
@@ -119,6 +137,36 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
             <div className="flex flex-wrap gap-2">{st.fixedRequirements.map((f, i) => <Badge key={i} variant="secondary" className="gap-1">{f}{!locked && <button aria-label="Remove" onClick={() => up({ fixedRequirements: st.fixedRequirements.filter((_, j) => j !== i) })}><X className="w-3 h-3" /></button>}</Badge>)}</div>
             {!locked && <div className="flex gap-2"><Input value={newFixed} onChange={(e) => setNewFixed(e.target.value)} placeholder="Add a must-keep detail" /><Button variant="outline" disabled={!newFixed.trim()} onClick={() => { up({ fixedRequirements: [...st.fixedRequirements, newFixed.trim()] }); setNewFixed(""); }}>Add</Button></div>}
           </div>
+          {!locked && <div className="rounded-lg border border-border p-3 space-y-3">
+            <p className="text-xs text-muted-foreground">Generate ideas for any kind of book. Pick the type and sub-category, then fine-tune.</p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
+                <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); }}><SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(BOOK_TYPE_INFO).map(([k, v]) => <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Sub-category</label>
+                <Select value={exGenre || "__any"} onValueChange={(v) => setExGenre(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent><SelectItem value="__any">Any / surprise me</SelectItem>{[...new Set([...(exGenre && !genresFor(exType).includes(exGenre) ? [exGenre] : []), ...genresFor(exType)])].map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Audience</label>
+                <Select value={exAudience || "__any"} onValueChange={(v) => setExAudience(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent><SelectItem value="__any">Any</SelectItem>{[...new Set([...(exAudience && !AUDIENCES.includes(exAudience) ? [exAudience] : []), ...AUDIENCES])].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Tone</label>
+                <Select value={exTone || "__any"} onValueChange={(v) => setExTone(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent><SelectItem value="__any">Any</SelectItem>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Originality:</span>
+              {(["safe", "balanced", "bold"] as const).map((o) => <Button key={o} size="sm" variant={exOriginality === o ? "default" : "outline"} onClick={() => setExOriginality(o)}>{o === "safe" ? "Familiar" : o === "bold" ? "Bold" : "Balanced"}</Button>)}
+              <Select value={String(exLength)} onValueChange={(v) => setExLength(+v)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>{LENGTHS.map((l) => <SelectItem key={l.v} value={String(l.v)}>{l.l}</SelectItem>)}</SelectContent></Select>
+              <Button size="sm" variant="ghost" onClick={() => setShowMore(!showMore)}>{showMore ? "Fewer options" : "More options"}</Button>
+            </div>
+            {showMore && <div className="grid gap-3 sm:grid-cols-3">
+              <Input value={exSetting} onChange={(e) => setExSetting(e.target.value)} placeholder={exFiction ? "Setting or time period" : "Industry, field or context"} />
+              <Input value={exComparables} onChange={(e) => setExComparables(e.target.value)} placeholder="Similar books (for feel only)" />
+              <Input value={exAvoid} onChange={(e) => setExAvoid(e.target.value)} placeholder="Things to avoid" />
+            </div>}
+            {exType !== book.book_type && <p className="text-xs text-muted-foreground">Ideas will be for a {BOOK_TYPE_INFO[exType as BookType]?.label}. Your book itself stays a {BOOK_TYPE_INFO[book.book_type as BookType]?.label ?? book.book_type}.</p>}
+          </div>}
           {!locked && <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">How many:</span>
             {COUNTS.map((c) => <Button key={c} size="sm" variant={count === c ? "default" : "outline"} onClick={() => setCount(c)}>{c}</Button>)}
