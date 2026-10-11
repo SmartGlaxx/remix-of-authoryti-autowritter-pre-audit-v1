@@ -10,9 +10,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import BookCard from "@/components/BookCard";
 import CreateBookEngine from "@/components/CreateBookEngine";
-import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useBooks } from "@/hooks/useBooks";
+import { getDefaultControls } from "@/types/book";
+import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { Book, CreateBookInput, BOOK_CATEGORIES, BOOK_TYPE_INFO, BookCategory, BookType } from "@/types/book";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,7 +26,6 @@ const Index = () => {
   const navigate = useNavigate();
   const { bookType: routeBookType, slug } = useParams<{ bookType?: string; slug?: string }>();
   const [showEngine, setShowEngine] = useState(false);
-  const [showChooser, setShowChooser] = useState(false);
   const [showIdeas, setShowIdeas] = useState(false);
   const [engineInitial, setEngineInitial] = useState<Partial<CreateBookInput> | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>("updated");
@@ -183,6 +182,22 @@ const Index = () => {
     } catch (error) {
       console.error("Failed to create book:", error);
     }
+  };
+
+  const [starting, setStarting] = useState(false);
+  // Single creation flow: New Book opens a draft straight into the Planning Studio (idea → summaries → write).
+  const startNewBook = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const newBook = await addBook({
+        title: "Untitled book", bookType: "novel", theme: "", audience: "general-readers", pov: "third-person-limited",
+        toneProfile: { primary: "conversational", intensity: 5, formality: 5, emotionalIntensity: 5, humorLevel: 3, authorityLevel: 5 } as any,
+        controls: { ...getDefaultControls("novel"), writerId: bestWriterFor("novel").id } as any,
+      });
+      navigate(`/books/${newBook.id}/plan`);
+    } catch (e) { console.error("Failed to start book:", e); toast.error("Couldn't start a new book"); }
+    finally { setStarting(false); }
   };
 
   const handleDeleteBook = async (id: string) => {
@@ -521,7 +536,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation onCreateBook={() => setShowChooser(true)} />
+      <Navigation onCreateBook={startNewBook} />
 
       <main>
         {isLoading ? (
@@ -554,7 +569,7 @@ const Index = () => {
                   generation.
                 </p>
               </div>
-              <Button variant="hero" size="lg" onClick={() => setShowChooser(true)} className="group">
+              <Button variant="hero" size="lg" onClick={startNewBook} className="group">
                 <Sparkles className="w-5 h-5 transition-transform group-hover:scale-110" />
                 Get Started
               </Button>
@@ -609,16 +624,6 @@ const Index = () => {
       <AnimatePresence>
         {showEngine && <CreateBookEngine key={engineInitial ? "prefilled" : "blank"} initial={engineInitial} onClose={() => { setShowEngine(false); setEngineInitial(undefined); }} onCreate={handleCreateBook} />}
       </AnimatePresence>
-      <Dialog open={showChooser} onOpenChange={setShowChooser}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-serif">Start a new book</DialogTitle><DialogDescription>Set it up yourself, or let AI suggest complete book ideas.</DialogDescription></DialogHeader>
-          <div className="grid gap-3">
-            <button type="button" onClick={() => { setShowChooser(false); setEngineInitial(undefined); setShowEngine(true); }} className="rounded-xl border border-border p-4 text-left hover:border-primary/50"><div className="font-medium">Start from scratch</div><div className="text-xs text-muted-foreground">Choose every setting in the Creation Engine.</div></button>
-            <button type="button" onClick={() => { setShowChooser(false); setShowIdeas(true); }} className="rounded-xl border border-primary/40 bg-primary/5 p-4 text-left hover:border-primary"><div className="font-medium">Get book ideas</div><div className="text-xs text-muted-foreground">Titles, descriptions, audience, writer and voice — ready to accept or adjust.</div></button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {showIdeas && <BookIdeasGenerator onBack={() => setShowIdeas(false)} onAccept={(input) => { setShowIdeas(false); setEngineInitial(input); setShowEngine(true); }} />}
     </div>
   );
 };

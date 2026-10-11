@@ -85,6 +85,12 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const save = (stage?: BookSetup["stage"]) => run("save", async () => {
     const r = await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: { ...st, stage: stage ?? st.stage } });
     if (!r.ok) throw new Error(r.data.message ?? r.data.issues?.filter((i: Row) => i.blocking).map((i: Row) => i.message).join(" ") ?? r.data.error ?? "Couldn't save");
+    // A fresh "Untitled book" draft takes its title, type and description from the chosen story.
+    const pick = st.selectedIndex != null ? st.alternatives[st.selectedIndex] : null;
+    if (book.title === "Untitled book" && (pick || st.premise.trim())) {
+      const title = (pick?.title || st.premise.split(/\n| — /)[0]).trim().slice(0, 120) || "Untitled book";
+      await supabase.from("books").update({ title, book_type: exType, theme: (pick?.logline || st.premise).slice(0, 1000), ...(exGenre ? { genre: exGenre } : {}), ...(exAudience ? { audience: exAudience } : {}) }).eq("id", book.id);
+    }
     setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); onSaved();
     if (stage === "planning") onContinue?.({ chapterCount, targetWords: exLength });
   });
