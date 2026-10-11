@@ -104,11 +104,10 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const [targetWords, setTargetWords] = useState(carry?.targetWords ?? 50000);
   const [chapterCount, setChapterCount] = useState(carry?.chapterCount ?? 12);
   const navigate = useNavigate();
-  const [count, setCount] = useState(3);
-  const [options, setOptions] = useState<Row[]>([]);
-  const [chosen, setChosen] = useState<number | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number; paused: boolean } | null>(null);
   const pauseRef = useRef(false);
+  // Continuous flow: approving the whole-book summary goes straight on to chapter and section summaries.
+  const [autoNext, setAutoNext] = useState(false);
   const master = plans.masters.find((m) => m.status === "APPROVED") ?? plans.masters.find((m) => m.status === "DRAFT");
   const mine = plans.plans.filter((p) => master && p.master_plan_id === master.id);
   const has = (level: string, ch: number) => mine.some((p) => p.plan_level === level && p.chapter_index === ch);
@@ -118,13 +117,8 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
     && mine.every((p) => p.plan_status === "READY");
 
-  const generateOptions = () => run("options", async () => {
-    const r = await callPlanBook({ action: isFiction ? "alternatives" : "concepts", bookId: book.id, count, ...brief });
-    if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
-    setOptions(isFiction ? r.data.alternatives : r.data.concepts); setChosen(null);
-  });
   const createMaster = () => run("master", async () => {
-    const extra = chosen === null ? {} : isFiction ? { alternatives: options, selectedIndex: chosen } : { concept: options[chosen] };
+    const extra = {}; // the story chosen in Setup reaches the planner server-side
     const r = await callPlanBook({ action: "master", bookId: book.id, requestId: crypto.randomUUID(), ...brief, ...extra });
     if (!r.ok) throw new Error(r.data.error ?? "Master plan failed");
     toast.success("Master plan drafted — review and approve it"); await refresh();
@@ -150,37 +144,25 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     <div className="space-y-6 mt-4">
       <Card>
         <CardHeader>
-          <CardTitle>1. Concept</CardTitle>
-          <CardDescription>{isFiction ? "Optional: compare complete story alternatives (with their twists), or go straight to a master plan from your own premise." : "Optional: compare different approaches to this book, or go straight to a master plan from your own concept."}</CardDescription>
+          <CardTitle>1. Your story</CardTitle>
+          <CardDescription>Comes from step 1 (Setup). To compare other options, go back to Setup — that's the one place to choose a story.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {picked && <p className="text-sm rounded-md border border-primary/50 p-3">Using your chosen story from Setup: <b>{picked.title}</b>. Your setup (cast, twists, narrator) goes into the plan automatically.</p>}
+          {picked ? <p className="text-sm rounded-md border border-primary/50 p-3">Chosen story: <b>{picked.title}</b>. Your cast, twists, narrator and series choice go into the plan automatically.</p>
+            : <p className="text-sm text-muted-foreground">No story option chosen — the plan is built from your own idea below.</p>}
           <Textarea value={premise} onChange={(e) => setPremise(e.target.value)} rows={4} placeholder="Your premise or concept" />
           <div className="flex flex-wrap gap-3 items-center text-sm">
             <label className="flex items-center gap-2">Words <Input type="number" className="w-28" value={targetWords} onChange={(e) => setTargetWords(Number(e.target.value))} /></label>
             <label className="flex items-center gap-2">Chapters <Input type="number" className="w-20" value={chapterCount} onChange={(e) => setChapterCount(Number(e.target.value))} /></label>
-            <div className="flex items-center gap-1">{COUNTS.map((c) => <Button key={c} size="sm" variant={count === c ? "default" : "outline"} onClick={() => setCount(c)}>{c}</Button>)}</div>
-            <Button variant="outline" onClick={generateOptions} disabled={!!busy}>{busy === "options" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{isFiction ? "Generate story alternatives" : "Generate book concepts"}</Button>
+            {(book.controls as Row)?.series?.enabled && <Badge variant="secondary">Series of {(book.controls as Row).series.books} books</Badge>}
           </div>
-          {options.length > 0 && (
-            <div className="grid md:grid-cols-2 gap-3">
-              {options.map((o, i) => (
-                <button key={i} onClick={() => setChosen(chosen === i ? null : i)} className={`text-left p-4 rounded-lg border transition-colors ${chosen === i ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>
-                  <p className="font-medium">{o.title}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{isFiction ? o.logline : o.coreThesis}</p>
-                  <p className="text-xs text-muted-foreground mt-2 line-clamp-6 whitespace-pre-line">{o.summary}</p>
-                  {isFiction ? <p className="text-xs mt-2"><span className="text-primary">Twist:</span> {o.twist}</p> : <p className="text-xs mt-2"><span className="text-primary">Reader gains:</span> {o.readerOutcome}</p>}
-                </button>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>2. Master plan</CardTitle>
-          <CardDescription>{chosen !== null ? `Built from option ${chosen + 1}.` : "Built from your premise above."} Plans never count as story canon — only accepted text does.</CardDescription>
+          <CardDescription>Built from your story above. Plans never count as story canon — only accepted text does.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button onClick={createMaster} disabled={!!busy || !premise.trim()}>{busy === "master" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Draft master plan</Button>
@@ -189,12 +171,16 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             <p className="text-sm whitespace-pre-wrap">{master.master_synopsis}</p>
             {master.intended_ending && <p className="text-sm"><span className="text-primary">Ending:</span> {master.intended_ending}</p>}
             {(master.plan_skeleton?.reveals ?? []).length > 0 && <p className="text-xs text-muted-foreground">Twists: {(master.plan_skeleton.reveals as Row[]).map((r) => `${r.summary} (ch. ${r.revealChapter + 1})`).join(" · ")}</p>}
+            {(master.plan_skeleton?.genreData?.series_books ?? []).length > 0 && <div className="space-y-2 pt-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Books in the series</p>
+              {(master.plan_skeleton.genreData.series_books as Row[]).map((sb) => <details key={sb.bookNumber} className="rounded-md border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Book {sb.bookNumber}{sb.title ? `: ${sb.title}` : ""}</summary><p className="text-sm whitespace-pre-wrap mt-2">{sb.summary}</p></details>)}
+            </div>}
             {master.status === "DRAFT" && <p className="text-xs text-muted-foreground">Not right? Edit your premise above and draft again — the new version replaces this draft.</p>}
           </div>}
           {plans.masters.map((m) => (
             <div key={m.id} className="flex items-center gap-3 text-sm border border-border rounded-md px-3 py-2">
               <span>Version {m.version}</span><Badge variant={m.status === "APPROVED" ? "default" : "outline"}>{m.status}</Badge>
-              {m.status === "DRAFT" && <Button size="sm" className="ml-auto" disabled={!!busy} onClick={() => run("approve", async () => { const r = await callPlanBook({ action: "approve_master", planId: m.id }); if (!r.ok) throw new Error(r.data.error); toast.success("Master plan approved"); await refresh(); })}>Approve</Button>}
+              {m.status === "DRAFT" && <Button size="sm" className="ml-auto" disabled={!!busy} onClick={() => run("approve", async () => { const r = await callPlanBook({ action: "approve_master", planId: m.id }); if (!r.ok) throw new Error(r.data.error); toast.success("Approved — now writing chapter and section summaries"); await refresh(); setAutoNext(true); })}>Approve & plan chapters</Button>}
             </div>
           ))}
         </CardContent>
