@@ -118,10 +118,11 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
   const isIdle = phase === "idle";
   const isComplete = phase === "completed" || book.status === "completed";
   const isAwaitingApproval = phase === "awaiting-approval";
-  const hasOutline = !!book.outline && book.outline.chapters.length > 0;
+  const outlineChapters = Array.isArray(book.outline?.chapters) ? book.outline!.chapters : [];
+  const hasOutline = outlineChapters.length > 0;
   const canStart = !hasOutline && (book.status === "planning" || book.status === "ready_to_write" || isIdle);
   const canGenerateChapter = hasOutline && !isGenerating && !isComplete;
-  const nextIncompleteChapter = book.outline?.chapters.findIndex(ch => ch.status !== "completed") ?? -1;
+  const nextIncompleteChapter = outlineChapters.findIndex(ch => ch.status !== "completed");
 
   const handleSaveTitle = () => {
     if (editTitle.trim()) {
