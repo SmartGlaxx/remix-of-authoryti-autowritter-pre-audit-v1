@@ -429,14 +429,39 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       {/* 5. Writer & voice — the AI author who writes the book */}
       {cur === "writer" && <Card>
         <CardHeader><CardTitle>{isFiction ? "5" : "4"}. Writer & voice</CardTitle>
-          <CardDescription>Choose the writer who will write this book. Their style carries through every chapter. Fine-tune the 15 expression sliders any time in Writer &amp; book settings.</CardDescription></CardHeader>
-        <CardContent className="space-y-3">
-          <WriterPicker bookType={exType} value={book.controls?.writerId} onChange={(id) => run("writer", async () => {
+          <CardDescription>Choose the writer who will write this book, then tune their voice. Each slider can move up to {MAX_ADJUST} steps from the writer's own starting point — their style still carries through every chapter.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <WriterPicker bookType={exType} value={writerId || book.controls?.writerId} onChange={(id) => run("writer", async () => {
             const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), writerId: id } }).eq("id", book.id);
             if (error) throw error;
+            setWriterId(id);
+            const base = WRITER_BASELINES[id] ?? NEUTRAL;
+            setSliders(base);
+            await saveSliders(base);
             toast.success("Writer chosen"); onSaved();
           })} />
           {busy === "writer" && <p className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" />Saving your writer…</p>}
+          {(() => { const base = WRITER_BASELINES[writerId || book.controls?.writerId] ?? NEUTRAL; return (
+          <div className="space-y-4 border-t border-border pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold">Expression controls</h4>
+              <Button size="sm" variant="outline" disabled={busy === "sliders"} onClick={() => saveSliders(sliders)}>{busy === "sliders" && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Save voice</Button>
+            </div>
+            {(["tone", "dynamism"] as const).map((g) => (
+              <div key={g} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g === "tone" ? "Tone" : "Energy & structure"}</p>
+                <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {SLIDERS.filter((s) => s.group === g).map((s) => (
+                    <div key={s.key} className="space-y-1">
+                      <div className="flex justify-between gap-2 text-xs"><span title={s.hint}>{s.label}</span><span className="shrink-0 text-muted-foreground">{sliders[s.key]}/10{offsetLabel(sliders[s.key], base[s.key])}</span></div>
+                      <BoundedSlider label={s.label} range={[Math.max(1, base[s.key] - MAX_ADJUST), Math.min(10, base[s.key] + MAX_ADJUST)]} base={base[s.key]} value={sliders[s.key]} onChange={(v) => setSliders({ ...sliders, [s.key]: v })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">The small mark under each rail is the writer's own starting value. Press Save voice when you're happy — you can return to this step any time before writing begins.</p>
+          </div> ); })()}
         </CardContent>
       </Card>}
       </motion.div>
