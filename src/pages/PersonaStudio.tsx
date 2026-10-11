@@ -225,6 +225,11 @@ function RelationshipDialog({ subject, identities, onClose, onSaved }: { subject
 
 export default function PersonaStudio() {
   const navigate = useNavigate();
+  return <PersonaStudioView onBack={() => navigate("/dashboard")} />;
+}
+
+/** One Persona Studio for both the standalone page and the in-book-setup window. */
+export function PersonaStudioView({ onBack, embedded = false }: { onBack: () => void; embedded?: boolean }) {
   const { user } = useAuth();
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
   const [universes, setUniverses] = useState<Row[]>([]); const [penNames, setPenNames] = useState<Row[]>([]);
@@ -270,10 +275,10 @@ export default function PersonaStudio() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} aria-label="Back"><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label={embedded ? "Back to book setup" : "Back"}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="min-w-0 flex-1"><h1 className="text-xl font-serif font-semibold">Persona Studio</h1><p className="text-sm text-muted-foreground truncate">Characters, universes and pen names that live beyond one book</p></div>
         </div>
       </header>
