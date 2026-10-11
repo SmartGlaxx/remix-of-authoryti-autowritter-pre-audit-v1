@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X } from "lucide-react";
+import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +35,7 @@ async function callPersona(body: Row) {
   return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; isFiction: boolean; onSaved: () => void }) {
+export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
   const [hasProse, setHasProse] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -85,7 +85,8 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
   const save = (stage?: BookSetup["stage"]) => run("save", async () => {
     const r = await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: { ...st, stage: stage ?? st.stage } });
     if (!r.ok) throw new Error(r.data.message ?? r.data.issues?.filter((i: Row) => i.blocking).map((i: Row) => i.message).join(" ") ?? r.data.error ?? "Couldn't save");
-    setSt(r.data.setup); toast.success("Setup saved — you can come back to it any time"); onSaved();
+    setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); onSaved();
+    if (stage === "planning") onContinue?.({ chapterCount, targetWords: exLength });
   });
 
   const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
@@ -96,6 +97,20 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
     const list: Row[] = (exFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
     if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
     else { const fresh = list.find((a) => !st.alternatives.some((b) => b.title === a.title)) ?? list[0]; const next = [...st.alternatives]; next[replaceIndex] = { ...(fresh as any), id: `alt${replaceIndex + 1}` }; up({ alternatives: next }); }
+  });
+
+  // "Surprise me": one random starting idea for the chosen book type, before any summaries exist.
+  const surpriseMe = () => run("surprise", async () => {
+    const { data, error } = await supabase.functions.invoke("book-ideas", { body: {
+      mode: "light", count: 2,
+      brief: [`A surprising, original ${BOOK_TYPE_INFO[exType as BookType]?.label ?? exType} idea`, exGenre && `in ${exGenre}`, exAudience && `for ${exAudience}`, exTone && `with a ${exTone.toLowerCase()} tone`, `variation ${Math.floor(Math.random() * 1e6)}`].filter(Boolean).join(" "),
+      catalog: { [exType]: { audiences: exAudience ? [exAudience] : AUDIENCES, genres: exGenre ? [exGenre] : genresFor(exType) } },
+    } });
+    if (error) throw new Error(error.message || "Couldn't get an idea");
+    const idea = (data as Row)?.ideas?.[Math.floor(Math.random() * ((data as Row)?.ideas?.length || 1))];
+    if (!idea) throw new Error((data as Row)?.error ?? "No idea came back — try again");
+    up({ premise: `${idea.title}${idea.subtitle ? ` — ${idea.subtitle}` : ""}\n\n${idea.description}` });
+    toast.success("Here's an idea — edit it or press Surprise me again");
   });
 
   const proposeTwists = () => run("twists", async () => {
@@ -131,7 +146,8 @@ export default function BookSetupTab({ book, isFiction, onSaved }: { book: Row; 
         <CardHeader><CardTitle>1. {exFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
           <CardDescription>{exFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
         <CardContent className="space-y-3">
-          <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise" />
+          <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
+          {!locked && <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!!busy} onClick={surpriseMe}>{busy === "surprise" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}Surprise me</Button></div>}
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Must-keep details (every option will keep these — e.g. a setting, a character, a fact):</p>
             <div className="flex flex-wrap gap-2">{st.fixedRequirements.map((f, i) => <Badge key={i} variant="secondary" className="gap-1">{f}{!locked && <button aria-label="Remove" onClick={() => up({ fixedRequirements: st.fixedRequirements.filter((_, j) => j !== i) })}><X className="w-3 h-3" /></button>}</Badge>)}</div>

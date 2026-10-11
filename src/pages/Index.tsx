@@ -179,7 +179,7 @@ const Index = () => {
     try {
       const newBook = await addBook(input);
       setShowEngine(false);
-      navigate(`/dashboard/${newBook.id}`);
+      navigate(`/books/${newBook.id}/plan`);
     } catch (error) {
       console.error("Failed to create book:", error);
     }

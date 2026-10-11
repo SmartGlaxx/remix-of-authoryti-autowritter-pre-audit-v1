@@ -26,7 +26,7 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ACTIONS = ["alternatives", "concepts", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
+const ACTIONS = ["edit_plan", "alternatives", "concepts", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
 // Story alternatives, concepts and twists use the real planner model for authors. Test mode (and STORY_AI_ENGINE=mock) always uses the free deterministic engine.
 const storyLive = () => Deno.env.get("STORY_AI_ENGINE") !== "mock";
 // Deployment handshake: test harnesses must read this BEFORE any AI-capable request and abort on mismatch,
@@ -75,11 +75,38 @@ Deno.serve(async (req) => {
     try { adapterForBookType(book.book_type); } catch { return json({ error: "Unsupported book type" }, 400); }
 
     if (action === "status") {
+      // The owner (author) sees the full plan, including planner-only synopsis and ending.
       const [{ data: masters }, { data: plans }] = await Promise.all([
-        db.from("book_master_plans").select("id, version, status, approved_at, created_at").eq("book_id", bookId).order("version", { ascending: false }),
-        db.from("book_progressive_plans").select("id, master_plan_id, plan_level, chapter_index, subsection_index, plan_status, version").eq("book_id", bookId).neq("plan_status", "SUPERSEDED"),
+        db.from("book_master_plans").select("id, version, status, approved_at, created_at, premise, master_synopsis, intended_ending, plan_skeleton").eq("book_id", bookId).eq("user_id", userId).order("version", { ascending: false }),
+        db.from("book_progressive_plans").select("id, book_id, master_plan_id, plan_level, chapter_index, subsection_index, plan_status, version, content").eq("book_id", bookId).eq("user_id", userId).neq("plan_status", "SUPERSEDED"),
       ]);
       return json({ masters, plans });
+    }
+
+    // Author edits a not-yet-approved chapter or section summary. Saved as a new version
+    // (the old PLANNED version is superseded by the same RPC); approved plans stay frozen.
+    if (action === "edit_plan") {
+      if (!UUID.test(String(body.planId))) return json({ error: "Invalid planId" }, 400);
+      const { data: row } = await db.from("book_progressive_plans").select("*").eq("id", body.planId).eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+      if (!row) return json({ error: "Plan not found" }, 404);
+      if (row.plan_status !== "PLANNED") return json({ error: "Approved plans can't be edited — only plans waiting for approval." }, 409);
+      const f = (body.fields ?? {}) as Record<string, unknown>;
+      const content = JSON.parse(JSON.stringify(row.content ?? {}));
+      if (row.plan_level === "CHAPTER" && content.chapter) {
+        if (typeof f.objective === "string" && f.objective.trim()) content.chapter.objective = s(f.objective, 4000);
+        if (typeof f.stakes === "string") content.stakes = s(f.stakes, 4000);
+        if (typeof f.focus === "string") content.focus = s(f.focus, 4000);
+      } else if (row.plan_level === "SECTION" && content.section) {
+        if (typeof f.objective === "string" && f.objective.trim()) content.section.objective = s(f.objective, 4000);
+        content.detail = content.detail ?? {};
+        for (const k of ["entry", "focus", "outcome"]) if (typeof f[k] === "string") content.detail[k] = s(f[k], 4000);
+      } else return json({ error: "This plan type can't be edited here" }, 400);
+      const { data, error } = await db.rpc("save_progressive_plan_batch", {
+        p_book_id: bookId, p_user_id: userId, p_master_plan_id: row.master_plan_id, p_idem: planIdemKey(["edit", row.id, crypto.randomUUID()]),
+        p_items: [{ plan_level: row.plan_level, chapter_index: row.chapter_index, subsection_index: row.subsection_index, content, dependencies: row.dependencies ?? [] }],
+      });
+      if (error) return json({ error: error.message }, 400);
+      return json({ saved: data });
     }
 
     // ── Phase 4: Book Setup (server-validated; stored apart from prose) ──

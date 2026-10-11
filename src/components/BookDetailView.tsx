@@ -36,7 +36,7 @@ interface BookDetailViewProps {
 const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(() => new URLSearchParams(window.location.search).get("settings") === "1");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(book.title);
   const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
