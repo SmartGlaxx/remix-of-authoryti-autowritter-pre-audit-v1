@@ -41,6 +41,8 @@ export interface BookBrief {
   premise: string; guidance?: string | null; targetWords: number; chapterCount: number; series?: SeriesRef | null;
   /** Planned multi-book series (author choice). Each book gets its own 450–700 word summary. */
   seriesPlan?: { books: number } | null;
+  /** Inception plot-twist mode (fiction alternatives): true = twist-architected, false = clean arcs, undefined = unspecified. */
+  twistMode?: boolean;
 }
 
 // ── Elastic summary length by book type (a guideline for the model, a loose bound for checks) ──
@@ -101,9 +103,60 @@ export function buildAlternativesPrompt(b: BookBrief, count: AlternativeCount): 
     system: system(a, "You design complete, genuinely different versions of a story for an author to choose from."),
     user: `${briefText(b)}${seriesText(b)}\n\nWrite exactly ${count} complete story alternatives. Each summary is ${bandText(summaryBand(b.bookType, b.genre))} and tells the whole story from opening to final resolution, ` +
       "including its central twist or reveals and the ending. They must differ from beginning to end — different engines of conflict, different turns, different endings — " +
-      "not variations on one plot and not drawn from a fixed list of twist types.\n" +
+      "not variations on one plot and not drawn from a fixed list of twist types.\n" + twistModeText(b) +
       'JSON: {"alternatives":[{"title":"","logline":"","summary":"(whole story)","twist":"(the key reveal in one or two sentences)","ending":"(one or two sentences)"}]}',
   };
+}
+
+/** Plot-twist mode is chosen at inception: ON architects every option around one major twist from the first page. */
+export const TWIST_MODE_ON =
+  "PLOT TWIST MODE IS ON. Build every alternative around one major, story-reframing twist designed from the start — not added at the end. " +
+  "The premise, characters and early events must plant fair clues that point the reader the wrong way; the reveal must recolour everything before it, and the ending must pay it off. " +
+  "Each alternative's twist must be a different kind of reversal.\n";
+export const TWIST_MODE_OFF =
+  "Plot twist mode is off: build clean, honest arcs driven by conflict and character. Do not engineer a misdirection or a shock reversal; the 'twist' field names the story's key turning point.\n";
+function twistModeText(b: BookBrief): string {
+  if (b.twistMode === true) return TWIST_MODE_ON;
+  if (b.twistMode === false) return TWIST_MODE_OFF;
+  return "";
+}
+
+// ── Service 0: "Adjust with AI" — rewrite the author's seed idea in a chosen direction (no alternatives) ──
+export const PREMISE_ADJUSTMENTS = {
+  twists: "more plot twists and reversals: betrayals, false assumptions, hidden identities",
+  drama: "more drama and higher personal stakes",
+  romance: "more romance and emotional chemistry",
+  darker: "a darker, grittier, more morally ambiguous tone",
+  pacing: "faster pacing, tighter deadlines and more thrills",
+  mystery: "more mystery, secrets and hidden clues",
+  depth: "more thematic and philosophical depth",
+  humor: "more humour and wit",
+  clarity: "a clearer, sharper hook and central question",
+  practical: "more practical, actionable value for the reader",
+} as const;
+export type PremiseAdjustment = keyof typeof PREMISE_ADJUSTMENTS;
+
+export function buildAdjustPremisePrompt(b: BookBrief, adjustments: PremiseAdjustment[], custom?: string | null): Prompt {
+  const a = adapterForBookType(b.bookType);
+  const wants = [...adjustments.filter((k) => k in PREMISE_ADJUSTMENTS).map((k) => PREMISE_ADJUSTMENTS[k]), custom?.trim() || ""].filter(Boolean);
+  if (!wants.length) throw new Error("Choose at least one adjustment");
+  if (!b.premise.trim()) throw new Error("Write an idea first");
+  return {
+    system: system(a, "You revise an author's book idea in the direction they ask, keeping everything they wrote that still fits."),
+    user: `${briefText(b)}\n\nRevise the premise above to add: ${wants.join("; ")}.\n` +
+      "Keep the author's names, setting and core idea unless they conflict with the request. Write 80–250 words, a seed idea (not a full outline). " +
+      (a.isFiction ? "" : "Invent no facts, quotes or statistics. ") +
+      'JSON: {"premise":"(the revised idea)","changes":"(one sentence on what changed)"}',
+  };
+}
+
+export function parseAdjustedPremise(raw: string): ParseResult<{ premise: string; changes: string }> {
+  return parseWith(raw, (o, issues) => {
+    const premise = str(o?.premise), changes = str(o?.changes);
+    if (words(premise) < 20) issues.push("Revised premise is too short");
+    if (words(premise) > 400) issues.push("Revised premise is too long");
+    return { premise, changes };
+  });
 }
 
 function overlap(a: string, b: string): number {
