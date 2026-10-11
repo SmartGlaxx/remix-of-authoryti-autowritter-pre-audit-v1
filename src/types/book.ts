@@ -672,6 +672,8 @@ export const GENRE_PRESETS: Record<BookCategory, string[]> = {
   ],
 };
 
+export const TEXTBOOK_SUBJECTS = ["Mathematics", "English Language", "English Literature", "Integrated / General Science", "Biology", "Chemistry", "Physics", "Social Studies / Civic Education", "History", "Geography", "Economics", "Commerce & Financial Accounting", "Computer Science / ICT", "Government", "Agricultural Science", "French / Modern Languages"];
+
 // Per-book-type genres (overrides category presets when present)
 export const BOOK_TYPE_GENRES: Record<BookType, string[]> = {
   novel: ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Horror", "Literary"],
