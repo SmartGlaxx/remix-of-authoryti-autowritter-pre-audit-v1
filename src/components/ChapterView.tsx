@@ -21,7 +21,9 @@ import { SequentialReveal } from "@/components/SequentialReveal";
 import { GuidedWritingToolbar } from "@/components/GuidedWritingToolbar";
 import { CharacterGallery } from "@/components/CharacterGallery";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2, Circle, Loader2, FileText, ChevronDown, Play, Check, X, Users, User, Pencil } from "lucide-react";
+import { SceneBlueprintPanel, HeldDraftAlert } from "@/components/SceneBlueprintPanel";
+import { isProgressiveBook } from "@/lib/candidateReview";
+import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2, Circle, Loader2, FileText, ChevronDown, Play, Check, X, Users, User, Pencil, Target } from "lucide-react";
 
 interface ChapterViewProps {
   book: Book;
@@ -51,7 +53,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
   const [manualText, setManualText] = useState("");
   const manualTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
-  const [sidebarTab, setSidebarTab] = useState<"chapters" | "characters">("chapters");
+  const [sidebarTab, setSidebarTab] = useState<"chapters" | "characters" | "blueprint">("chapters");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [editingChapterIdx, setEditingChapterIdx] = useState<number | null>(null);
   const [editChapterTitle, setEditChapterTitle] = useState("");
@@ -76,6 +78,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [writingChapterIdx]);
   const hasCharacters = book.outline?.characters && book.outline.characters.length > 0;
+  const progressive = isProgressiveBook(book.controls);
   const isVisualBook = VISUAL_BOOK_TYPES.includes(book.bookType);
   const selectedTemplate = book.controls?.selectedTemplateId
     ? BOOK_TEMPLATES.find(t => t.id === book.controls.selectedTemplateId)
@@ -617,17 +620,21 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
       {/* Sidebar */}
       <Card className="w-64 shrink-0 flex flex-col min-h-0">
         <div className="p-4 border-b shrink-0">
-          {hasCharacters ? (
-            <Tabs value={sidebarTab} onValueChange={(v) => { setSidebarTab(v as "chapters" | "characters"); if (v === "chapters") setSelectedCharacterId(null); }}>
+          {hasCharacters || progressive ? (
+            <Tabs value={sidebarTab} onValueChange={(v) => { setSidebarTab(v as "chapters" | "characters" | "blueprint"); if (v === "chapters") setSelectedCharacterId(null); }}>
               <TabsList className="w-full">
                 <TabsTrigger value="chapters" className="flex-1 gap-1.5 text-xs">
                   <BookOpen className="w-3.5 h-3.5" />
                   Chapters
                 </TabsTrigger>
-                <TabsTrigger value="characters" className="flex-1 gap-1.5 text-xs">
+                {hasCharacters && <TabsTrigger value="characters" className="flex-1 gap-1.5 text-xs">
                   <Users className="w-3.5 h-3.5" />
                   Characters
-                </TabsTrigger>
+                </TabsTrigger>}
+                {progressive && <TabsTrigger value="blueprint" className="flex-1 gap-1 text-xs" title="Scene blueprint">
+                  <Target className="w-3.5 h-3.5" />
+                  Plan
+                </TabsTrigger>}
               </TabsList>
             </Tabs>
           ) : (
@@ -639,7 +646,9 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
-          {sidebarTab === "chapters" ? (
+          {sidebarTab === "blueprint" && progressive && currentChapter ? (
+            <SceneBlueprintPanel bookId={book.id} chapterIndex={selectedChapter} subsectionIndex={Math.max(0, currentChapter.subsections.findIndex((x) => x.status !== "completed") === -1 ? currentChapter.subsections.length - 1 : currentChapter.subsections.findIndex((x) => x.status !== "completed"))} />
+          ) : sidebarTab !== "characters" ? (
             <div className="p-3 space-y-1">
               {chapters.map((chapter, idx) => {
                 const StatusIcon = statusConfig[chapter.status].icon;
@@ -787,6 +796,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
                       </div>
                     </div>
                   )}
+                  {progressive && <HeldDraftAlert bookId={book.id} chapterIndex={selectedChapter} />}
                   {currentChapter.subsections.map((sub, subIdx) => renderSubsectionContent(sub, subIdx, selectedChapter))}
                 </motion.div>
               </AnimatePresence>

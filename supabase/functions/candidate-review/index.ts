@@ -66,7 +66,14 @@ Deno.serve(async (req) => {
         db.from("canon_reconciliation_logs").select("id, chapter_index, subsection_index, severity, discrepancy_type, description, prose_excerpt, canon_reference, decision, rationale, application_status, candidate_id, created_at").eq("book_id", bookId).not("dedup_key", "like", "selftest_%").order("created_at", { ascending: false }).limit(200),
         db.from("editorial_validation_findings").select("*").eq("book_id", bookId).eq("status", "OPEN").order("created_at", { ascending: false }).limit(200),
       ]);
-      return json({ candidates: candidates ?? [], logs: logs ?? [], findings: findings ?? [] });
+      const { data: tree } = await db.from("book_candidate_drafts").select("id, parent_candidate_id").eq("book_id", bookId).limit(1000);
+      const parentOf = new Map((tree ?? []).map((t) => [t.id, t.parent_candidate_id]));
+      const withLineage = (candidates ?? []).map((c) => {
+        const lineage = [c.id]; let p = c.parent_candidate_id;
+        for (let i = 0; p && i < 20; i++) { lineage.push(p); p = parentOf.get(p) ?? null; }
+        return { ...c, lineage };
+      });
+      return json({ candidates: withLineage, logs: logs ?? [], findings: findings ?? [] });
     }
 
     // Client polling after a progressive section streams: accepted, held, or still validating.
@@ -86,14 +93,36 @@ Deno.serve(async (req) => {
       return json({ state: "pending" });
     }
 
-    if (action === "accept") {
+    // Author edits are persisted as a new candidate version BEFORE any validation, so checks
+    // always run against the latest saved text (never an unsaved browser copy).
+    if (action === "save_edit") {
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
+      const edited = typeof body.editedText === "string" ? body.editedText.trim().slice(0, 60_000) : "";
+      if (!edited) return json({ error: "Empty text" }, 400);
       const { data: c } = await db.from("book_candidate_drafts").select("*").eq("id", body.candidateId).eq("book_id", bookId).eq("user_id", userId).maybeSingle();
       if (!c || !["BLOCKED_MATERIAL", "NEEDS_AUTHOR_REVIEW"].includes(c.validation_status)) return json({ error: "Candidate not open" }, 409);
-      const { data: linked } = await db.from("canon_reconciliation_logs").select("id, decision, canon_reference").eq("candidate_id", c.id);
+      if (edited === c.draft_text) return json({ status: "unchanged", candidate_id: c.id });
+      const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id, p_text: edited, p_hash: contentHash(edited), p_status: c.validation_status, p_findings: c.findings ?? [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });
+      return error ? json({ error: error.message }, 400) : json(data);
+    }
+
+    if (action === "accept") {
+      if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
+      if (typeof body.editedText === "string") return json({ error: "SAVE_EDIT_FIRST", message: "Save edits before running checks." }, 409);
+      const { data: c } = await db.from("book_candidate_drafts").select("*").eq("id", body.candidateId).eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+      if (!c || !["BLOCKED_MATERIAL", "NEEDS_AUTHOR_REVIEW"].includes(c.validation_status)) return json({ error: "Candidate not open" }, 409);
+      // Contradictions stay linked to the version they were raised on; include the whole edit lineage.
+      const lineage: string[] = [c.id];
+      let parent = c.parent_candidate_id as string | null;
+      for (let i = 0; parent && i < 20; i++) {
+        lineage.push(parent);
+        const { data: p } = await db.from("book_candidate_drafts").select("parent_candidate_id").eq("id", parent).maybeSingle();
+        parent = p?.parent_candidate_id ?? null;
+      }
+      const { data: linked } = await db.from("canon_reconciliation_logs").select("id, decision, canon_reference").in("candidate_id", lineage);
       if ((linked ?? []).some((l) => l.decision === "PENDING")) return json({ error: "RECONCILIATION_REQUIRED", message: "Decide every contradiction before accepting." }, 409);
-      const edited = typeof body.editedText === "string" && body.editedText.trim() ? body.editedText.trim().slice(0, 60_000) : null;
-      const text = edited ?? c.draft_text;
+      const edited = null;
+      const text = c.draft_text;
       const { data: bk } = await db.from("books").select("book_type, controls, outline").eq("id", bookId).maybeSingle();
       const ps = await loadProgressiveState(db, bookId, userId, bk!.book_type, bk!.outline, c.chapter_index, c.subsection_index);
       if (!ps.plan.usable) return json({ error: "PLAN_REQUIRED" }, 409);

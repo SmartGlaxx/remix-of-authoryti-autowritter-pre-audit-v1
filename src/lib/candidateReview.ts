@@ -47,3 +47,18 @@ export async function priorSectionOutcome(bookId: string, chapter: number, subse
 }
 
 export const isProgressiveBook = (controls: unknown) => (controls as Record<string, unknown> | null)?.planning_pipeline === "progressive";
+
+/**
+ * Accept a held draft. Unsaved edits are persisted first as a new candidate version, then the
+ * full server pre-acceptance + fenced pipeline runs on that latest saved version only.
+ */
+export async function saveThenAccept(bookId: string, candidateId: string, draftText: string, editedText?: string) {
+  let id = candidateId;
+  if (editedText !== undefined && editedText.trim() && editedText.trim() !== draftText.trim()) {
+    const s = await callReview<{ candidate_id?: string; error?: string }>({ action: "save_edit", bookId, candidateId, editedText });
+    if (!s.ok || !s.data.candidate_id) throw new Error(s.data.error ?? "Could not save your edit");
+    id = s.data.candidate_id;
+  }
+  const r = await callReview<any>({ action: "accept", bookId, candidateId: id });
+  return { ...r, candidateId: id };
+}

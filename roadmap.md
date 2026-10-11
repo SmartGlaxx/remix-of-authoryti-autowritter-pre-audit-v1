@@ -122,3 +122,9 @@
 - [x] Old story-options box removed from Plan tab (Setup is the one place to choose a story)
 - [x] "Open in Planning Studio" in each book's menu; "Change setup & rewrite the book"
 - [x] Approving the whole-book summary goes straight on to chapter/section summaries
+
+# Phase 5
+- [x] Stage A: Scene plan panel, inline held-draft review (save edit before checks, full fenced acceptance), plan cards + Start writing handoff
+- [ ] Stage A: click-through check of reopening a book's setup in the preview (needs a signed-in session)
+- [ ] Stage B: end-to-end connection checks
+- [ ] Stage C: full regression, live checks, deployment check
