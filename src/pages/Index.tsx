@@ -627,16 +627,6 @@ const Index = () => {
       <AnimatePresence>
         {showEngine && <CreateBookEngine key={engineInitial ? "prefilled" : "blank"} initial={engineInitial} onClose={() => { setShowEngine(false); setEngineInitial(undefined); }} onCreate={handleCreateBook} />}
       </AnimatePresence>
-      <Dialog open={showChooser} onOpenChange={setShowChooser}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-serif">Start a new book</DialogTitle><DialogDescription>Set it up yourself, or let AI suggest complete book ideas.</DialogDescription></DialogHeader>
-          <div className="grid gap-3">
-            <button type="button" onClick={() => { setShowChooser(false); setEngineInitial(undefined); setShowEngine(true); }} className="rounded-xl border border-border p-4 text-left hover:border-primary/50"><div className="font-medium">Start from scratch</div><div className="text-xs text-muted-foreground">Choose every setting in the Creation Engine.</div></button>
-            <button type="button" onClick={() => { setShowChooser(false); setShowIdeas(true); }} className="rounded-xl border border-primary/40 bg-primary/5 p-4 text-left hover:border-primary"><div className="font-medium">Get book ideas</div><div className="text-xs text-muted-foreground">Titles, descriptions, audience, writer and voice — ready to accept or adjust.</div></button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {showIdeas && <BookIdeasGenerator onBack={() => setShowIdeas(false)} onAccept={(input) => { setShowIdeas(false); setEngineInitial(input); setShowEngine(true); }} />}
     </div>
   );
 };
