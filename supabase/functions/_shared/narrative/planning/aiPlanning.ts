@@ -39,7 +39,23 @@ function system(a: GenreAdapter, role: string): string {
 export interface BookBrief {
   title: string; bookType: string; genre?: string | null; audience?: string | null;
   premise: string; guidance?: string | null; targetWords: number; chapterCount: number; series?: SeriesRef | null;
+  /** Planned multi-book series (author choice). Each book gets its own 450–700 word summary. */
+  seriesPlan?: { books: number } | null;
 }
+
+// ── Elastic summary length by book type (a guideline for the model, a loose bound for checks) ──
+export interface SummaryBand { min: number; max: number }
+const EPIC_GENRE = /fantasy|thriller|mystery|crime|sci-?fi|science fiction|epic|suspense/i;
+export function summaryBand(bookType: string, genre?: string | null): SummaryBand {
+  if (bookType === "comic") return { min: 150, max: 350 };
+  if (["children", "short-story", "poetry"].includes(bookType)) return { min: 200, max: 400 };
+  if (["novel", "fiction-serial", "drama", "biography", "memoir"].includes(bookType)) return EPIC_GENRE.test(genre ?? "") && bookType !== "biography" && bookType !== "memoir" ? { min: 550, max: 750 } : { min: 450, max: 700 };
+  return { min: 350, max: 550 };
+}
+/** Series books: each book summary is 450–700 words regardless of type. */
+export const SERIES_BOOK_BAND: SummaryBand = { min: 450, max: 700 };
+const bandText = (bd: SummaryBand) => `${bd.min}–${bd.max} words (use what the story genuinely needs within that range — not a fixed count)`;
+const seriesText = (b: BookBrief) => b.seriesPlan && b.seriesPlan.books > 1 ? `\nThis is a planned series of ${b.seriesPlan.books} books. Each option's summary covers the arc of the whole series and makes clear how each book ends and hooks into the next.` : "";
 const briefText = (b: BookBrief) => [
   `Title: ${b.title}`, `Book type: ${b.bookType}`, b.genre ? `Genre: ${b.genre}` : "", b.audience ? `Audience: ${b.audience}` : "",
   `Target length: about ${b.targetWords} words across about ${b.chapterCount} chapters (estimates).`,
@@ -76,17 +92,17 @@ export function buildAlternativesPrompt(b: BookBrief, count: AlternativeCount): 
   const a = adapterForBookType(b.bookType);
   if (!a.isFiction) return {
     system: system(a, "You brainstorm complete, genuinely different approaches to a book for an author to choose from."),
-    user: `${briefText(b)}\n\nWrite exactly ${count} complete book alternatives. Each is about 500 words and describes the whole book from opening to final chapter: ` +
+    user: `${briefText(b)}${seriesText(b)}\n\nWrite exactly ${count} complete book alternatives. Each summary is ${bandText(summaryBand(b.bookType, b.genre))} and describes the whole book from opening to final chapter: ` +
       "its angle, structure, key ideas and what the reader walks away with. They must differ throughout — different angles, structures and outcomes — not variations on one outline. " +
       "Invent no facts, quotes or statistics.\n" +
-      'JSON: {"alternatives":[{"title":"","logline":"(one-sentence pitch)","summary":"(~500 words)","twist":"(the key insight or fresh angle in one or two sentences)","ending":"(what the reader gains, one or two sentences)"}]}',
+      'JSON: {"alternatives":[{"title":"","logline":"(one-sentence pitch)","summary":"(whole book)","twist":"(the key insight or fresh angle in one or two sentences)","ending":"(what the reader gains, one or two sentences)"}]}',
   };
   return {
     system: system(a, "You design complete, genuinely different versions of a story for an author to choose from."),
-    user: `${briefText(b)}\n\nWrite exactly ${count} complete story alternatives. Each is about 500 words and tells the whole story from opening to final resolution, ` +
+    user: `${briefText(b)}${seriesText(b)}\n\nWrite exactly ${count} complete story alternatives. Each summary is ${bandText(summaryBand(b.bookType, b.genre))} and tells the whole story from opening to final resolution, ` +
       "including its central twist or reveals and the ending. They must differ from beginning to end — different engines of conflict, different turns, different endings — " +
       "not variations on one plot and not drawn from a fixed list of twist types.\n" +
-      'JSON: {"alternatives":[{"title":"","logline":"","summary":"(~500 words)","twist":"(the key reveal in one or two sentences)","ending":"(one or two sentences)"}]}',
+      'JSON: {"alternatives":[{"title":"","logline":"","summary":"(whole story)","twist":"(the key reveal in one or two sentences)","ending":"(one or two sentences)"}]}',
   };
 }
 
@@ -97,7 +113,9 @@ function overlap(a: string, b: string): number {
   return n / Math.min(A.size, B.size);
 }
 
-export function parseAlternatives(raw: string, count: AlternativeCount): ParseResult<StoryAlternative[]> {
+export function parseAlternatives(raw: string, count: AlternativeCount, band: SummaryBand = { min: 500, max: 600 }): ParseResult<StoryAlternative[]> {
+  // Loose bounds: the band guides the model; only clearly too short / too long output is repaired.
+  const lo = Math.round(band.min * 0.6), hi = Math.round(band.max * 1.35);
   return parseWith(raw, (o, issues) => {
     const list = Array.isArray(o?.alternatives) ? o.alternatives : [];
     if (list.length !== count) issues.push(`Expected ${count} alternatives, got ${list.length}`);
@@ -107,7 +125,7 @@ export function parseAlternatives(raw: string, count: AlternativeCount): ParseRe
     out.forEach((x, i) => {
       if (!x.title || !x.logline || !x.twist || !x.ending) issues.push(`Alternative ${i + 1} is missing fields`);
       const w = words(x.summary);
-      if (w < 300 || w > 800) issues.push(`Alternative ${i + 1} summary is ${w} words; aim for about 500`);
+      if (w < lo || w > hi) issues.push(`Alternative ${i + 1} summary is ${w} words; aim for ${band.min}–${band.max}`);
     });
     const titles = new Set(out.map((x) => x.title.toLowerCase()));
     if (titles.size !== out.length) issues.push("Alternative titles must be distinct");
@@ -180,8 +198,10 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       `\nPlan the whole book. Chapter objective kinds must come from: ${a.chapterObjectives.join(", ")}. ` +
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +
-      `JSON: {"premise":"","synopsis":"(whole book, 300-600 words)","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
+      (b.seriesPlan && b.seriesPlan.books > 1 ? `This book belongs to a planned series of ${b.seriesPlan.books} books. Also give "seriesBooks": one entry per book in the series, each with its own inciting incident, climax and hook into the next; the synopsis is the whole series arc.\n` : "") +
+      `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
       (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
+      (b.seriesPlan && b.seriesPlan.books > 1 ? `,"seriesBooks":[{"bookNumber":1,"title":"","summary":"(${bandText(SERIES_BOOK_BAND)})"}]` : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
   };
 }
@@ -233,6 +253,12 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
       setupDirectives: (Array.isArray(r?.setupDirectives) ? r.setupDirectives : []).map((d: any) => ({ chapterIndex: Number(d?.chapterIndex), writerInstruction: str(d?.writerInstruction), viewpointKnows: str(d?.viewpointKnows) || undefined, readerSees: str(d?.readerSees) || undefined })).filter((d: any) => Number.isInteger(d.chapterIndex) && d.writerInstruction),
     })) : [];
     if (a.isFiction) genreData.reveals = reveals;
+    if (b.seriesPlan && b.seriesPlan.books > 1) {
+      const sb = (Array.isArray(o?.seriesBooks) ? o.seriesBooks : []).map((x: any, i: number) => ({ bookNumber: Number(x?.bookNumber) || i + 1, title: str(x?.title), summary: str(x?.summary) })).filter((x: any) => x.summary);
+      if (sb.length !== b.seriesPlan.books) issues.push(`Expected ${b.seriesPlan.books} series book summaries, got ${sb.length}`);
+      sb.forEach((x: any) => { const w = words(x.summary); if (w < SERIES_BOOK_BAND.min * 0.6 || w > SERIES_BOOK_BAND.max * 1.35) issues.push(`Series book ${x.bookNumber} summary is ${w} words; aim for 450–700`); });
+      genreData.series_books = sb;
+    }
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");
     const premise = str(o?.premise), synopsis = str(o?.synopsis), ending = str(o?.ending);
     if (!premise || !synopsis || !ending) issues.push("premise, synopsis and ending are required");

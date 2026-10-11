@@ -237,6 +237,8 @@ Deno.serve(async (req) => {
       chapterCount: Math.min(80, Math.max(1, Number(body.chapterCount) || 12)),
       series: null,
     };
+    const ser = (book as any).controls?.series;
+    if (ser?.enabled && Number(ser.books) > 1) brief.seriesPlan = { books: Math.min(12, Math.max(2, Math.round(Number(ser.books)))) };
     // Author-configured banned words (book controls, or the list sent with an idea request) apply to every planning service.
     const bannedSrc = Array.isArray(body.bannedWords) ? body.bannedWords : Array.isArray((book as any).controls?.bannedWords) ? (book as any).controls.bannedWords : [];
     const banned = [...new Set(bannedSrc.map((w: unknown) => s(w, 60).toLowerCase()).filter(Boolean))].slice(0, 100);
@@ -251,7 +253,7 @@ Deno.serve(async (req) => {
         const fixed = normalizeSetup(book.story_setup).fixedRequirements;
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
         const pr = buildAlternativesPrompt(brief, count);
-        const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count));
+        const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count, summaryBand(ovType, brief.genre)));
         return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
