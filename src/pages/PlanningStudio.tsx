@@ -15,9 +15,36 @@ import { callPlanBook, callReview } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
 import IdentityReviewPanel from "@/components/IdentityReviewPanel";
+import { WriterPicker } from "@/components/WriterPicker";
+import { ModelConfigCard } from "@/components/ModelConfigCard";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 
 type Row = Record<string, any>;
+
+// Writer & voice step inside the continuous flow — same picker and locked profiles as Book Settings.
+function WriterStep({ book, onBack, onNext, onSaved }: { book: Row; onBack: () => void; onNext: () => void; onSaved: () => void }) {
+  const [writerId, setWriterId] = useState<string | undefined>(book.controls?.writerId);
+  const save = async (id: string) => {
+    const prev = writerId; setWriterId(id);
+    const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), writerId: id } }).eq("id", book.id);
+    if (error) { setWriterId(prev); toast.error("Couldn't change the writer."); return; }
+    toast.success("Writer chosen"); onSaved();
+  };
+  return (
+    <div className="space-y-6 mt-4">
+      <Card><CardHeader><CardTitle>Virtual writer</CardTitle><CardDescription>The author whose voice shapes every section. Fine-tune the 15 style controls any time in Writer & book settings.</CardDescription></CardHeader>
+        <CardContent><WriterPicker bookType={book.book_type} value={writerId} onChange={save} /></CardContent></Card>
+      <ModelConfigCard bookId={book.id} writerId={writerId ?? bestWriterFor(book.book_type).id} />
+      <div className="flex items-center gap-2 sticky bottom-0 bg-background py-3 border-t border-border z-10">
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" />Back</Button>
+        <Button className="ml-auto" onClick={onNext}>Next: Chapter & section summaries<ArrowRight className="w-4 h-4 ml-1" /></Button>
+      </div>
+    </div>
+  );
+}
 const COUNTS = [3, 5, 7, 10];
 
 export default function PlanningStudio() {
@@ -27,6 +54,9 @@ export default function PlanningStudio() {
   const [review, setReview] = useState<{ candidates: Row[]; logs: Row[]; findings: Row[] }>({ candidates: [], logs: [], findings: [] });
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState("setup");
+  const [dir, setDir] = useState(1);
+  const ORDER = ["setup", "writer", "plan", "review", "memory"];
+  const goTab = (t: string) => { setDir(ORDER.indexOf(t) >= ORDER.indexOf(tab) ? 1 : -1); setTab(t); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const [carry, setCarry] = useState<{ chapterCount: number; targetWords: number } | null>(null);
   const navigate = useNavigate();
 
@@ -70,26 +100,22 @@ export default function PlanningStudio() {
 
       <main className="max-w-5xl mx-auto px-4 md:px-8 py-6">
         <ol className="flex flex-wrap gap-2 text-xs mb-4">
-          {[["Idea & story", "setup"], ["Whole-book summary", "plan"], ["Chapter summaries", "plan"], ["Section summaries", "plan"], ["Approve", "plan"], ["Write", "plan"]].map(([s, t], i) => (
-            <li key={s}><button onClick={() => setTab(t)} className={`px-3 py-1 rounded-full border ${tab === t ? "border-primary text-foreground" : "border-border text-muted-foreground"}`}>{i + 1}. {s}</button></li>
+          {[["Idea, story & cast", "setup"], ["Writer & voice", "writer"], ["Chapter & section summaries", "plan"], ["Review", "review"], ["Story memory", "memory"]].map(([s, t], i) => (
+            <li key={s}><button onClick={() => goTab(t)} className={`px-3 py-1 rounded-full border transition-colors ${tab === t ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"}`}>{i + 1}. {s}{t === "review" && openCount > 0 ? ` (${openCount})` : ""}</button></li>
           ))}
         </ol>
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/${bookId}?settings=1`)}><Settings2 className="w-4 h-4 mr-1" />Writer & book settings</Button>
-          <Button size="sm" variant="outline" onClick={() => navigate("/personas")}><Users className="w-4 h-4 mr-1" />Personas</Button>
-        </div>
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="setup">Setup</TabsTrigger>
-            <TabsTrigger value="plan">Plan</TabsTrigger>
-            <TabsTrigger value="review">Review {openCount > 0 && <Badge variant="destructive" className="ml-2">{openCount}</Badge>}</TabsTrigger>
-            <TabsTrigger value="memory">Story memory</TabsTrigger>
-          </TabsList>
-          <TabsContent value="setup"><BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} onContinue={(o) => { setCarry(o); setTab("plan"); window.scrollTo(0, 0); }} /></TabsContent>
-          <TabsContent value="plan"><PlanTab key={carry ? `${carry.chapterCount}-${carry.targetWords}` : "p"} book={book} carry={carry} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} /></TabsContent>
-          <TabsContent value="review"><div className="space-y-6"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /><IdentityReviewPanel bookId={bookId} /></div></TabsContent>
-          <TabsContent value="memory"><MemoryTab bookId={bookId} busy={busy} run={run} /></TabsContent>
-        </Tabs>
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div key={tab} custom={dir} initial={{ opacity: 0, x: dir * 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -60 }} transition={{ duration: 0.3, ease: "easeOut" }}>
+            {tab === "setup" && <BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} onContinue={(o) => { setCarry(o); goTab("writer"); }} />}
+            {tab === "writer" && <WriterStep book={book} onBack={() => goTab("setup")} onNext={() => goTab("plan")} onSaved={refresh} />}
+            {tab === "plan" && <div className="space-y-2">
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => goTab("writer")}><ArrowLeft className="w-4 h-4 mr-1" />Back to writer & voice</Button>
+              <PlanTab key={carry ? `${carry.chapterCount}-${carry.targetWords}` : "p"} book={book} carry={carry} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} />
+            </div>}
+            {tab === "review" && <div className="space-y-6"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /><IdentityReviewPanel bookId={bookId} /></div>}
+            {tab === "memory" && <MemoryTab bookId={bookId} busy={busy} run={run} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
