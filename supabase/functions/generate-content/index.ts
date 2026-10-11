@@ -425,6 +425,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  // Fail-closed: this service has no free stand-in, so test mode must never reach a paid model.
+  if (req.headers.get("x-ai-test-mode") === "1") {
+    return new Response(JSON.stringify({ error: "test_mode_blocked" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 
   try {
     // WAF check
