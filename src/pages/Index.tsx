@@ -194,7 +194,7 @@ const Index = () => {
     setStarting(true);
     try {
       const newBook = await addBook({
-        title: "Untitled book", bookType: "novel", theme: "", audience: "general-readers", pov: "third-limited" as any,
+        title: "Untitled book", bookType: "novel", theme: "", audience: "general-readers", pov: "third-person-limited",
         toneProfile: { primary: "conversational", intensity: 5, formality: 5, emotionalIntensity: 5, humorLevel: 3, authorityLevel: 5 } as any,
         controls: { ...getDefaultControls("novel"), writerId: bestWriterFor("novel").id } as any,
       });
