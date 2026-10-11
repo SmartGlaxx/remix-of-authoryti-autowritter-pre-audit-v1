@@ -3,7 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 
 // Editing sends the chosen cover image back, so allow larger bodies.
 const MAX_PAYLOAD_BYTES = 15_000_000;
-const IMAGE_MODEL = "google/gemini-3-pro-image";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,26 +24,8 @@ async function getAuthUser(req: Request) {
   return { id: data.claims.sub as string };
 }
 
-class GatewayError extends Error { constructor(msg: string, public status: number) { super(msg); } }
-
-async function callImageModel(apiKey: string, content: unknown): Promise<string> {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: IMAGE_MODEL, messages: [{ role: "user", content }], modalities: ["image", "text"] }),
-  });
-  if (!response.ok) {
-    const t = await response.text();
-    console.error("image gateway error", response.status, t);
-    if (response.status === 429) throw new GatewayError("Too many requests right now. Please wait a moment and try again.", 429);
-    if (response.status === 402) throw new GatewayError("AI credits have run out. Please add credits to continue.", 402);
-    throw new GatewayError(`Image service error (${response.status})`, response.status >= 500 ? 502 : response.status);
-  }
-  const data = await response.json();
-  const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (!url) throw new GatewayError("The AI did not return an image. Try adjusting your description.", 422);
-  return url;
-}
+import { generateOpenAIImage, ImageError } from "../_shared/ai/openaiImage.ts";
+const GatewayError = ImageError;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -55,8 +36,6 @@ serve(async (req) => {
     const user = await getAuthUser(req);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
     const body = await req.json();
     const mode = body.mode === "edit" ? "edit" : "generate";
@@ -74,10 +53,7 @@ serve(async (req) => {
       const prompt = `Edit this book cover. Apply ONLY this change: ${instruction}
 
 Keep everything else exactly the same: same composition, same colors, same lighting, same typography, same text wording and placement, same aspect ratio. Do not add or remove anything that was not asked for.`;
-      const url = await callImageModel(apiKey, [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: image } },
-      ]);
+      const url = await generateOpenAIImage({ admin, userId: user.id, prompt, size: "1024x1536", references: [image] });
       return json({ cover: url });
     }
 
@@ -112,7 +88,7 @@ ${toggles.length ? `Extra style: ${toggles.join("; ")}\n` : ""}
 Typography: render the title in a ${font} typeface, colored ${textColor}, positioned at the ${textPosition} of the cover. Text must be crisp, legible, correctly spelled, and integrated professionally with the artwork. Include no other words.
 Format: portrait, 2:3 book cover proportions, full bleed.
 This is option ${i + 1} of ${numCovers}: make it a clearly distinct interpretation from the others.`;
-      return callImageModel(apiKey, prompt);
+      return generateOpenAIImage({ admin, userId: user.id, prompt, size: "1024x1536" });
     }));
 
     const covers = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);

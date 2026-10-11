@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { generateOpenAIImage, ImageError } from "../_shared/ai/openaiImage.ts";
+
+const hasRefs = (refs: { portraitUrl?: string }[], use: unknown) => !!use && refs.some((c) => c.portraitUrl);
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 50_000;
@@ -95,8 +98,6 @@ serve(async (req) => {
     if (validationError) return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { content, bookType, theme, imageOpportunity, style, characters, visualStyleGuide, useCharacterReferences } = body;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     await auditLog(auth.user.id, "generate_image", "book", undefined, { bookType });
 
@@ -122,49 +123,18 @@ serve(async (req) => {
 
     console.log("Generating image with prompt:", imagePrompt.substring(0, 200) + "...");
 
-    const hasPortraits = characterRefs.some((c: CharacterReference) => c.portraitUrl);
-    let response;
-    
-    if (hasPortraits && useCharacterReferences && isChildrensBook) {
-      const portraitsToUse = characterRefs.filter((c: CharacterReference) => c.portraitUrl).slice(0, 2);
-      if (portraitsToUse.length > 0) {
-        const messageContent: any[] = [
-          { type: "text", text: `Using these character reference portraits, create a new scene illustration:\n\nScene: ${promptContent}\nStyle: ${styleGuide}\n\nCRITICAL: Characters must look EXACTLY like references.\n- No text\n- ${isChildrensBook ? "Child-friendly" : "Professional"}\n- 16:9` }
-        ];
-        for (const char of portraitsToUse) {
-          messageContent.push({ type: "image_url", image_url: { url: char.portraitUrl } });
-        }
-        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "google/gemini-3-pro-image-preview", messages: [{ role: "user", content: messageContent }], modalities: ["image", "text"] }),
-        });
-      } else {
-        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "google/gemini-3-pro-image-preview", messages: [{ role: "user", content: imagePrompt }], modalities: ["image", "text"] }),
-        });
-      }
-    } else {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-3-pro-image-preview", messages: [{ role: "user", content: imagePrompt }], modalities: ["image", "text"] }),
-      });
+    const portraits = (hasRefs(characterRefs, useCharacterReferences) ? characterRefs.filter((c: CharacterReference) => c.portraitUrl).slice(0, 2).map((c: CharacterReference) => c.portraitUrl!) : []);
+    const finalPrompt = portraits.length
+      ? `Using the attached character reference portraits, create a new scene illustration.\n\nScene: ${promptContent}\nStyle: ${styleGuide}\n\nCRITICAL: Characters must look EXACTLY like the references.\n- No text\n- ${isChildrensBook ? "Child-friendly" : "Professional"}\n- Landscape composition`
+      : imagePrompt;
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    let imageUrl: string;
+    try {
+      imageUrl = await generateOpenAIImage({ admin, userId: auth.user.id, prompt: finalPrompt, size: "1536x1024", references: portraits });
+    } catch (e) {
+      if (e instanceof ImageError) return new Response(JSON.stringify({ error: e.message }), { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
     }
-
-    if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!imageUrl) { console.error("No image in response:", JSON.stringify(data)); throw new Error("No image generated"); }
 
     return new Response(JSON.stringify({ imageUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
