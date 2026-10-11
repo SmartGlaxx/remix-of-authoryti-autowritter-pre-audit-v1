@@ -11,6 +11,7 @@ import type { ChapterPlan, MasterPlanSkeleton } from "../_shared/narrative/plann
 import {
   STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, assertConceptsEligible, buildConceptsPrompt, parseConcepts, conceptGuidance, type NonfictionConcept, buildAlternativesPrompt, buildBeatsPrompt, buildChapterPrompt, buildMasterPrompt,
   buildSectionPrompt, parseAlternatives, summaryBand, parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, runChapterBatch, runWithRepair,
+  buildAdjustPremisePrompt, parseAdjustedPremise, PREMISE_ADJUSTMENTS, type PremiseAdjustment,
   type AlternativeCount, type BookBrief, type MasterContext, type ModelCall, type Prompt, type StoryAlternative,
 } from "../_shared/narrative/planning/aiPlanning.ts";
 import {
@@ -219,7 +220,7 @@ Deno.serve(async (req) => {
     const storyCall = (mockOut: string): ModelCall => storyLive() && !testMode ? call : async (p) => { prompts.push(p); if (dryRun) throw new DryRunStop(); return mockOut; };
     // Optional idea-explorer overrides (alternatives/concepts only): any known book type + sub-category and extra preferences.
     let ovType = book.book_type;
-    if ((action === "alternatives" || action === "concepts") && typeof body.bookType === "string") {
+    if ((action === "alternatives" || action === "concepts" || action === "adjust_premise") && typeof body.bookType === "string") {
       try { adapterForBookType(body.bookType); ovType = body.bookType; } catch { return json({ error: "Unknown book type" }, 400); }
     }
     const ex = (body.explore && typeof body.explore === "object") ? body.explore as Record<string, unknown> : {};
@@ -247,11 +248,23 @@ Deno.serve(async (req) => {
     if (cur && ovType === "textbook") brief.guidance = [brief.guidance, `Textbook following the ${s(cur.country, 120)} curriculum at ${s(cur.level, 120)} level. Chapters are curriculum units; sections are topic lessons with learning objectives, explanations, worked examples, practice questions and a summary.`].filter(Boolean).join("\n");
 
     try {
+      if (action === "adjust_premise") {
+        const keys = (Array.isArray(body.adjustments) ? body.adjustments : []).map((k: unknown) => String(k)).filter((k: string) => k in PREMISE_ADJUSTMENTS).slice(0, 4) as PremiseAdjustment[];
+        const custom = s(body.custom, 300) || null;
+        if (!s(body.premise, 6000)) return json({ error: "Write an idea first" }, 400);
+        let pr: Prompt;
+        try { pr = buildAdjustPremisePrompt(brief, keys, custom); } catch (e) { return json({ error: (e as Error).message }, 400); }
+        const mock = JSON.stringify({ premise: `${brief.premise}\n\nRevised for: ${[...keys.map((k) => PREMISE_ADJUSTMENTS[k]), custom].filter(Boolean).join("; ")}. The story now leans into these qualities from its opening through its ending, keeping the original characters and setting.`, changes: "Test version: no AI was used." });
+        const r = await runWithRepair(storyCall(mock), pr, parseAdjustedPremise);
+        return r.ok ? json({ ...r.value, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues }, 422);
+      }
+
       if (action === "alternatives") {
         const count = Number(body.count) as AlternativeCount;
         try { assertAlternativesEligible(ovType, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const fixed = normalizeSetup(book.story_setup).fixedRequirements;
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
+        if (typeof body.twistMode === "boolean" && adapterForBookType(ovType).isFiction) brief.twistMode = body.twistMode;
         const pr = buildAlternativesPrompt(brief, count);
         const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count, summaryBand(ovType, brief.genre)));
         return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
