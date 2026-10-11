@@ -229,7 +229,8 @@ export default function PersonaStudio() {
 }
 
 /** One Persona Studio for both the standalone page and the in-book-setup window. */
-export function PersonaStudioView({ onBack, embedded = false }: { onBack: () => void; embedded?: boolean }) {
+export interface BookLink { castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void }
+export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBack: () => void; embedded?: boolean; bookLink?: BookLink }) {
   const { user } = useAuth();
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
   const [universes, setUniverses] = useState<Row[]>([]); const [penNames, setPenNames] = useState<Row[]>([]);
@@ -317,7 +318,15 @@ export function PersonaStudioView({ onBack, embedded = false }: { onBack: () => 
                         const other = idById[r.subject_identity_id === p.identity_id ? r.target_identity_id : r.subject_identity_id];
                         return <div key={r.id} className="text-xs text-muted-foreground">{labelOf(r.relationship_type)} · {other?.display_name}</div>;
                       })}</div>
-                      <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Add relationship</Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Add relationship</Button>
+                        {bookLink && (() => {
+                          const inBook = bookLink.castIdentityIds.includes(p.identity_id);
+                          const wrongUniverse = (bookLink.universeId ?? null) !== (p.identity.universe_id ?? null);
+                          if (inBook) return <Badge className="h-8 px-3">✓ In this book</Badge>;
+                          return <Button size="sm" disabled={bookLink.locked || wrongUniverse} title={wrongUniverse ? "This persona belongs to a different universe than this book" : undefined} onClick={() => bookLink.onAdd({ id: p.identity_id, name: p.identity.display_name })}><Plus className="w-4 h-4" />{wrongUniverse ? "Other universe" : "Add to this book"}</Button>;
+                        })()}
+                      </div>
                     </CardContent>
                   </Card>
                 );
