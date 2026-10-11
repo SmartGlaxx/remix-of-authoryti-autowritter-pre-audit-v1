@@ -39,7 +39,7 @@ function system(a: GenreAdapter, role: string): string {
 export interface BookBrief {
   title: string; bookType: string; genre?: string | null; audience?: string | null;
   premise: string; guidance?: string | null; targetWords: number; chapterCount: number; series?: SeriesRef | null;
-  /** Planned multi-book series (author choice). Each book gets its own 450–700 word summary. */
+  /** Planned multi-book series (author choice). Each book gets its own 450–500 word summary. */
   seriesPlan?: { books: number } | null;
   /** Inception plot-twist mode (fiction alternatives): true = twist-architected, false = clean arcs, undefined = unspecified. */
   twistMode?: boolean;
@@ -309,7 +309,7 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
     if (b.seriesPlan && b.seriesPlan.books > 1) {
       const sb = (Array.isArray(o?.seriesBooks) ? o.seriesBooks : []).map((x: any, i: number) => ({ bookNumber: Number(x?.bookNumber) || i + 1, title: str(x?.title), summary: str(x?.summary) })).filter((x: any) => x.summary);
       if (sb.length !== b.seriesPlan.books) issues.push(`Expected ${b.seriesPlan.books} series book summaries, got ${sb.length}`);
-      sb.forEach((x: any) => { const w = words(x.summary); if (w < SERIES_BOOK_BAND.min * 0.6 || w > SERIES_BOOK_BAND.max * 1.35) issues.push(`Series book ${x.bookNumber} summary is ${w} words; aim for 450–700`); });
+      sb.forEach((x: any) => { const w = words(x.summary); if (w < SERIES_BOOK_BAND.min * 0.6 || w > SERIES_BOOK_BAND.max * 1.35) issues.push(`Series book ${x.bookNumber} summary is ${w} words; aim for 450–500`); });
       genreData.series_books = sb;
     }
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");

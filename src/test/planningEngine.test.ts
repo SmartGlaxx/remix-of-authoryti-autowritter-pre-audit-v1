@@ -157,9 +157,13 @@ describe("book type sub-categories", () => {
 import { summaryBand, SERIES_BOOK_BAND, buildMasterPrompt } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
 describe("elastic summary lengths", () => {
   it("comic summaries are 150–350 words", () => expect(summaryBand("comic")).toEqual({ min: 150, max: 350 }));
-  it("novel summaries are 450–700 words", () => expect(summaryBand("novel", "Literary")).toEqual({ min: 450, max: 700 }));
-  it("epic thrillers stretch to 750", () => expect(summaryBand("novel", "Thriller & Suspense").max).toBe(750));
-  it("series books are 450–700 each", () => expect(SERIES_BOOK_BAND).toEqual({ min: 450, max: 700 }));
+  it("novel summaries are 450–500 words", () => expect(summaryBand("novel", "Literary")).toEqual({ min: 450, max: 500 }));
+  it("epic thrillers are capped at 500", () => expect(summaryBand("novel", "Thriller & Suspense").max).toBe(500));
+  it("series books are 450–500 each", () => expect(SERIES_BOOK_BAND).toEqual({ min: 450, max: 500 }));
+  it("no summary band exceeds 500 words", () => {
+    for (const t of ["comic", "children", "short-story", "poetry", "novel", "fiction-serial", "drama", "biography", "memoir", "self-help", "business", "cookbook", "textbook"])
+      expect(summaryBand(t).max).toBeLessThanOrEqual(500);
+  });
   it("series master plan asks for one summary per book", () => {
     const p = buildMasterPrompt({ title: "T", bookType: "novel", premise: "p", targetWords: 50000, chapterCount: 12, seriesPlan: { books: 5 } }, null);
     expect(p.user).toContain("series of 5 books");
