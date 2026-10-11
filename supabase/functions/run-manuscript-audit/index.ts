@@ -26,6 +26,10 @@ const now = () => new Date().toISOString();
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  // Fail-closed: no free stand-in here, so test mode must never reach a paid model.
+  if (req.headers.get("x-ai-test-mode") === "1") {
+    return new Response(JSON.stringify({ error: "test_mode_blocked" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const authHeader = req.headers.get("authorization");
