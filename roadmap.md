@@ -108,3 +108,11 @@
 - [x] Viewpoints may share a chapter in separate sections
 - [ ] Phase 4 live checks (`/tmp/sec/p4v.py`, 14 checks) — blocked until the updated planning service is deployed; handshake still reports the old build
 - [ ] Later: consolidate the Plan tab's older story-options box with the Setup tab (both call the same `alternatives` service; keep both until then)
+
+# Unified creation flow
+- [x] Surprise me idea button
+- [x] Visible/editable chapter + section summaries
+- [x] New Book → Planning Studio → Start writing
+- [x] Writer & settings / Personas links in Planning Studio
+- [ ] Flexible summary lengths (150–700) + series mode in planner prompts
+- [ ] Retire old Plan-tab concept box / CreateBookEngine duplication
