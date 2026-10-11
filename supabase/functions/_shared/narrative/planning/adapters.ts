@@ -108,7 +108,7 @@ export const GENRE_ADAPTERS: readonly GenreAdapter[] = [
   },
   {
     id: "technical", label: "Technical / instructional", isFiction: false,
-    bookTypes: ["technology", "programming", "ai-ml", "science-popular", "reference"],
+    bookTypes: ["technology", "programming", "ai-ml", "science-popular", "reference", "textbook"],
     masterFields: ["prerequisites", "learning_outcomes", "versions"],
     chapterObjectives: ["concept", "setup", "tutorial", "reference", "troubleshooting"],
     sectionUnit: "step", sectionsPerChapter: { min: 2, max: 6, default: 4 },

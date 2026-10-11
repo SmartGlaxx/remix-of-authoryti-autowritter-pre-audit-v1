@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
-import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, type BookType } from "@/types/book";
+import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
@@ -21,6 +21,12 @@ type Row = Record<string, any>;
 const COUNTS = [3, 5, 7, 10];
 const POV_LABEL: Record<string, string> = { first_person: "First person", third_limited: "Third person (close)", third_omniscient: "Third person (all-knowing)", second_person: "Second person" };
 const AUDIENCES = ["Children (5-8)", "Middle grade (8-12)", "Young adult", "New adult", "Adult", "Professionals", "Beginners", "General readers"];
+// Audiences that make sense for each kind of book.
+const AUD_KIDS = ["Toddlers (1-3)", "Early readers (4-6)", "Young children (6-8)", "Middle grade (8-12)"];
+const AUD_FICTION = ["Middle grade (8-12)", "Young adult (13-17)", "New adult (18-25)", "General adult", "Literary readers"];
+const AUD_PRO = ["Beginners / curious", "General readers", "Workplace professionals", "Founders & leaders", "Advanced practitioners"];
+const AUD_TEXT = ["Primary pupils", "Junior secondary students", "Senior secondary students", "University / college students", "Teachers"];
+const audiencesFor = (t: string) => t === "children" ? AUD_KIDS : t === "textbook" ? AUD_TEXT : t === "comic" ? ["Children (6-10)", ...AUD_FICTION] : t === "cookbook" ? ["Beginner cooks", "Home cooks", "Families", "Experienced cooks"] : (BOOK_TYPE_INFO[t as BookType]?.category === "fiction" || t === "poetry" || t === "drama") ? AUD_FICTION : AUD_PRO;
 const TONES = ["Dark", "Hopeful", "Funny", "Suspenseful", "Romantic", "Literary", "Cozy", "Gritty", "Inspiring", "Practical", "Authoritative", "Conversational"];
 const LENGTHS = [{ v: 20000, l: "Short (~20k words)" }, { v: 50000, l: "Standard (~50k)" }, { v: 80000, l: "Long (~80k)" }, { v: 120000, l: "Epic (~120k)" }];
 const genresFor = (t: string) => BOOK_TYPE_GENRES[t as BookType] ?? GENRE_PRESETS[BOOK_TYPE_INFO[t as BookType]?.category ?? "fiction"] ?? [];
@@ -59,7 +65,18 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const [exAvoid, setExAvoid] = useState("");
   const [exOriginality, setExOriginality] = useState<"safe" | "balanced" | "bold">("balanced");
   const [showMore, setShowMore] = useState(false);
+  const [tbCountry, setTbCountry] = useState("usa");
+  const [tbLevel, setTbLevel] = useState("junior-secondary");
+  const [banned, setBanned] = useState<string[]>(Array.isArray(book.controls?.bannedWords) ? book.controls.bannedWords : DEFAULT_BANNED_WORDS);
+  const [newBan, setNewBan] = useState("");
+  const saveBanned = async (next: string[]) => {
+    setBanned(next);
+    const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), bannedWords: next } }).eq("id", book.id);
+    if (error) toast.error("Couldn't save the word list");
+  };
   const exFiction = fictionType(exType);
+  const audList = audiencesFor(exType);
+  const curriculum = exType === "textbook" ? { country: TEXTBOOK_COUNTRIES.find((c) => c.value === tbCountry)?.label, level: TEXTBOOK_LEVELS.find((l) => l.value === tbLevel)?.label } : undefined;
 
   const load = async () => {
     const [r, ids, us, ps] = await Promise.all([
@@ -91,6 +108,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       const title = (pick?.title || st.premise.split(/\n| — /)[0]).trim().slice(0, 120) || "Untitled book";
       await supabase.from("books").update({ title, book_type: exType, theme: (pick?.logline || st.premise).slice(0, 1000), ...(exGenre ? { genre: exGenre } : {}), ...(exAudience ? { audience: exAudience } : {}) }).eq("id", book.id);
     }
+    if (!Array.isArray(book.controls?.bannedWords)) await saveBanned(banned);
     setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); onSaved();
     if (stage === "planning") onContinue?.({ chapterCount, targetWords: exLength });
   });
@@ -98,7 +116,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
     // Save fixed requirements first so the server keeps them in every option.
     await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
-    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
+    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, bannedWords: banned, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality, curriculum }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
     if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
     const list: Row[] = (exFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
     if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
@@ -109,8 +127,8 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const surpriseMe = () => run("surprise", async () => {
     const { data, error } = await supabase.functions.invoke("book-ideas", { body: {
       mode: "light", count: 2,
-      brief: [`A surprising, original ${BOOK_TYPE_INFO[exType as BookType]?.label ?? exType} idea`, exGenre && `in ${exGenre}`, exAudience && `for ${exAudience}`, exTone && `with a ${exTone.toLowerCase()} tone`, `variation ${Math.floor(Math.random() * 1e6)}`].filter(Boolean).join(" "),
-      catalog: { [exType]: { audiences: exAudience ? [exAudience] : AUDIENCES, genres: exGenre ? [exGenre] : genresFor(exType) } },
+      brief: [`A surprising, original ${BOOK_TYPE_INFO[exType as BookType]?.label ?? exType} idea`, exGenre && `in ${exGenre}`, exAudience && `for ${exAudience}`, exTone && `with a ${exTone.toLowerCase()} tone`, curriculum && `following the ${curriculum.country} curriculum at ${curriculum.level} level`, banned.length && `never using the words: ${banned.join(", ")}`, `variation ${Math.floor(Math.random() * 1e6)}`].filter(Boolean).join(" "),
+      catalog: { [exType]: { audiences: exAudience ? [exAudience] : audList, genres: exGenre ? [exGenre] : genresFor(exType) } },
     } });
     if (error) throw new Error(error.message || "Couldn't get an idea");
     const idea = (data as Row)?.ideas?.[Math.floor(Math.random() * ((data as Row)?.ideas?.length || 1))];
@@ -152,6 +170,27 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
         <CardHeader><CardTitle>1. {exFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
           <CardDescription>{exFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
         <CardContent className="space-y-3">
+          {!locked && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
+              <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); setExAudience(""); }}><SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(BOOK_TYPE_INFO).map(([k, v]) => <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">{exType === "textbook" ? "Subject" : "Sub-category"}</label>
+              <Select value={exGenre || "__any"} onValueChange={(v) => setExGenre(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                <SelectContent><SelectItem value="__any">Any / surprise me</SelectItem>{[...new Set([...(exGenre && !genresFor(exType).includes(exGenre) ? [exGenre] : []), ...genresFor(exType)])].map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Audience</label>
+              <Select value={exAudience || "__any"} onValueChange={(v) => setExAudience(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                <SelectContent><SelectItem value="__any">Any</SelectItem>{[...new Set([...(exAudience && !audList.includes(exAudience) ? [exAudience] : []), ...audList])].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Tone</label>
+              <Select value={exTone || "__any"} onValueChange={(v) => setExTone(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                <SelectContent><SelectItem value="__any">Any</SelectItem>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+          </div>}
+          {!locked && exType === "textbook" && <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Country curriculum</label>
+              <Select value={tbCountry} onValueChange={setTbCountry}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TEXTBOOK_COUNTRIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">School level</label>
+              <Select value={tbLevel} onValueChange={setTbLevel}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TEXTBOOK_LEVELS.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent></Select></div>
+          </div>}
+          {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0]].filter(Boolean).join(" · ")}</span></p>}
           <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
           {!locked && <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!!busy} onClick={surpriseMe}>{busy === "surprise" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}Surprise me</Button></div>}
           <div className="space-y-2">
@@ -159,22 +198,13 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
             <div className="flex flex-wrap gap-2">{st.fixedRequirements.map((f, i) => <Badge key={i} variant="secondary" className="gap-1">{f}{!locked && <button aria-label="Remove" onClick={() => up({ fixedRequirements: st.fixedRequirements.filter((_, j) => j !== i) })}><X className="w-3 h-3" /></button>}</Badge>)}</div>
             {!locked && <div className="flex gap-2"><Input value={newFixed} onChange={(e) => setNewFixed(e.target.value)} placeholder="Add a must-keep detail" /><Button variant="outline" disabled={!newFixed.trim()} onClick={() => { up({ fixedRequirements: [...st.fixedRequirements, newFixed.trim()] }); setNewFixed(""); }}>Add</Button></div>}
           </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Words not allowed (kept out of ideas, plans and writing — remove any you want to allow):</p>
+            <div className="flex flex-wrap gap-2">{banned.map((w) => <Badge key={w} variant="outline" className="gap-1">{w}<button aria-label={`Allow ${w}`} onClick={() => saveBanned(banned.filter((x) => x !== w))}><X className="w-3 h-3" /></button></Badge>)}{!banned.length && <span className="text-xs text-muted-foreground">None</span>}</div>
+            <div className="flex gap-2"><Input value={newBan} onChange={(e) => setNewBan(e.target.value)} placeholder="Add a word or phrase" onKeyDown={(e) => { if (e.key === "Enter" && newBan.trim()) { saveBanned([...new Set([...banned, newBan.trim().toLowerCase()])]); setNewBan(""); } }} /><Button variant="outline" disabled={!newBan.trim()} onClick={() => { saveBanned([...new Set([...banned, newBan.trim().toLowerCase()])]); setNewBan(""); }}>Add word</Button></div>
+          </div>
           {!locked && <div className="rounded-lg border border-border p-3 space-y-3">
-            <p className="text-xs text-muted-foreground">Generate ideas for any kind of book. Pick the type and sub-category, then fine-tune.</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
-                <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); }}><SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{Object.entries(BOOK_TYPE_INFO).map(([k, v]) => <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Sub-category</label>
-                <Select value={exGenre || "__any"} onValueChange={(v) => setExGenre(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
-                  <SelectContent><SelectItem value="__any">Any / surprise me</SelectItem>{[...new Set([...(exGenre && !genresFor(exType).includes(exGenre) ? [exGenre] : []), ...genresFor(exType)])].map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Audience</label>
-                <Select value={exAudience || "__any"} onValueChange={(v) => setExAudience(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
-                  <SelectContent><SelectItem value="__any">Any</SelectItem>{[...new Set([...(exAudience && !AUDIENCES.includes(exAudience) ? [exAudience] : []), ...AUDIENCES])].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Tone</label>
-                <Select value={exTone || "__any"} onValueChange={(v) => setExTone(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
-                  <SelectContent><SelectItem value="__any">Any</SelectItem>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
-            </div>
+            <p className="text-xs text-muted-foreground">Fine-tune the ideas.</p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Originality:</span>
               {(["safe", "balanced", "bold"] as const).map((o) => <Button key={o} size="sm" variant={exOriginality === o ? "default" : "outline"} onClick={() => setExOriginality(o)}>{o === "safe" ? "Familiar" : o === "bold" ? "Bold" : "Balanced"}</Button>)}

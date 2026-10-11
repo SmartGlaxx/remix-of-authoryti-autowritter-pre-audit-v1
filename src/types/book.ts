@@ -14,6 +14,7 @@ export type BookType =
   | "programming"
   | "ai-ml"
   | "science-popular"
+  | "textbook"
   | "cookbook"
   | "magazine"
   | "poetry"
@@ -489,6 +490,7 @@ export const BOOK_TYPE_INFO: Record<BookType, { label: string; icon: string; des
   programming: { label: "Programming", icon: "⚙️", description: "Coding tutorials and references", category: "educational" },
   "ai-ml": { label: "AI & Machine Learning", icon: "🤖", description: "Artificial intelligence concepts", category: "educational" },
   "science-popular": { label: "Science (Popular)", icon: "🧪", description: "Accessible science writing", category: "educational" },
+  textbook: { label: "Textbook", icon: "🎓", description: "School textbooks by curriculum, level and subject", category: "educational" },
   cookbook: { label: "Cookbook", icon: "🍳", description: "Recipes and culinary guides", category: "educational" },
   
   // Creative
@@ -615,6 +617,7 @@ export const BOOK_TYPE_AUDIENCES: Record<BookType, string[]> = {
   programming: ["16-plus", "academics-undergraduate", "professionals", "industry-experts", "specialized-experts"],
   "ai-ml": ["academics-undergraduate", "professionals", "industry-experts", "specialized-experts", "scholars-researchers"],
   "science-popular": ["16-plus", "general-readers", "academics-undergraduate"],
+  textbook: ["children-1-9", "older-children-10-15", "16-plus", "academics-undergraduate"],
   cookbook: ["older-children-10-15", "16-plus", "general-readers"],
 
   // Creative
@@ -669,22 +672,51 @@ export const GENRE_PRESETS: Record<BookCategory, string[]> = {
   ],
 };
 
+export const TEXTBOOK_SUBJECTS = ["Mathematics", "English Language", "English Literature", "Integrated / General Science", "Biology", "Chemistry", "Physics", "Social Studies / Civic Education", "History", "Geography", "Economics", "Commerce & Financial Accounting", "Computer Science / ICT", "Government", "Agricultural Science", "French / Modern Languages"];
+
 // Per-book-type genres (overrides category presets when present)
-export const BOOK_TYPE_GENRES: Partial<Record<BookType, string[]>> = {
-  "self-help": [
-    "Personal Growth",
-    "Habits & Productivity",
-    "Relationships & Communication",
-    "Confidence & Mindset",
-  ],
-  business: [
-    "Leadership & Management",
-    "Entrepreneurship & Startups",
-    "Marketing & Branding",
-    "Strategy & Innovation",
-    "Career & Professional Growth",
-  ],
+export const BOOK_TYPE_GENRES: Record<BookType, string[]> = {
+  novel: ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Horror", "Literary"],
+  "fiction-serial": ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Horror", "Adventure"],
+  "short-story": ["Flash Fiction", "Character Studies", "Speculative", "Slice of Life", "Dark & Gothic", "Humor & Satire"],
+  children: ["Bedtime & Calming", "Early Learning & ABCs", "Animal Adventures", "Picture Book Story", "Fable & Folktale", "Friendship & Feelings", "Silly & Funny", "Nature & Discovery"],
+  comic: ["Superhero", "Slice of Life", "Mythic Adventure", "Sci-Fi & Cyberpunk", "Detective & Noir", "Horror", "Historical Adventure"],
+  biography: ["Historical Figures", "Visionary Leaders", "Innovators & Scientists", "Cultural Icons", "Unsung Heroes", "Political Leaders"],
+  memoir: ["Coming of Age", "Overcoming Adversity", "Cultural Roots & Identity", "Travel & Adventure", "Family & Heritage", "Creative Life & Calling"],
+  "self-help": ["Personal Growth & Mindset", "Habits & Productivity", "Emotional Healing & Grief", "Confidence & Communication", "Relationships", "Stress & Mindfulness"],
+  business: ["Startup & Entrepreneurship", "Leadership & Culture", "Strategy & Innovation", "Marketing & Growth", "Sales & Operations", "Career & Executive"],
+  finance: ["Budgeting & Debt Freedom", "Stock Investing", "Real Estate", "Wealth Building (FIRE)", "Crypto & Digital Assets", "Corporate Finance"],
+  technology: ["Web Architecture", "Systems & Backend", "DevOps & Cloud", "Security", "Emerging Tech", "Beginner Tech"],
+  programming: ["Beginner Coding", "Clean Code & Patterns", "Web Development", "Systems Programming", "Data & Databases", "Testing & Quality"],
+  "ai-ml": ["AI & LLMs", "Machine Learning Basics", "Deep Learning", "AI Ethics & Society", "Applied AI for Business", "Data Science"],
+  "science-popular": ["Physics & Astronomy", "Earth & Planetary Science", "Chemistry & Matter", "Computing & Information", "History of Science", "Mathematics & Everyday Logic", "Brain & Mind"],
+  textbook: TEXTBOOK_SUBJECTS,
+  cookbook: ["Weeknight & Quick Meals", "Baking & Pastries", "Plant-Based & Vegan", "Regional & Heritage", "Comfort Classics", "Meal Prep & Budget", "Drinks & Fermentation"],
+  magazine: ["Industry Insights", "Culture & Arts", "Lifestyle", "Special Interest", "Local & Community"],
+  poetry: ["Nature & Contemplation", "Love & Yearning", "Spoken Word & Urban", "Free Verse", "Structured & Traditional", "Grief & Resilience"],
+  drama: ["Feature Screenplay", "TV Pilot / Episodic", "Stage Play", "Chamber Drama", "Dark Satire", "Mystery Script"],
+  reference: ["Technical Manuals", "Field Guides", "Comprehensive Handbooks", "Dictionaries & Glossaries", "How-To Guides"],
+  custom: ["General", "Anthology", "Special Interest"],
 };
+
+// Textbooks: curriculum country, school level and subject.
+export const TEXTBOOK_COUNTRIES = [
+  { value: "usa", label: "USA (Common Core / NGSS / state standards)" },
+  { value: "canada", label: "Canada (provincial curricula)" },
+  { value: "uk", label: "United Kingdom (National Curriculum / GCSE / A-Level)" },
+  { value: "australia", label: "Australia (ACARA / VCE / HSC)" },
+  { value: "nigeria", label: "Nigeria (NERDC / WAEC / NECO / BECE)" },
+  { value: "ghana", label: "Ghana (NaCCA / GES / WAEC / BECE)" },
+];
+export const TEXTBOOK_LEVELS = [
+  { value: "primary", label: "Primary / Elementary (ages 5–11)" },
+  { value: "junior-secondary", label: "Junior Secondary / Middle School (ages 11–14)" },
+  { value: "senior-secondary", label: "Senior Secondary / High School (ages 14–18)" },
+  { value: "tertiary", label: "College / University / Vocational" },
+];
+
+// Default banned words: fantasy vocabulary the author can remove or extend in the UI.
+export const DEFAULT_BANNED_WORDS = ["magic", "magical", "wizard", "sorcery", "spell", "enchanted"];
 
 // All book types are enabled in the Creation Engine.
 export const ENABLED_BOOK_TYPES: BookType[] = Object.keys(BOOK_TYPE_INFO) as BookType[];

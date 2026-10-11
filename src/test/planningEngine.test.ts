@@ -13,7 +13,8 @@ describe("Phase C adapters", () => {
   });
   it("every app book type maps to exactly one adapter", () => {
     const types = CONTEXT_PROFILES.flatMap((p) => p.bookTypes);
-    expect(types.length).toBe(20);
+    expect(types.length).toBe(21);
+    expect(GENRE_ADAPTERS.find((a) => a.bookTypes.includes("textbook"))?.id).toBe("technical");
     for (const t of types) expect(GENRE_ADAPTERS.filter((a) => a.bookTypes.includes(t)).length).toBe(1);
   });
   it("unknown book type throws rather than guessing", () => {
@@ -136,5 +137,19 @@ describe("Self-test reconciliation record cannot block benchmarks", () => {
       { decision: "PENDING", dedup_key: "real_2", severity: "MINOR" },
     ];
     expect(blockingDiscrepancies(logs).map((l) => l.dedup_key)).toEqual(["real_1"]);
+  });
+});
+
+import { BOOK_TYPE_GENRES, DEFAULT_BANNED_WORDS } from "@/types/book";
+describe("book type sub-categories", () => {
+  it("children's books never offer adult genres", () => {
+    expect(BOOK_TYPE_GENRES.children).not.toContain("Romance");
+    expect(BOOK_TYPE_GENRES.children).not.toContain("Thriller & Suspense");
+  });
+  it("popular science no longer lists Evolution & Nature", () => {
+    expect(BOOK_TYPE_GENRES["science-popular"]).not.toContain("Evolution & Nature");
+  });
+  it("default banned words include fantasy terms", () => {
+    expect(DEFAULT_BANNED_WORDS).toEqual(expect.arrayContaining(["magic", "magical", "wizard"]));
   });
 });
