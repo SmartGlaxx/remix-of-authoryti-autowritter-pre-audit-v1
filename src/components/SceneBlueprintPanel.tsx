@@ -76,7 +76,7 @@ export function SceneBlueprintPanel({ bookId, chapterIndex, subsectionIndex }: {
         {data.anchors.length ? <ul className="space-y-1">{data.anchors.map((a) => <li key={a.anchor_key} className="text-xs"><Badge variant="outline" className="mr-1 text-[10px]">{a.anchor_type}</Badge>{a.exact_text}</li>)}</ul> : <p className="text-xs text-muted-foreground">None yet.</p>}
       </Section>
       <Section icon={Eye} title="What characters know" note="Learned on the page so far">
-        {data.knowledge.length ? <ul className="space-y-1">{data.knowledge.map((k, i) => <li key={i} className="text-xs">{k.claim}{k.certainty && k.certainty !== "certain" && <span className="text-muted-foreground"> ({k.certainty})</span>}</li>)}</ul> : <p className="text-xs text-muted-foreground">Nothing recorded yet.</p>}
+        {data.knowledge.length ? <ul className="space-y-1">{data.knowledge.map((k, i) => <li key={i} className="text-xs">{k.claim}{k.access === "hindsight" && <span className="text-muted-foreground"> (hindsight only)</span>}{k.certainty && k.certainty !== "certain" && <span className="text-muted-foreground"> ({k.certainty})</span>}</li>)}</ul> : <p className="text-xs text-muted-foreground">Nothing recorded yet.</p>}
       </Section>
       <Section icon={KeyRound} title="Author eyes only" note="Foreshadowing guidance. Never treated as something characters know or as established fact.">
         {directives.length ? <ul className="space-y-1">{directives.map((d, i) => <li key={i} className="text-xs italic">{txt(d)}</li>)}</ul> : <p className="text-xs text-muted-foreground">No twist setup in this section.</p>}
