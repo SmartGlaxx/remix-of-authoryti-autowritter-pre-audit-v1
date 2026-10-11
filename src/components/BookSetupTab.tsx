@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles } from "lucide-react";
+import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,18 +130,26 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
     // Save fixed requirements first so the server keeps them in every option.
     await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
-    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, bannedWords: banned, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality, curriculum }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
+    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, bannedWords: banned, twistMode: exFiction ? st.twistsEnabled : undefined, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality, curriculum }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
     if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
     const list: Row[] = (exFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
     if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
     else { const fresh = list.find((a) => !st.alternatives.some((b) => b.title === a.title)) ?? list[0]; const next = [...st.alternatives]; next[replaceIndex] = { ...(fresh as any), id: `alt${replaceIndex + 1}` }; up({ alternatives: next }); }
   });
 
+  // "Adjust with AI": rewrite the seed idea in a chosen direction before any options are made.
+  const adjustPremise = () => run("adjust", async () => {
+    const r = await callPlanBook({ action: "adjust_premise", bookId: book.id, premise: st.premise, adjustments: adjustKey && adjustKey !== "custom" ? [adjustKey] : [], custom: adjustKey === "custom" ? adjustCustom : undefined, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, chapterCount, targetWords: exLength, bannedWords: banned, explore: { tone: exTone } });
+    if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The rewrite didn't pass checks; try again." : r.data.error);
+    setPrevPremise(st.premise); up({ premise: r.data.premise });
+    toast.success(r.data.changes || "Idea adjusted — edit it, adjust again, or undo");
+  });
+
   // "Surprise me": one random starting idea for the chosen book type, before any summaries exist.
   const surpriseMe = () => run("surprise", async () => {
     const { data, error } = await supabase.functions.invoke("book-ideas", { body: {
       mode: "light", count: 2,
-      brief: [`A surprising, original ${BOOK_TYPE_INFO[exType as BookType]?.label ?? exType} idea`, exGenre && `in ${exGenre}`, exAudience && `for ${exAudience}`, exTone && `with a ${exTone.toLowerCase()} tone`, curriculum && `following the ${curriculum.country} curriculum at ${curriculum.level} level`, banned.length && `never using the words: ${banned.join(", ")}`, `variation ${Math.floor(Math.random() * 1e6)}`].filter(Boolean).join(" "),
+      brief: [`A surprising, original ${BOOK_TYPE_INFO[exType as BookType]?.label ?? exType} idea`, exGenre && `in ${exGenre}`, exAudience && `for ${exAudience}`, exTone && `with a ${exTone.toLowerCase()} tone`, exFiction && st.twistsEnabled && "built around one huge, story-reframing plot twist", curriculum && `following the ${curriculum.country} curriculum at ${curriculum.level} level`, banned.length && `never using the words: ${banned.join(", ")}`, `variation ${Math.floor(Math.random() * 1e6)}`].filter(Boolean).join(" "),
       catalog: { [exType]: { audiences: exAudience ? [exAudience] : audList, genres: exGenre ? [exGenre] : genresFor(exType) } },
     } });
     if (error) throw new Error(error.message || "Couldn't get an idea");
@@ -208,9 +216,21 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
             <label className="flex items-center gap-2"><Switch checked={series.enabled} onCheckedChange={(on) => saveSeries({ ...series, enabled: on })} aria-label="Series" />Part of a series</label>
             {series.enabled && <><Input type="number" className="w-20" min={2} max={12} value={series.books} onChange={(e) => saveSeries({ ...series, books: Math.max(2, Math.min(12, +e.target.value || 3)) })} aria-label="Books in series" /><span className="text-xs text-muted-foreground">books — each gets its own 450–700 word summary (about {series.books * 450}–{series.books * 700} words in all)</span></>}
           </div>}
-          {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0]].filter(Boolean).join(" · ")}</span></p>}
+          {!locked && exFiction && <div className="flex items-start gap-3 rounded-md border border-primary/40 bg-primary/5 p-3">
+            <Switch checked={st.twistsEnabled} onCheckedChange={(on) => up({ twistsEnabled: on })} aria-label="Plot twist mode" />
+            <div className="text-sm"><p className="font-medium">Plot twist mode {st.twistsEnabled ? "on" : "off"}</p>
+              <p className="text-xs text-muted-foreground">{st.twistsEnabled ? "Every story option will be built around one big twist from the very first page, with clues planted along the way." : "Story options will follow clean arcs with no engineered shock reversal."} Choose this before making your options.</p></div>
+          </div>}
+          {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0], exFiction && (st.twistsEnabled ? "plot twist mode" : "no twist")].filter(Boolean).join(" · ")}</span></p>}
           <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
-          {!locked && <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!!busy} onClick={surpriseMe}>{busy === "surprise" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}Surprise me</Button></div>}
+          {!locked && <div className="flex flex-wrap justify-end items-center gap-2">
+            <Select value={adjustKey} onValueChange={setAdjustKey}><SelectTrigger className="w-56 h-9" aria-label="What to change"><SelectValue placeholder="What should change?" /></SelectTrigger>
+              <SelectContent>{ADJUSTMENTS.filter((o) => exFiction ? o.value !== "practical" : !["twists", "romance", "darker"].includes(o.value)).map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select>
+            {adjustKey === "custom" && <Input className="w-56 h-9" value={adjustCustom} maxLength={300} onChange={(e) => setAdjustCustom(e.target.value)} placeholder="e.g. set it in 1920s Lagos" />}
+            <Button size="sm" variant="outline" disabled={!!busy || !st.premise.trim() || !adjustKey || (adjustKey === "custom" && !adjustCustom.trim())} onClick={adjustPremise}>{busy === "adjust" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}Adjust with AI</Button>
+            {prevPremise !== null && <Button size="sm" variant="ghost" onClick={() => { up({ premise: prevPremise }); setPrevPremise(null); }}>Undo</Button>}
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={surpriseMe}>{busy === "surprise" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}Surprise me</Button>
+          </div>}
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Must-keep details (every option will keep these — e.g. a setting, a character, a fact):</p>
             <div className="flex flex-wrap gap-2">{st.fixedRequirements.map((f, i) => <Badge key={i} variant="secondary" className="gap-1">{f}{!locked && <button aria-label="Remove" onClick={() => up({ fixedRequirements: st.fixedRequirements.filter((_, j) => j !== i) })}><X className="w-3 h-3" /></button>}</Badge>)}</div>
