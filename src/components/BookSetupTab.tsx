@@ -17,6 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
 import { WriterPicker } from "@/components/WriterPicker";
+import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
+import { SLIDERS, MAX_ADJUST, NEUTRAL, readSliders, type SliderValues } from "../../supabase/functions/_shared/writers/sliders";
+import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
 import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
@@ -78,6 +81,18 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const [exTone, setExTone] = useState("");
   const [exLength, setExLength] = useState(50000);
   const [exSetting, setExSetting] = useState("");
+  const [writerId, setWriterId] = useState<string>(book.controls?.writerId ?? "");
+  const [sliders, setSliders] = useState<SliderValues>(() => readSliders(book.tone_profile, book.controls));
+  // Where each slider value is stored so the writing engine reads it back (legacy field names).
+  const TONE_KEYS: Partial<Record<keyof SliderValues, string>> = { formality: "formality", emotion: "emotionalIntensity", warmth: "warmth", humor: "humorLevel", authority: "authorityLevel", directness: "directness", readerIntimacy: "readerIntimacy" };
+  const CONTROL_KEYS: Partial<Record<keyof SliderValues, string>> = { pacing: "velocity", elaboration: "scope", conceptualComplexity: "entityComplexity", perspective: "perspectiveMultiplexing", creativity: "creativity", hookFrequency: "hookFrequency", sensoryDetail: "sensoryDetail", sentenceVariation: "sentenceVariation" };
+  const saveSliders = (next: SliderValues) => run("sliders", async () => {
+    const tone: Row = { ...(book.tone_profile ?? {}) }; const controls: Row = { ...(book.controls ?? {}) };
+    for (const s of SLIDERS) { if (TONE_KEYS[s.key]) tone[TONE_KEYS[s.key]!] = next[s.key]; if (CONTROL_KEYS[s.key]) controls[CONTROL_KEYS[s.key]!] = next[s.key]; }
+    const { error } = await supabase.from("books").update({ tone_profile: tone, controls }).eq("id", book.id);
+    if (error) throw error;
+    toast.success("Voice settings saved"); onSaved();
+  });
   const [exComparables, setExComparables] = useState("");
   const [exAvoid, setExAvoid] = useState("");
   const [exOriginality, setExOriginality] = useState<"safe" | "balanced" | "bold">("balanced");
@@ -414,14 +429,39 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       {/* 5. Writer & voice — the AI author who writes the book */}
       {cur === "writer" && <Card>
         <CardHeader><CardTitle>{isFiction ? "5" : "4"}. Writer & voice</CardTitle>
-          <CardDescription>Choose the writer who will write this book. Their style carries through every chapter. Fine-tune the 15 expression sliders any time in Writer &amp; book settings.</CardDescription></CardHeader>
-        <CardContent className="space-y-3">
-          <WriterPicker bookType={exType} value={book.controls?.writerId} onChange={(id) => run("writer", async () => {
+          <CardDescription>Choose the writer who will write this book, then tune their voice. Each slider can move up to {MAX_ADJUST} steps from the writer's own starting point — their style still carries through every chapter.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <WriterPicker bookType={exType} value={writerId || book.controls?.writerId} onChange={(id) => run("writer", async () => {
             const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), writerId: id } }).eq("id", book.id);
             if (error) throw error;
+            setWriterId(id);
+            const base = WRITER_BASELINES[id] ?? NEUTRAL;
+            setSliders(base);
+            await saveSliders(base);
             toast.success("Writer chosen"); onSaved();
           })} />
           {busy === "writer" && <p className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" />Saving your writer…</p>}
+          {(() => { const base = WRITER_BASELINES[writerId || book.controls?.writerId] ?? NEUTRAL; return (
+          <div className="space-y-4 border-t border-border pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold">Expression controls</h4>
+              <Button size="sm" variant="outline" disabled={busy === "sliders"} onClick={() => saveSliders(sliders)}>{busy === "sliders" && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Save voice</Button>
+            </div>
+            {(["tone", "dynamism"] as const).map((g) => (
+              <div key={g} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g === "tone" ? "Tone" : "Energy & structure"}</p>
+                <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {SLIDERS.filter((s) => s.group === g).map((s) => (
+                    <div key={s.key} className="space-y-1">
+                      <div className="flex justify-between gap-2 text-xs"><span title={s.hint}>{s.label}</span><span className="shrink-0 text-muted-foreground">{sliders[s.key]}/10{offsetLabel(sliders[s.key], base[s.key])}</span></div>
+                      <BoundedSlider label={s.label} range={[Math.max(1, base[s.key] - MAX_ADJUST), Math.min(10, base[s.key] + MAX_ADJUST)]} base={base[s.key]} value={sliders[s.key]} onChange={(v) => setSliders({ ...sliders, [s.key]: v })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">The small mark under each rail is the writer's own starting value. Press Save voice when you're happy — you can return to this step any time before writing begins.</p>
+          </div> ); })()}
         </CardContent>
       </Card>}
       </motion.div>
