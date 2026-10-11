@@ -1,7 +1,8 @@
 // Phase 4 — optional advanced Book Setup inside Planning Studio. Every step is skippable; the
 // server validates and stores the setup apart from prose, and the master planner reads it.
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { PersonaStudioView } from "@/pages/PersonaStudio";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
@@ -59,6 +60,8 @@ async function callPersona(body: Row) {
 export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
   const [screen, setScreen] = useState(0);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const draftKey = `book-setup-draft:${book.id}`;
   const [dir, setDir] = useState<1 | -1>(1);
   const [hasProse, setHasProse] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -131,12 +134,29 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       supabase.from("fictional_universes").select("id, name").eq("is_archived", false).order("name"),
       supabase.from("author_identities").select("id, pen_name").eq("is_archived", false).order("pen_name"),
     ]);
-    const s0 = r.ok ? (r.data.setup as BookSetup) : emptySetup();
+    let s0 = r.ok ? (r.data.setup as BookSetup) : emptySetup();
     if (!s0.premise) s0.premise = book.theme ?? "";
+    // Unsaved edits survive reloads: a local draft for this book wins over the last server copy.
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      if (d?.st && !r.data?.hasProse) { s0 = { ...s0, ...d.st }; if (typeof d.screen === "number") setScreen(d.screen); }
+    } catch { /* ignore broken draft */ }
     setSt(s0); setHasProse(!!r.data?.hasProse);
     setIdentities(ids.data ?? []); setUniverses(us.data ?? []); setPens(ps.data ?? []);
   };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [book.id]);
+  useEffect(() => {
+    if (!st) return;
+    try { localStorage.setItem(draftKey, JSON.stringify({ st, screen, savedAt: Date.now() })); } catch { /* storage full */ }
+  }, [st, screen, draftKey]);
+  const refreshLibrary = async () => {
+    const [ids, us, ps] = await Promise.all([
+      supabase.from("narrative_identities").select("id, display_name, level, universe_id").is("merged_into_id", null).order("display_name").limit(1000),
+      supabase.from("fictional_universes").select("id, name").eq("is_archived", false).order("name"),
+      supabase.from("author_identities").select("id, pen_name").eq("is_archived", false).order("pen_name"),
+    ]);
+    setIdentities(ids.data ?? []); setUniverses(us.data ?? []); setPens(ps.data ?? []);
+  };
 
   const issues = useMemo(() => (st ? validateSetup(st, { bookType: book.book_type, penNames: pens as any, chapterCount }) : []), [st, pens, chapterCount, book.book_type]);
   if (!st) return <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>;
@@ -219,6 +239,8 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const isLast = screen >= screens.length - 1;
   const go = (d: 1 | -1) => {
     if (d === 1 && cur === "idea") callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st }).catch(() => {});
+    // Quiet server save on every step so nothing is lost if the tab closes.
+    if (st && !hasProse) callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st }).catch(() => {});
     setDir(d); setScreen((s) => Math.max(0, Math.min(screens.length - 1, s + d))); window.scrollTo({ top: 0, behavior: "smooth" });
   };
   return (
@@ -353,7 +375,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
           <div className="flex flex-wrap gap-2">
             <Input className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your characters" />
             <Button variant="outline" disabled={!!busy} onClick={() => run("recs", async () => { await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st }); const r = await callPlanBook({ action: "recommend_cast", bookId: book.id }); if (!r.ok) throw new Error(r.data.error); setRecs(r.data.recommendations); })}>Suggest from story</Button>
-            <Button variant="ghost" asChild><Link to="/personas">Open Persona Studio (full profiles, AI or hybrid)</Link></Button>
+            <Button variant="ghost" onClick={() => setStudioOpen(true)}>Open Persona Studio (full profiles, AI or hybrid)</Button>
           </div>
           {libraryHits.length > 0 && <div className="flex flex-wrap gap-2">{libraryHits.map((i) => <Button key={i.id} size="sm" variant="secondary" disabled={locked && false} onClick={() => { addCast({ name: i.display_name, identityId: i.id, lightweight: false }); setSearch(""); }}><Plus className="w-3 h-3 mr-1" />{i.display_name}</Button>)}</div>}
           {recs.length > 0 && <div className="rounded-md border border-border p-3 space-y-1"><p className="text-xs text-muted-foreground">Suggestions (you decide — nothing is created or merged automatically):</p>
@@ -477,6 +499,12 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
             : <Button onClick={() => go(1)}>Next: {SCREEN_LABEL[screens[screen + 1]]}<ArrowRight className="w-4 h-4 ml-1" /></Button>}
         </div>
       </div>
+      <Dialog open={studioOpen} onOpenChange={(o) => { setStudioOpen(o); if (!o) refreshLibrary(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto p-0">
+          <DialogTitle className="sr-only">Persona Studio</DialogTitle>
+          <PersonaStudioView embedded onBack={() => { setStudioOpen(false); refreshLibrary(); }} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
