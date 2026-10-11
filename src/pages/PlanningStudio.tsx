@@ -259,7 +259,7 @@ function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats }: { ch
   const secs = rows.filter((p) => p.plan_level === "SECTION").sort((a, b) => a.subsection_index - b.subsection_index);
   const beats = rows.filter((p) => p.plan_level === "BEATS");
   const c = chap?.content ?? {};
-  const edit = (row: Row, fields: Row) => run(`e-${row.id}`, async () => { const r = await callPlanBook({ action: "edit_plan", bookId: row.book_id ?? undefined, planId: row.id, fields }); if (!r.ok) throw new Error(r.data.error); toast.success("Saved"); await refresh(); });
+  const edit = (row: Row, fields: Row) => run(`e-${row.id}`, async () => { const r = await callPlanBook({ action: "edit_plan", bookId: row.book_id, planId: row.id, fields }); if (!r.ok) throw new Error(r.data.error); toast.success("Saved"); await refresh(); });
   const status = (lv: string) => { const rs = rows.filter((p) => p.plan_level === lv); return rs.length ? (rs.every((p) => p.plan_status === "READY") ? "approved" : "planned") : "—"; };
   return (
     <div className="border border-border rounded-md">
@@ -283,7 +283,7 @@ function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats }: { ch
               <EditableText label="Opens with" value={d.entry ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { entry: v })} />
               <EditableText label="Turns on" value={d.focus ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { focus: v })} />
               <EditableText label="Ends with" value={d.outcome ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { outcome: v })} />
-              {b && (b.content?.beats ?? []).length > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Scene beats ({b.content.beats.length})</summary><ol className="list-decimal ml-5 mt-1 space-y-0.5">{(b.content.beats as Row[]).map((x, i) => <li key={i}>{x.goal ?? x.description ?? x.text ?? JSON.stringify(x)}</li>)}</ol></details>}
+              {b && (b.content?.beats ?? []).length > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Scene beats ({b.content.beats.length})</summary><ol className="list-decimal ml-5 mt-1 space-y-0.5">{(b.content.beats as Row[]).map((x, i) => <li key={i}>{String(x.kind ?? "").replace(/_/g, " ")}{x.targetWords ? ` · ~${x.targetWords} words` : ""}{(b.content?.notes as Row[] | undefined)?.find((n) => n.id === x.id)?.note ? ` — ${(b.content.notes as Row[]).find((n) => n.id === x.id)!.note}` : ""}</li>)}</ol></details>}
             </div>; })}
           {secs.length > 0 && beats.length === 0 && <Button size="sm" variant="outline" disabled={!!busy} onClick={onBeats}>Add scene beats</Button>}
         </div>

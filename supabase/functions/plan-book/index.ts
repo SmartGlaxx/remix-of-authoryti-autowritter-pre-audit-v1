@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       // The owner (author) sees the full plan, including planner-only synopsis and ending.
       const [{ data: masters }, { data: plans }] = await Promise.all([
         db.from("book_master_plans").select("id, version, status, approved_at, created_at, premise, master_synopsis, intended_ending, plan_skeleton").eq("book_id", bookId).eq("user_id", userId).order("version", { ascending: false }),
-        db.from("book_progressive_plans").select("id, master_plan_id, plan_level, chapter_index, subsection_index, plan_status, version, content").eq("book_id", bookId).eq("user_id", userId).neq("plan_status", "SUPERSEDED"),
+        db.from("book_progressive_plans").select("id, book_id, master_plan_id, plan_level, chapter_index, subsection_index, plan_status, version, content").eq("book_id", bookId).eq("user_id", userId).neq("plan_status", "SUPERSEDED"),
       ]);
       return json({ masters, plans });
     }
