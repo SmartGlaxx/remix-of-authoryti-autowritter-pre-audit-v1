@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
+type ScreenKey = "idea" | "twists" | "cast" | "narration";
+const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name" };
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +54,8 @@ async function callPersona(body: Row) {
 
 export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
+  const [screen, setScreen] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
   const [hasProse, setHasProse] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [count, setCount] = useState(3);
@@ -193,13 +198,24 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   });
 
   const locked = hasProse;
+  const screens = (isFiction ? ["idea", "twists", "cast", "narration"] : ["idea", "cast", "narration"]) as ScreenKey[];
+  const cur = screens[Math.min(screen, screens.length - 1)];
+  const isLast = screen >= screens.length - 1;
+  const go = (d: 1 | -1) => {
+    if (d === 1 && cur === "idea") callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st }).catch(() => {});
+    setDir(d); setScreen((s) => Math.max(0, Math.min(screens.length - 1, s + d))); window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   return (
     <div className="space-y-6 mt-4">
-      <p className="text-sm text-muted-foreground">Every step here is optional. Skip anything, save as you go, and come back later. Books that don't use this keep writing exactly as before.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {screens.map((s, i) => <button key={s} onClick={() => { setDir(i > screen ? 1 : -1); setScreen(i); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${i === screen ? "border-primary bg-primary/10 text-foreground" : i < screen ? "border-primary/40 text-foreground" : "border-border text-muted-foreground"}`}>{i < screen && <Check className="inline w-3 h-3 mr-1" />}{SCREEN_LABEL[s]}</button>)}
+      </div>
       {locked && <div className="flex gap-2 items-start text-sm rounded-md border border-border p-3"><Lock className="w-4 h-4 mt-0.5 text-primary" /><span>Writing has started. The story, narrator, point of view, universe and character identities are locked to protect what's already written. Cast notes, roles and pen name can still change.</span><Button size="sm" variant="outline" className="ml-auto shrink-0" disabled={!!busy} onClick={rewriteBook}>{busy === "rewrite" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Change setup & rewrite the book</Button></div>}
 
+      <AnimatePresence mode="wait" custom={dir}>
+      <motion.div key={cur} custom={dir} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: "easeOut" }}>
       {/* 1. Concept & story options */}
-      <Card>
+      {cur === "idea" && <Card>
         <CardHeader><CardTitle>1. {exFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
           <CardDescription>{exFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
         <CardContent className="space-y-3">
@@ -290,10 +306,10 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* 2. Twist reveal schedule (fiction only) — the twist itself is chosen at inception in step 1 */}
-      {isFiction && <Card>
+      {cur === "twists" && <Card>
         <CardHeader><CardTitle>2. Twist reveals & clues</CardTitle><CardDescription>{st.twistsEnabled ? "Your chosen story already carries its big twist. Here you can add extra twists and set which chapter each one is revealed in; clues are planted before, never revealed early." : "Plot twist mode is off. Turn it on in step 1 before making story options."}</CardDescription></CardHeader>
         {st.twistsEnabled && <CardContent className="space-y-3">
           {!locked && <Button variant="outline" onClick={proposeTwists} disabled={!!busy || st.selectedIndex === null}>{busy === "twists" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Suggest extra twists for the chosen story</Button>}
@@ -314,7 +330,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       </Card>}
 
       {/* 3. Cast */}
-      <Card>
+      {cur === "cast" && <Card>
         <CardHeader><CardTitle>{isFiction ? "3" : "2"}. Characters</CardTitle>
           <CardDescription>Use characters from your library or add new ones. Book-only characters don't need a profile. Roles apply to this book only — a character's lasting profile is never changed here.</CardDescription></CardHeader>
         <CardContent className="space-y-3">
@@ -348,10 +364,10 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
               {!locked && <Button size="icon" variant="ghost" aria-label="Remove" onClick={() => up({ cast: st.cast.filter((x) => x.key !== c.key), viewpoints: st.viewpoints.filter((v) => v.castKey !== c.key), narration: { ...st.narration, narratorKey: st.narration.narratorKey === c.key ? null : st.narration.narratorKey } })}><Trash2 className="w-4 h-4" /></Button>}
             </div>))}</div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* 4. Narration, perspective, universe, pen name */}
-      <Card>
+      {cur === "narration" && <Card>
         <CardHeader><CardTitle>{isFiction ? "4" : "3"}. Narrator, perspective, universe & pen name</CardTitle>
           <CardDescription>A pen name is only the name printed as author — it never becomes a character or narrator.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
@@ -393,13 +409,19 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
           </div>
           {st.universeId && <p className="text-xs text-muted-foreground">Established dates, ages, deaths and relationships from this universe will be respected. Ideas in this setup never become universe facts until they're written and accepted.</p>}
         </CardContent>
-      </Card>
+      </Card>}
+      </motion.div>
+      </AnimatePresence>
 
-      {issues.length > 0 && <div className="space-y-1">{issues.map((i, k) => <p key={k} className={`text-sm ${i.blocking ? "text-destructive" : "text-muted-foreground"}`}>{i.blocking ? "Fix: " : "Note: "}{i.message}</p>)}</div>}
-      <div className="flex flex-wrap gap-2 sticky bottom-0 bg-background py-3 border-t border-border">
-        <Button onClick={() => save()} disabled={!!busy}>{busy === "save" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save setup</Button>
-        <Button variant="outline" onClick={() => save("planning")} disabled={!!busy || issues.some((i) => i.blocking)}>Save & continue to planning</Button>
-        <span className="text-xs text-muted-foreground self-center">The master plan in the Plan tab will use this setup.</span>
+      {isLast && issues.length > 0 && <div className="space-y-1">{issues.map((i, k) => <p key={k} className={`text-sm ${i.blocking ? "text-destructive" : "text-muted-foreground"}`}>{i.blocking ? "Fix: " : "Note: "}{i.message}</p>)}</div>}
+      <div className="flex flex-wrap items-center gap-2 sticky bottom-0 bg-background py-3 border-t border-border z-10">
+        <Button variant="ghost" onClick={() => go(-1)} disabled={screen === 0}><ArrowLeft className="w-4 h-4 mr-1" />Back</Button>
+        <Button variant="outline" onClick={() => save()} disabled={!!busy}>{busy === "save" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
+        <div className="ml-auto">
+          {isLast
+            ? <Button onClick={() => save("planning")} disabled={!!busy || issues.some((i) => i.blocking)}>Next: Writer & voice<ArrowRight className="w-4 h-4 ml-1" /></Button>
+            : <Button onClick={() => go(1)}>Next: {SCREEN_LABEL[screens[screen + 1]]}<ArrowRight className="w-4 h-4 ml-1" /></Button>}
+        </div>
       </div>
     </div>
   );
