@@ -27,7 +27,7 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ACTIONS = ["edit_plan", "alternatives", "concepts", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
+const ACTIONS = ["edit_plan", "alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
 // Story alternatives, concepts and twists use the real planner model for authors. Test mode (and STORY_AI_ENGINE=mock) always uses the free deterministic engine.
 const storyLive = () => Deno.env.get("STORY_AI_ENGINE") !== "mock";
 // Deployment handshake: test harnesses must read this BEFORE any AI-capable request and abort on mismatch,
