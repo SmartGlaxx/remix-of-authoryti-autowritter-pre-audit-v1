@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, CheckCircle2, AlertTriangle, Pause, Play } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2, CheckCircle2, AlertTriangle, Pause, Play, PenLine, Settings2, Users, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,14 @@ export default function PlanningStudio() {
   const [plans, setPlans] = useState<{ masters: Row[]; plans: Row[] }>({ masters: [], plans: [] });
   const [review, setReview] = useState<{ candidates: Row[]; logs: Row[]; findings: Row[] }>({ candidates: [], logs: [], findings: [] });
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState("setup");
+  const [carry, setCarry] = useState<{ chapterCount: number; targetWords: number } | null>(null);
+  const navigate = useNavigate();
 
   const isFiction = useMemo(() => { try { return book ? adapterForBookType(book.book_type).isFiction : true; } catch { return true; } }, [book]);
 
   const refresh = useCallback(async () => {
-    const { data: b } = await supabase.from("books").select("id, title, book_type, theme, controls, outline").eq("id", bookId).maybeSingle();
+    const { data: b } = await supabase.from("books").select("id, title, book_type, theme, controls, outline, story_setup, word_count").eq("id", bookId).maybeSingle();
     setBook(b);
     const [p, r] = await Promise.all([callPlanBook({ action: "status", bookId }), callReview({ action: "status", bookId })]);
     if (p.ok) setPlans({ masters: p.data.masters ?? [], plans: p.data.plans ?? [] });
@@ -66,20 +69,24 @@ export default function PlanningStudio() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 md:px-8 py-6">
-        <ol className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-6">
-          {["Book setup (optional)", "Master plan", "Chapters → sections → beats", "Approve", "Write & check", "Review"].map((s, i) => (
-            <li key={s} className="px-3 py-1 rounded-full border border-border">{i + 1}. {s}</li>
+        <ol className="flex flex-wrap gap-2 text-xs mb-4">
+          {[["Idea & story", "setup"], ["Whole-book summary", "plan"], ["Chapter summaries", "plan"], ["Section summaries", "plan"], ["Approve", "plan"], ["Write", "plan"]].map(([s, t], i) => (
+            <li key={s}><button onClick={() => setTab(t)} className={`px-3 py-1 rounded-full border ${tab === t ? "border-primary text-foreground" : "border-border text-muted-foreground"}`}>{i + 1}. {s}</button></li>
           ))}
         </ol>
-        <Tabs defaultValue="setup">
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/${bookId}?settings=1`)}><Settings2 className="w-4 h-4 mr-1" />Writer & book settings</Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/personas")}><Users className="w-4 h-4 mr-1" />Personas</Button>
+        </div>
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="setup">Setup</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="review">Review {openCount > 0 && <Badge variant="destructive" className="ml-2">{openCount}</Badge>}</TabsTrigger>
             <TabsTrigger value="memory">Story memory</TabsTrigger>
           </TabsList>
-          <TabsContent value="setup"><BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} /></TabsContent>
-          <TabsContent value="plan"><PlanTab book={book} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} /></TabsContent>
+          <TabsContent value="setup"><BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} onContinue={(o) => { setCarry(o); setTab("plan"); window.scrollTo(0, 0); }} /></TabsContent>
+          <TabsContent value="plan"><PlanTab key={carry ? `${carry.chapterCount}-${carry.targetWords}` : "p"} book={book} carry={carry} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} /></TabsContent>
           <TabsContent value="review"><div className="space-y-6"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /><IdentityReviewPanel bookId={bookId} /></div></TabsContent>
           <TabsContent value="memory"><MemoryTab bookId={bookId} busy={busy} run={run} /></TabsContent>
         </Tabs>
@@ -90,10 +97,13 @@ export default function PlanningStudio() {
 
 type RunFn = (label: string, fn: () => Promise<void>) => Promise<void>;
 
-function PlanTab({ book, isFiction, plans, busy, run, refresh }: { book: Row; isFiction: boolean; plans: { masters: Row[]; plans: Row[] }; busy: string | null; run: RunFn; refresh: () => Promise<void> }) {
-  const [premise, setPremise] = useState<string>(book.theme ?? "");
-  const [targetWords, setTargetWords] = useState(50000);
-  const [chapterCount, setChapterCount] = useState(12);
+function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: Row; carry: { chapterCount: number; targetWords: number } | null; isFiction: boolean; plans: { masters: Row[]; plans: Row[] }; busy: string | null; run: RunFn; refresh: () => Promise<void> }) {
+  const setup = (book.story_setup ?? {}) as Row;
+  const picked = Number.isInteger(setup.selectedIndex) ? setup.alternatives?.[setup.selectedIndex] : null;
+  const [premise, setPremise] = useState<string>(picked ? `${picked.title}: ${picked.logline}` : setup.premise || book.theme || "");
+  const [targetWords, setTargetWords] = useState(carry?.targetWords ?? 50000);
+  const [chapterCount, setChapterCount] = useState(carry?.chapterCount ?? 12);
+  const navigate = useNavigate();
   const [count, setCount] = useState(3);
   const [options, setOptions] = useState<Row[]>([]);
   const [chosen, setChosen] = useState<number | null>(null);
