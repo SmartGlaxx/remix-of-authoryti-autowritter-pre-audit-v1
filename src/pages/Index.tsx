@@ -13,6 +13,8 @@ import CreateBookEngine from "@/components/CreateBookEngine";
 import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useBooks } from "@/hooks/useBooks";
+import { getDefaultControls } from "@/types/book";
+import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { Book, CreateBookInput, BOOK_CATEGORIES, BOOK_TYPE_INFO, BookCategory, BookType } from "@/types/book";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -183,6 +185,22 @@ const Index = () => {
     } catch (error) {
       console.error("Failed to create book:", error);
     }
+  };
+
+  const [starting, setStarting] = useState(false);
+  // Single creation flow: New Book opens a draft straight into the Planning Studio (idea → summaries → write).
+  const startNewBook = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const newBook = await addBook({
+        title: "Untitled book", bookType: "novel", theme: "", audience: "general-readers", pov: "third-limited" as any,
+        toneProfile: { primary: "conversational", intensity: 5, formality: 5, emotionalIntensity: 5, humorLevel: 3, authorityLevel: 5 } as any,
+        controls: { ...getDefaultControls("novel"), writerId: bestWriterFor("novel").id } as any,
+      });
+      navigate(`/books/${newBook.id}/plan`);
+    } catch (e) { console.error("Failed to start book:", e); toast.error("Couldn't start a new book"); }
+    finally { setStarting(false); }
   };
 
   const handleDeleteBook = async (id: string) => {
@@ -521,7 +539,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation onCreateBook={() => setShowChooser(true)} />
+      <Navigation onCreateBook={startNewBook} />
 
       <main>
         {isLoading ? (
@@ -554,7 +572,7 @@ const Index = () => {
                   generation.
                 </p>
               </div>
-              <Button variant="hero" size="lg" onClick={() => setShowChooser(true)} className="group">
+              <Button variant="hero" size="lg" onClick={startNewBook} className="group">
                 <Sparkles className="w-5 h-5 transition-transform group-hover:scale-110" />
                 Get Started
               </Button>
