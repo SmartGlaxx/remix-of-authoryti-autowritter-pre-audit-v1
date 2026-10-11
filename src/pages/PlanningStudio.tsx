@@ -139,6 +139,10 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     }
     toast.success("Planning finished — review and approve"); setProgress(null); await refresh();
   });
+  useEffect(() => {
+    if (autoNext && master?.status === "APPROVED" && !busy) { setAutoNext(false); planAll(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNext, master?.status, busy]);
 
   return (
     <div className="space-y-6 mt-4">
