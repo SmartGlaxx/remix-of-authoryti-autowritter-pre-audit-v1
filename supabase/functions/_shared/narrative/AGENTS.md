@@ -43,3 +43,4 @@
 
 - Free end-to-end testing uses the `x-ai-test-mode: 1` header (or `testMode: true`) on `plan-book`, `candidate-review` and `extract-narrative-state`: model replies are caller-supplied or a deterministic mock and go through the real parsers, checks and fenced commits; with no stand-in the call is refused and no key is reachable — live tests can never spend AI credit.
 - A character can join a book only if it belongs to the same story world (`book_identity_roles` trigger `enforce_book_role_universe`) — cross-world canon leaks are impossible at the database level.
+- Covers, illustrations and portraits go through `_shared/ai/openaiImage.ts`: the user's saved OpenAI key first, the in-app OpenAI image model as fallback — one place to change image models.
