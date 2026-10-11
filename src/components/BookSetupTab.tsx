@@ -69,6 +69,20 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const [tbLevel, setTbLevel] = useState("junior-secondary");
   const [banned, setBanned] = useState<string[]>(Array.isArray(book.controls?.bannedWords) ? book.controls.bannedWords : DEFAULT_BANNED_WORDS);
   const [newBan, setNewBan] = useState("");
+  const [series, setSeries] = useState<{ enabled: boolean; books: number }>({ enabled: !!book.controls?.series?.enabled, books: Number(book.controls?.series?.books) || 3 });
+  const saveSeries = async (next: { enabled: boolean; books: number }) => {
+    setSeries(next);
+    const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), bannedWords: banned, series: next } }).eq("id", book.id);
+    if (error) toast.error("Couldn't save the series choice");
+  };
+  const rewriteBook = () => run("rewrite", async () => {
+    const typed = window.prompt(`This clears all written text so you can change the setup and write the book again. Your setup and plans are kept.\n\nType the book title to confirm: ${book.title}`);
+    if (typed === null) return;
+    if (typed.trim() !== String(book.title).trim()) throw new Error("Title didn't match — nothing was changed");
+    const { error } = await supabase.from("books").update({ outline: null, status: "planning", word_count: 0, current_chapter_index: 0, current_subsection_index: 0 }).eq("id", book.id);
+    if (error) throw error;
+    toast.success("Written text cleared — you can now change the setup and plan again"); onSaved(); await load();
+  });
   const saveBanned = async (next: string[]) => {
     setBanned(next);
     const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), bannedWords: next } }).eq("id", book.id);
@@ -163,7 +177,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   return (
     <div className="space-y-6 mt-4">
       <p className="text-sm text-muted-foreground">Every step here is optional. Skip anything, save as you go, and come back later. Books that don't use this keep writing exactly as before.</p>
-      {locked && <div className="flex gap-2 items-start text-sm rounded-md border border-border p-3"><Lock className="w-4 h-4 mt-0.5 text-primary" /><span>Writing has started. The story, narrator, point of view, universe and character identities are locked to protect what's already written. Cast notes, roles and pen name can still change.</span></div>}
+      {locked && <div className="flex gap-2 items-start text-sm rounded-md border border-border p-3"><Lock className="w-4 h-4 mt-0.5 text-primary" /><span>Writing has started. The story, narrator, point of view, universe and character identities are locked to protect what's already written. Cast notes, roles and pen name can still change.</span><Button size="sm" variant="outline" className="ml-auto shrink-0" disabled={!!busy} onClick={rewriteBook}>{busy === "rewrite" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Change setup & rewrite the book</Button></div>}
 
       {/* 1. Concept & story options */}
       <Card>
@@ -189,6 +203,10 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
               <Select value={tbCountry} onValueChange={setTbCountry}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TEXTBOOK_COUNTRIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">School level</label>
               <Select value={tbLevel} onValueChange={setTbLevel}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TEXTBOOK_LEVELS.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent></Select></div>
+          </div>}
+          {!locked && <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2"><Switch checked={series.enabled} onCheckedChange={(on) => saveSeries({ ...series, enabled: on })} aria-label="Series" />Part of a series</label>
+            {series.enabled && <><Input type="number" className="w-20" min={2} max={12} value={series.books} onChange={(e) => saveSeries({ ...series, books: Math.max(2, Math.min(12, +e.target.value || 3)) })} aria-label="Books in series" /><span className="text-xs text-muted-foreground">books — each gets its own 450–700 word summary (about {series.books * 450}–{series.books * 700} words in all)</span></>}
           </div>}
           {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0]].filter(Boolean).join(" · ")}</span></p>}
           <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />

@@ -2,7 +2,7 @@
 // they feed the existing master planner as planner-only guidance; twists become scheduled reveals,
 // never narrator knowledge. Shared by browser, plan-book and tests.
 import { adapterForBookType } from "./adapters.ts";
-import { STORY_ALTERNATIVE_COUNTS, extractJson, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
+import { STORY_ALTERNATIVE_COUNTS, extractJson, summaryBand, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
 import { resolveIdentity, type KnownIdentity, type IdentityMatch } from "../identityResolution.ts";
 
 export const SETUP_SCHEMA = 1;
@@ -243,7 +243,7 @@ export function mockAlternativesOutput(b: BookBrief, count: number, fixed: strin
   const fixedLine = fixed.length ? ` Fixed: ${fixed.join("; ")}.` : "";
   const alts = Array.from({ length: count }, (_, i) => {
     const conflict = CONFLICTS[(seed + i) % 10], structure = STRUCTURES[(seed + 3 * i) % 10], ending = ENDINGS[(seed + 7 * i) % 10];
-    const summary = `A ${structure} turning on ${conflict}.${fixedLine} ` + mockParagraphs(seed + i * 104729, 470);
+    const summary = `A ${structure} turning on ${conflict}.${fixedLine} ` + mockParagraphs(seed + i * 104729, Math.round((summaryBand(b.bookType, b.genre).min + summaryBand(b.bookType, b.genre).max) / 2));
     return { title: `${b.title}: ${structure.replace(/\b\w/g, (c) => c.toUpperCase())} ${i + 1}`, logline: `A ${structure} about ${conflict}, ending in ${ending}.`, summary, twist: `What seemed to be ${conflict} was engineered by someone close to the protagonist.`, ending: `A ${ending}.` };
   });
   return JSON.stringify({ alternatives: alts });
