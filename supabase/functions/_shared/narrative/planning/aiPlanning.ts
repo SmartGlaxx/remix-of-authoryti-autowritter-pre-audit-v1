@@ -51,11 +51,11 @@ const EPIC_GENRE = /fantasy|thriller|mystery|crime|sci-?fi|science fiction|epic|
 export function summaryBand(bookType: string, genre?: string | null): SummaryBand {
   if (bookType === "comic") return { min: 150, max: 350 };
   if (["children", "short-story", "poetry"].includes(bookType)) return { min: 200, max: 400 };
-  if (["novel", "fiction-serial", "drama", "biography", "memoir"].includes(bookType)) return EPIC_GENRE.test(genre ?? "") && bookType !== "biography" && bookType !== "memoir" ? { min: 550, max: 750 } : { min: 450, max: 700 };
-  return { min: 350, max: 550 };
+  if (["novel", "fiction-serial", "drama", "biography", "memoir"].includes(bookType)) return EPIC_GENRE.test(genre ?? "") && bookType !== "biography" && bookType !== "memoir" ? { min: 450, max: 500 } : { min: 450, max: 500 };
+  return { min: 350, max: 500 };
 }
-/** Series books: each book summary is 450–700 words regardless of type. */
-export const SERIES_BOOK_BAND: SummaryBand = { min: 450, max: 700 };
+/** Series books: each book summary is 450–500 words regardless of type. */
+export const SERIES_BOOK_BAND: SummaryBand = { min: 450, max: 500 };
 const bandText = (bd: SummaryBand) => `${bd.min}–${bd.max} words (use what the story genuinely needs within that range — not a fixed count)`;
 const seriesText = (b: BookBrief) => b.seriesPlan && b.seriesPlan.books > 1 ? `\nThis is a planned series of ${b.seriesPlan.books} books. Each option's summary covers the arc of the whole series and makes clear how each book ends and hooks into the next.` : "";
 const briefText = (b: BookBrief) => [
