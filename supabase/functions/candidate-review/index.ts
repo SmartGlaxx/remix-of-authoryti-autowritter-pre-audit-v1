@@ -2,6 +2,7 @@
 // owner-verified database functions; acceptance re-runs full validation under a fenced lease.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
+import { failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 import { loadProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
@@ -95,6 +96,18 @@ Deno.serve(async (req) => {
 
     // Author edits are persisted as a new candidate version BEFORE any validation, so checks
     // always run against the latest saved text (never an unsaved browser copy).
+    // Test mode only: seed a held draft on the caller's own book so the review flow can be exercised for free.
+    // Seeded drafts are never accepted without the full validation + fenced commit below.
+    if (action === "test_seed_candidate") {
+      if (!(body.testMode === true || req.headers.get("x-ai-test-mode") === "1")) return json({ error: "Test mode only" }, 403);
+      const ch = int(body.chapterIndex), sb = int(body.subsectionIndex);
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 20_000) : "";
+      if (ch === null || sb === null || !text) return json({ error: "Invalid input" }, 400);
+      const ps0 = await db.from("book_master_plans").select("id").eq("book_id", bookId).eq("status", "APPROVED").order("version", { ascending: false }).limit(1).maybeSingle();
+      const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sb, p_master_plan_id: ps0.data?.id ?? null, p_text: text, p_hash: contentHash(text), p_status: "NEEDS_AUTHOR_REVIEW", p_findings: [{ code: "TEST_SEED", stage: 1, severity: "minor", message: "Seeded for a free test." }], p_usage: {}, p_origin: "generated", p_parent: null, p_dedup_keys: [] });
+      return error ? json({ error: error.message }, 400) : json(data);
+    }
+
     if (action === "save_edit") {
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
       const edited = typeof body.editedText === "string" ? body.editedText.trim().slice(0, 60_000) : "";
@@ -133,7 +146,14 @@ Deno.serve(async (req) => {
       const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "candidate-review", _max_per_hour: 60, _max_per_day: 300 });
       if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
       const cfg = await loadBookModelConfig(db, bookId, userId);
-      const { evaluate, repair } = modelCallers(cfg, userId, bookId, createAIDeps(db, userId));
+      // Fail-closed test mode: no key is reachable; the evaluator is a deterministic mock that reports every
+      // beat planted and no continuity issue, so the free Stage 1 checks and the fenced commit still run for real.
+      const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
+      const live = modelCallers(cfg, userId, bookId, testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId));
+      const evaluate: typeof live.evaluate = testMode
+        ? async () => ({ text: JSON.stringify({ beats: ctx.beats.map((b) => ({ id: b.id, planted: true, resolved: true, explanationRevealed: false })), continuity: [], disclosures: [], epistemic: [], claims: [] }), usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 } })
+        : live.evaluate;
+      const repair = live.repair;
       const r = await runPreAcceptance(text, ctx, evaluate, repair, { warnRatio: Number((bk!.controls as any)?.revisionWarnRatio) || undefined });
       const hash = contentHash(r.text);
       if (r.decision !== "accept") {
