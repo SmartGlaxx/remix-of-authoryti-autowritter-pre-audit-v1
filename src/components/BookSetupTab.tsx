@@ -108,6 +108,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       const title = (pick?.title || st.premise.split(/\n| — /)[0]).trim().slice(0, 120) || "Untitled book";
       await supabase.from("books").update({ title, book_type: exType, theme: (pick?.logline || st.premise).slice(0, 1000), ...(exGenre ? { genre: exGenre } : {}), ...(exAudience ? { audience: exAudience } : {}) }).eq("id", book.id);
     }
+    if (!Array.isArray(book.controls?.bannedWords)) await saveBanned(banned);
     setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); onSaved();
     if (stage === "planning") onContinue?.({ chapterCount, targetWords: exLength });
   });

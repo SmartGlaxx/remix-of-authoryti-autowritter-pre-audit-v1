@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const bookId = body.bookId;
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     if (!(await verifyBookOwnership(db, bookId, userId))) return json({ error: "Book not found" }, 404);
-    const { data: book } = await db.from("books").select("title, book_type, genre, audience, theme, word_count, story_setup, universe_id").eq("id", bookId).maybeSingle();
+    const { data: book } = await db.from("books").select("title, book_type, genre, audience, theme, word_count, story_setup, universe_id, controls").eq("id", bookId).maybeSingle();
     if (!book) return json({ error: "Book not found" }, 404);
     try { adapterForBookType(book.book_type); } catch { return json({ error: "Unsupported book type" }, 400); }
 
@@ -237,6 +237,12 @@ Deno.serve(async (req) => {
       chapterCount: Math.min(80, Math.max(1, Number(body.chapterCount) || 12)),
       series: null,
     };
+    // Author-configured banned words (book controls, or the list sent with an idea request) apply to every planning service.
+    const bannedSrc = Array.isArray(body.bannedWords) ? body.bannedWords : Array.isArray((book as any).controls?.bannedWords) ? (book as any).controls.bannedWords : [];
+    const banned = [...new Set(bannedSrc.map((w: unknown) => s(w, 60).toLowerCase()).filter(Boolean))].slice(0, 100);
+    if (banned.length) brief.guidance = [brief.guidance, `Never use these words or phrases anywhere (titles, summaries, plans): ${banned.join(", ")}.`].filter(Boolean).join("\n");
+    const cur = (ex.curriculum && typeof ex.curriculum === "object") ? ex.curriculum as Record<string, unknown> : null;
+    if (cur && ovType === "textbook") brief.guidance = [brief.guidance, `Textbook following the ${s(cur.country, 120)} curriculum at ${s(cur.level, 120)} level. Chapters are curriculum units; sections are topic lessons with learning objectives, explanations, worked examples, practice questions and a summary.`].filter(Boolean).join("\n");
 
     try {
       if (action === "alternatives") {
