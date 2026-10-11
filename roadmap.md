@@ -127,5 +127,6 @@
 - [x] Stage A: Scene plan panel, inline held-draft review (save edit before checks, full fenced acceptance), plan cards + Start writing handoff
 - [x] Stage A: click-through of setup reopen + writing-desk Plan tab (fixed crash on books with an incomplete plan)
 - [x] Stage B: Plan tab follows scene chronology
-- [ ] Stage B: held-draft card click-through, temp-book setup→plan→write→accept→memory run with mocks, shared-universe cross-book check
+- [x] Stage B: held-draft card, free end-to-end setup→plan→accept→memory run, shared-world checks (fixed cross-world character link)
+- [ ] Stage C: final verification (awaiting go-ahead)
 - [ ] Stage C: full regression, live checks, deployment check

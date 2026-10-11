@@ -210,9 +210,12 @@ Deno.serve(async (req) => {
     const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
     const deps = testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId);
     const prompts: Prompt[] = [];
+    // Test mode only: a caller-supplied planner reply goes through the real parser, repair loop and saves.
+    const mockPlanner = testMode && typeof body.mockOutput === "string" ? String(body.mockOutput).slice(0, 100_000) : null;
     const call: ModelCall = async (p) => {
       prompts.push(p);
       if (dryRun) throw new DryRunStop();
+      if (mockPlanner !== null) return mockPlanner;
       const { text } = await generateAIText({ role: "planner", config, userId, bookId, request: { system: p.system, user: p.user, json: true } }, deps);
       return text;
     };
