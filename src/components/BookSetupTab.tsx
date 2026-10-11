@@ -81,6 +81,18 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const [exTone, setExTone] = useState("");
   const [exLength, setExLength] = useState(50000);
   const [exSetting, setExSetting] = useState("");
+  const [writerId, setWriterId] = useState<string>(book.controls?.writerId ?? "");
+  const [sliders, setSliders] = useState<SliderValues>(() => readSliders(book.tone_profile, book.controls));
+  // Where each slider value is stored so the writing engine reads it back (legacy field names).
+  const TONE_KEYS: Partial<Record<keyof SliderValues, string>> = { formality: "formality", emotion: "emotionalIntensity", warmth: "warmth", humor: "humorLevel", authority: "authorityLevel", directness: "directness", readerIntimacy: "readerIntimacy" };
+  const CONTROL_KEYS: Partial<Record<keyof SliderValues, string>> = { pacing: "velocity", elaboration: "scope", conceptualComplexity: "entityComplexity", perspective: "perspectiveMultiplexing", creativity: "creativity", hookFrequency: "hookFrequency", sensoryDetail: "sensoryDetail", sentenceVariation: "sentenceVariation" };
+  const saveSliders = (next: SliderValues) => run("sliders", async () => {
+    const tone: Row = { ...(book.tone_profile ?? {}) }; const controls: Row = { ...(book.controls ?? {}) };
+    for (const s of SLIDERS) { if (TONE_KEYS[s.key]) tone[TONE_KEYS[s.key]!] = next[s.key]; if (CONTROL_KEYS[s.key]) controls[CONTROL_KEYS[s.key]!] = next[s.key]; }
+    const { error } = await supabase.from("books").update({ tone_profile: tone, controls }).eq("id", book.id);
+    if (error) throw error;
+    toast.success("Voice settings saved"); onSaved();
+  });
   const [exComparables, setExComparables] = useState("");
   const [exAvoid, setExAvoid] = useState("");
   const [exOriginality, setExOriginality] = useState<"safe" | "balanced" | "bold">("balanced");
