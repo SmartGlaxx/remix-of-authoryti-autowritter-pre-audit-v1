@@ -66,7 +66,14 @@ Deno.serve(async (req) => {
         db.from("canon_reconciliation_logs").select("id, chapter_index, subsection_index, severity, discrepancy_type, description, prose_excerpt, canon_reference, decision, rationale, application_status, candidate_id, created_at").eq("book_id", bookId).not("dedup_key", "like", "selftest_%").order("created_at", { ascending: false }).limit(200),
         db.from("editorial_validation_findings").select("*").eq("book_id", bookId).eq("status", "OPEN").order("created_at", { ascending: false }).limit(200),
       ]);
-      return json({ candidates: candidates ?? [], logs: logs ?? [], findings: findings ?? [] });
+      const { data: tree } = await db.from("book_candidate_drafts").select("id, parent_candidate_id").eq("book_id", bookId).limit(1000);
+      const parentOf = new Map((tree ?? []).map((t) => [t.id, t.parent_candidate_id]));
+      const withLineage = (candidates ?? []).map((c) => {
+        const lineage = [c.id]; let p = c.parent_candidate_id;
+        for (let i = 0; p && i < 20; i++) { lineage.push(p); p = parentOf.get(p) ?? null; }
+        return { ...c, lineage };
+      });
+      return json({ candidates: withLineage, logs: logs ?? [], findings: findings ?? [] });
     }
 
     // Client polling after a progressive section streams: accepted, held, or still validating.
