@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Book as BookIcon, Clock, FileText, MoreVertical, Play, Trash2, ImagePlus, Image } from "lucide-react";
+import { Book as BookIcon, Clock, FileText, MoreVertical, Play, Trash2, ImagePlus, Image, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ const statusLabels = {
 
 const BookCard = ({ book, onSelect, onDelete, onUpdateCover, index }: BookCardProps) => {
   const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const navigate = useNavigate();
   const hasCover = !!book.coverUrl;
 
   const typeInfo = BOOK_TYPE_INFO[book.bookType] ?? {
@@ -56,6 +58,10 @@ const BookCard = ({ book, onSelect, onDelete, onUpdateCover, index }: BookCardPr
       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(book); }}>
         <Play className="w-4 h-4 mr-2" />
         Open
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/books/${book.id}/plan`); }}>
+        <Sparkles className="w-4 h-4 mr-2" />
+        Open in Planning Studio
       </DropdownMenuItem>
       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCoverModalOpen(true); }}>
         {hasCover ? <Image className="w-4 h-4 mr-2" /> : <ImagePlus className="w-4 h-4 mr-2" />}

@@ -10,7 +10,7 @@ import { adapterForBookType } from "../_shared/narrative/planning/adapters.ts";
 import type { ChapterPlan, MasterPlanSkeleton } from "../_shared/narrative/planning/engine.ts";
 import {
   STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, assertConceptsEligible, buildConceptsPrompt, parseConcepts, conceptGuidance, type NonfictionConcept, buildAlternativesPrompt, buildBeatsPrompt, buildChapterPrompt, buildMasterPrompt,
-  buildSectionPrompt, parseAlternatives, parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, runChapterBatch, runWithRepair,
+  buildSectionPrompt, parseAlternatives, summaryBand, parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, runChapterBatch, runWithRepair,
   type AlternativeCount, type BookBrief, type MasterContext, type ModelCall, type Prompt, type StoryAlternative,
 } from "../_shared/narrative/planning/aiPlanning.ts";
 import {
