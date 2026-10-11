@@ -5,8 +5,8 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
-type ScreenKey = "idea" | "twists" | "cast" | "narration";
-const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name" };
+type ScreenKey = "idea" | "twists" | "cast" | "narration" | "writer";
+const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name", writer: "Writer & voice" };
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
+import { WriterPicker } from "@/components/WriterPicker";
 import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
@@ -198,7 +199,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   });
 
   const locked = hasProse;
-  const screens = (isFiction ? ["idea", "twists", "cast", "narration"] : ["idea", "cast", "narration"]) as ScreenKey[];
+  const screens = (isFiction ? ["idea", "twists", "cast", "narration", "writer"] : ["idea", "cast", "narration", "writer"]) as ScreenKey[];
   const cur = screens[Math.min(screen, screens.length - 1)];
   const isLast = screen >= screens.length - 1;
   const go = (d: 1 | -1) => {
@@ -410,6 +411,19 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
           {st.universeId && <p className="text-xs text-muted-foreground">Established dates, ages, deaths and relationships from this universe will be respected. Ideas in this setup never become universe facts until they're written and accepted.</p>}
         </CardContent>
       </Card>}
+      {/* 5. Writer & voice — the AI author who writes the book */}
+      {cur === "writer" && <Card>
+        <CardHeader><CardTitle>{isFiction ? "5" : "4"}. Writer & voice</CardTitle>
+          <CardDescription>Choose the writer who will write this book. Their style carries through every chapter. Fine-tune the 15 expression sliders any time in Writer &amp; book settings.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          <WriterPicker bookType={exType} value={book.controls?.writerId} onChange={(id) => run("writer", async () => {
+            const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), writerId: id } }).eq("id", book.id);
+            if (error) throw error;
+            toast.success("Writer chosen"); onSaved();
+          })} />
+          {busy === "writer" && <p className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" />Saving your writer…</p>}
+        </CardContent>
+      </Card>}
       </motion.div>
       </AnimatePresence>
 
@@ -419,7 +433,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
         <Button variant="outline" onClick={() => save()} disabled={!!busy}>{busy === "save" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
         <div className="ml-auto">
           {isLast
-            ? <Button onClick={() => save("planning")} disabled={!!busy || issues.some((i) => i.blocking)}>Next: Writer & voice<ArrowRight className="w-4 h-4 ml-1" /></Button>
+            ? <Button onClick={() => save("planning")} disabled={!!busy || issues.some((i) => i.blocking)}>Next: Build the plan<ArrowRight className="w-4 h-4 ml-1" /></Button>
             : <Button onClick={() => go(1)}>Next: {SCREEN_LABEL[screens[screen + 1]]}<ArrowRight className="w-4 h-4 ml-1" /></Button>}
         </div>
       </div>
