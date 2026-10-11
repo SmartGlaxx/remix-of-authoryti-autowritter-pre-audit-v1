@@ -67,13 +67,20 @@ function parseWith<T>(raw: string, fn: (o: any, issues: string[]) => T | null): 
 export interface StoryAlternative { id: string; title: string; logline: string; summary: string; twist: string; ending: string }
 
 export function assertAlternativesEligible(bookType: string, count: number): void {
-  if (!adapterForBookType(bookType).isFiction) throw new Error("Story alternatives are only available for fiction");
+  adapterForBookType(bookType); // any app book type may brainstorm alternatives
   if (!(STORY_ALTERNATIVE_COUNTS as readonly number[]).includes(count)) throw new Error("Count must be 3, 5, 7 or 10");
 }
 
 export function buildAlternativesPrompt(b: BookBrief, count: AlternativeCount): Prompt {
   assertAlternativesEligible(b.bookType, count);
   const a = adapterForBookType(b.bookType);
+  if (!a.isFiction) return {
+    system: system(a, "You brainstorm complete, genuinely different approaches to a book for an author to choose from."),
+    user: `${briefText(b)}\n\nWrite exactly ${count} complete book alternatives. Each is about 500 words and describes the whole book from opening to final chapter: ` +
+      "its angle, structure, key ideas and what the reader walks away with. They must differ throughout — different angles, structures and outcomes — not variations on one outline. " +
+      "Invent no facts, quotes or statistics.\n" +
+      'JSON: {"alternatives":[{"title":"","logline":"(one-sentence pitch)","summary":"(~500 words)","twist":"(the key insight or fresh angle in one or two sentences)","ending":"(what the reader gains, one or two sentences)"}]}',
+  };
   return {
     system: system(a, "You design complete, genuinely different versions of a story for an author to choose from."),
     user: `${briefText(b)}\n\nWrite exactly ${count} complete story alternatives. Each is about 500 words and tells the whole story from opening to final resolution, ` +
@@ -117,7 +124,7 @@ export interface NonfictionConcept {
 }
 
 export function assertConceptsEligible(bookType: string, count: number): void {
-  if (adapterForBookType(bookType).isFiction) throw new Error("Book concepts are for nonfiction; fiction uses story alternatives");
+  adapterForBookType(bookType);
   if (!(STORY_ALTERNATIVE_COUNTS as readonly number[]).includes(count)) throw new Error("Count must be 3, 5, 7 or 10");
 }
 

@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
     try {
       if (action === "alternatives") {
         const count = Number(body.count) as AlternativeCount;
-        try { assertAlternativesEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
+        try { assertAlternativesEligible(ovType, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const fixed = normalizeSetup(book.story_setup).fixedRequirements;
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
         const pr = buildAlternativesPrompt(brief, count);
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
       // Nonfiction concepts: a separate, genre-appropriate service (no twists, no plot).
       if (action === "concepts") {
         const count = Number(body.count) as AlternativeCount;
-        try { assertConceptsEligible(book.book_type, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
+        try { assertConceptsEligible(ovType, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const pr = buildConceptsPrompt(brief, count);
         const r = await runWithRepair(storyCall(mockConceptsOutput(brief, count)), pr, (t) => parseConcepts(t, count));
         return r.ok ? json({ concepts: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);

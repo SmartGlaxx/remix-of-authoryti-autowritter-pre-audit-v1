@@ -85,9 +85,9 @@ describe("Phase G runtime: combined evaluator", () => {
 });
 
 describe("Phase H: genre services and memory safety", () => {
-  it("story alternatives stay fiction-only; concepts are nonfiction-only", () => {
-    expect(() => assertAlternativesEligible("self-help", 3)).toThrow();
-    expect(() => assertConceptsEligible("novel", 3)).toThrow();
+  it("story alternatives and concepts work for every book type", () => {
+    expect(() => assertAlternativesEligible("self-help", 3)).not.toThrow();
+    expect(() => assertConceptsEligible("novel", 3)).not.toThrow();
     expect(() => assertConceptsEligible("self-help", 4)).toThrow();
     expect(() => assertConceptsEligible("self-help", 5)).not.toThrow();
   });
