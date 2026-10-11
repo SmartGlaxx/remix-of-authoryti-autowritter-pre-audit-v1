@@ -28,6 +28,14 @@ const AUD_PRO = ["Beginners / curious", "General readers", "Workplace profession
 const AUD_TEXT = ["Primary pupils", "Junior secondary students", "Senior secondary students", "University / college students", "Teachers"];
 const audiencesFor = (t: string) => t === "children" ? AUD_KIDS : t === "textbook" ? AUD_TEXT : t === "comic" ? ["Children (6-10)", ...AUD_FICTION] : t === "cookbook" ? ["Beginner cooks", "Home cooks", "Families", "Experienced cooks"] : (BOOK_TYPE_INFO[t as BookType]?.category === "fiction" || t === "poetry" || t === "drama") ? AUD_FICTION : AUD_PRO;
 const TONES = ["Dark", "Hopeful", "Funny", "Suspenseful", "Romantic", "Literary", "Cozy", "Gritty", "Inspiring", "Practical", "Authoritative", "Conversational"];
+const ADJUSTMENTS = [
+  { value: "twists", label: "More plot twists" }, { value: "drama", label: "More drama & stakes" },
+  { value: "romance", label: "More romance" }, { value: "darker", label: "Darker & grittier" },
+  { value: "pacing", label: "Faster pacing & thrills" }, { value: "mystery", label: "More mystery & secrets" },
+  { value: "depth", label: "More depth & meaning" }, { value: "humor", label: "More humour" },
+  { value: "clarity", label: "Sharper hook" }, { value: "practical", label: "More practical value" },
+  { value: "custom", label: "Something else…" },
+];
 const LENGTHS = [{ v: 20000, l: "Short (~20k words)" }, { v: 50000, l: "Standard (~50k)" }, { v: 80000, l: "Long (~80k)" }, { v: 120000, l: "Epic (~120k)" }];
 const genresFor = (t: string) => BOOK_TYPE_GENRES[t as BookType] ?? GENRE_PRESETS[BOOK_TYPE_INFO[t as BookType]?.category ?? "fiction"] ?? [];
 const fictionType = (t: string) => { try { return adapterForBookType(t).isFiction; } catch { return true; } };
@@ -57,6 +65,9 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   const [newFixed, setNewFixed] = useState("");
   const [exType, setExType] = useState<string>(book.book_type ?? "novel");
   const [exGenre, setExGenre] = useState<string>(book.genre ?? "");
+  const [adjustKey, setAdjustKey] = useState<string>("");
+  const [adjustCustom, setAdjustCustom] = useState("");
+  const [prevPremise, setPrevPremise] = useState<string | null>(null);
   const [exAudience, setExAudience] = useState<string>(book.audience ?? "");
   const [exTone, setExTone] = useState("");
   const [exLength, setExLength] = useState(50000);
@@ -281,12 +292,11 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
         </CardContent>
       </Card>
 
-      {/* 2. Plot twists (fiction only) */}
+      {/* 2. Twist reveal schedule (fiction only) — the twist itself is chosen at inception in step 1 */}
       {isFiction && <Card>
-        <CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>2. Plot twists</CardTitle><CardDescription>Optional. Approved twists guide the plan with planted clues; they're never revealed early or treated as fact until written.</CardDescription></div>
-          <Switch checked={st.twistsEnabled} disabled={locked} onCheckedChange={(on) => up({ twistsEnabled: on })} aria-label="Plot twists on or off" /></div></CardHeader>
+        <CardHeader><CardTitle>2. Twist reveals & clues</CardTitle><CardDescription>{st.twistsEnabled ? "Your chosen story already carries its big twist. Here you can add extra twists and set which chapter each one is revealed in; clues are planted before, never revealed early." : "Plot twist mode is off. Turn it on in step 1 before making story options."}</CardDescription></CardHeader>
         {st.twistsEnabled && <CardContent className="space-y-3">
-          {!locked && <Button variant="outline" onClick={proposeTwists} disabled={!!busy}>{busy === "twists" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Suggest twists</Button>}
+          {!locked && <Button variant="outline" onClick={proposeTwists} disabled={!!busy || st.selectedIndex === null}>{busy === "twists" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Suggest extra twists for the chosen story</Button>}
           {st.twists.map((t) => (
             <div key={t.id} className="rounded-lg border border-border p-3 space-y-2">
               <Textarea rows={2} value={t.text} disabled={locked} onChange={(e) => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, text: e.target.value, authorEdited: true } : x) })} />
