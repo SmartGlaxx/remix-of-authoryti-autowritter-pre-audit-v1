@@ -116,3 +116,9 @@
 - [x] Writer & settings / Personas links in Planning Studio
 - [ ] Flexible summary lengths (150–700) + series mode in planner prompts
 - [ ] Retire old Plan-tab concept box / CreateBookEngine duplication
+
+## Single creation flow
+- [x] Elastic summary lengths by book type; series mode (450–700 words per book)
+- [x] Old story-options box removed from Plan tab (Setup is the one place to choose a story)
+- [x] "Open in Planning Studio" in each book's menu; "Change setup & rewrite the book"
+- [x] Approving the whole-book summary goes straight on to chapter/section summaries
