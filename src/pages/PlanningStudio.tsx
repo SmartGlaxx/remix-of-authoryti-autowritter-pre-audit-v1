@@ -325,7 +325,8 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
     <div className="space-y-6 mt-4">
       {review.candidates.length === 0 && <p className="text-sm text-muted-foreground">No drafts are waiting for you.</p>}
       {review.candidates.map((c) => {
-        const logs = review.logs.filter((l) => l.candidate_id === c.id);
+        const lineage: string[] = c.lineage ?? [c.id];
+        const logs = review.logs.filter((l) => lineage.includes(l.candidate_id));
         const pending = logs.some((l) => l.decision === "PENDING");
         const text = edits[c.id] ?? c.draft_text;
         return (
@@ -357,7 +358,7 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
               <Textarea rows={10} value={text} onChange={(e) => setEdits({ ...edits, [c.id]: e.target.value })} />
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!!busy || pending} onClick={() => run(`a-${c.id}`, async () => {
-                  const r = await callReview({ action: "accept", bookId, candidateId: c.id, editedText: edits[c.id] && edits[c.id] !== c.draft_text ? edits[c.id] : undefined });
+                  const r = await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
                   if (r.data.status === "accepted") {
                     toast.success("Accepted — updating story memory");
                     await runNarrativeExtraction(bookId, c.chapter_index, c.subsection_index);
