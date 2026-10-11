@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { callPlanBook, callReview } from "@/lib/candidateReview";
+import { callPlanBook, callReview, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
 import IdentityReviewPanel from "@/components/IdentityReviewPanel";
