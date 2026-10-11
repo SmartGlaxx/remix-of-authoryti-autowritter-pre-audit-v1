@@ -10,8 +10,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import BookCard from "@/components/BookCard";
 import CreateBookEngine from "@/components/CreateBookEngine";
-import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useBooks } from "@/hooks/useBooks";
 import { getDefaultControls } from "@/types/book";
 import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
@@ -28,7 +26,6 @@ const Index = () => {
   const navigate = useNavigate();
   const { bookType: routeBookType, slug } = useParams<{ bookType?: string; slug?: string }>();
   const [showEngine, setShowEngine] = useState(false);
-  const [showChooser, setShowChooser] = useState(false);
   const [showIdeas, setShowIdeas] = useState(false);
   const [engineInitial, setEngineInitial] = useState<Partial<CreateBookInput> | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>("updated");
