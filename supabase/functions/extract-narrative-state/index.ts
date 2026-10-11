@@ -39,9 +39,14 @@ Deno.serve(async (req) => {
     if (claimsErr || !userId) return json({ error: "Unauthorized" }, 401);
 
     const text = await req.text();
-    if (text.length > 2000) return json({ error: "Payload too large" }, 413);
+    const testHeader = req.headers.get("x-ai-test-mode") === "1";
+    if (text.length > (testHeader ? 20_000 : 2000)) return json({ error: "Payload too large" }, 413);
     let body: Record<string, unknown>;
     try { body = JSON.parse(text); } catch { return json({ error: "Invalid JSON" }, 400); }
+    // Fail-closed test mode: the extractor reply is caller-supplied and runs through the real parser, evidence
+    // checks and saves; without one the call is refused. No AI key is ever reached.
+    const testMode = testHeader || body.testMode === true;
+    if (testMode && typeof body.mockOutput !== "string") return json({ error: "test_mode_blocked" }, 403);
     const { bookId, chapterIndex, subsectionIndex } = body as { bookId: unknown; chapterIndex: unknown; subsectionIndex: unknown };
     if (typeof bookId !== "string" || !UUID.test(bookId)) return json({ error: "Invalid bookId" }, 400);
     if (!Number.isInteger(chapterIndex) || (chapterIndex as number) < 0 || (chapterIndex as number) > 999) return json({ error: "Invalid chapterIndex" }, 400);
@@ -73,7 +78,8 @@ Deno.serve(async (req) => {
     try {
       const repo = createSupabaseNarrativeRepo(db, userId);
       const config = await loadBookModelConfig(db, bookId, userId);
-      outcome = await processSectionExtraction(repo, makeExtractionCaller(db, userId, bookId, config), bookId, { chapterIndex: ch, subsectionIndex: sub }, { knowledge: trackKnowledge });
+      const caller: ModelCaller = testMode ? async () => ({ content: String(body.mockOutput), model: "test-mock" }) : makeExtractionCaller(db, userId, bookId, config);
+      outcome = await processSectionExtraction(repo, caller, bookId, { chapterIndex: ch, subsectionIndex: sub }, { knowledge: trackKnowledge });
     } catch (e) {
       await markSync("FAILED", e instanceof Error ? e.message : e);
       throw e;
