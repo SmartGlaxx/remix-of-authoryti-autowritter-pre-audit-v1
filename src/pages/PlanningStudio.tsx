@@ -114,6 +114,9 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const has = (level: string, ch: number) => mine.some((p) => p.plan_level === level && p.chapter_index === ch);
   const chapters = [...new Set(mine.filter((p) => p.plan_level === "CHAPTER").map((p) => p.chapter_index))].sort((a, b) => a - b);
   const brief = { premise, targetWords, chapterCount };
+  const allReady = master?.status === "APPROVED" && chapters.length > 0 && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
+    && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
+    && mine.every((p) => p.plan_status === "READY");
 
   const generateOptions = () => run("options", async () => {
     const r = await callPlanBook({ action: isFiction ? "alternatives" : "concepts", bookId: book.id, count, ...brief });
@@ -151,6 +154,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
           <CardDescription>{isFiction ? "Optional: compare complete story alternatives (with their twists), or go straight to a master plan from your own premise." : "Optional: compare different approaches to this book, or go straight to a master plan from your own concept."}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {picked && <p className="text-sm rounded-md border border-primary/50 p-3">Using your chosen story from Setup: <b>{picked.title}</b>. Your setup (cast, twists, narrator) goes into the plan automatically.</p>}
           <Textarea value={premise} onChange={(e) => setPremise(e.target.value)} rows={4} placeholder="Your premise or concept" />
           <div className="flex flex-wrap gap-3 items-center text-sm">
             <label className="flex items-center gap-2">Words <Input type="number" className="w-28" value={targetWords} onChange={(e) => setTargetWords(Number(e.target.value))} /></label>
@@ -180,6 +184,13 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
         </CardHeader>
         <CardContent className="space-y-3">
           <Button onClick={createMaster} disabled={!!busy || !premise.trim()}>{busy === "master" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Draft master plan</Button>
+          {master?.master_synopsis && <div className="rounded-lg border border-border p-4 space-y-2">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Whole-book summary (version {master.version})</p>
+            <p className="text-sm whitespace-pre-wrap">{master.master_synopsis}</p>
+            {master.intended_ending && <p className="text-sm"><span className="text-primary">Ending:</span> {master.intended_ending}</p>}
+            {(master.plan_skeleton?.reveals ?? []).length > 0 && <p className="text-xs text-muted-foreground">Twists: {(master.plan_skeleton.reveals as Row[]).map((r) => `${r.summary} (ch. ${r.revealChapter + 1})`).join(" · ")}</p>}
+            {master.status === "DRAFT" && <p className="text-xs text-muted-foreground">Not right? Edit your premise above and draft again — the new version replaces this draft.</p>}
+          </div>}
           {plans.masters.map((m) => (
             <div key={m.id} className="flex items-center gap-3 text-sm border border-border rounded-md px-3 py-2">
               <span>Version {m.version}</span><Badge variant={m.status === "APPROVED" ? "default" : "outline"}>{m.status}</Badge>
@@ -204,27 +215,79 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
               })}>4. Approve all planned</Button>
             </div>
             {progress && <Progress value={(progress.done / progress.total) * 100} />}
-            <div className="divide-y divide-border border border-border rounded-md">
-              {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground">No chapters expanded yet.</p>}
+            <div className="space-y-2">
+              {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground border border-border rounded-md">No chapter summaries yet. Press "Plan the whole book" to explode the summary into chapters and sections.</p>}
               {chapters.map((ch) => (
-                <div key={ch} className="flex flex-wrap items-center gap-2 p-3 text-sm">
-                  <span className="font-medium w-24">Chapter {ch + 1}</span>
-                  {["CHAPTER", "SECTION", "BEATS"].map((lv) => {
-                    const rows = mine.filter((p) => p.plan_level === lv && p.chapter_index === ch);
-                    const ready = rows.length && rows.every((p) => p.plan_status === "READY");
-                    return <Badge key={lv} variant={ready ? "default" : rows.length ? "secondary" : "outline"}>{lv.toLowerCase()} {ready ? "approved" : rows.length ? "planned" : "—"}</Badge>;
-                  })}
-                  <div className="ml-auto flex gap-2">
-                    {!has("SECTION", ch) && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("sec", async () => { const r = await callPlanBook({ action: "sections", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}>Plan sections</Button>}
-                    {has("SECTION", ch) && !has("BEATS", ch) && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("beats", async () => { const r = await callPlanBook({ action: "beats", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}>Plan beats</Button>}
-                  </div>
-                </div>
+                <ChapterCard key={ch} ch={ch} rows={mine.filter((p) => p.chapter_index === ch)} busy={busy} run={run} refresh={refresh}
+                  onSections={() => run("sec", async () => { const r = await callPlanBook({ action: "sections", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}
+                  onBeats={() => run("beats", async () => { const r = await callPlanBook({ action: "beats", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })} />
               ))}
             </div>
+            {allReady && <div className="rounded-lg border border-primary p-4 flex flex-wrap items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-primary" /><span className="text-sm flex-1">The whole book is planned and approved. Writing will follow these exact summaries, section by section.</span>
+              <Button disabled={!!busy} onClick={() => run("write", async () => {
+                const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive" };
+                const { error } = await supabase.from("books").update({ controls }).eq("id", book.id); if (error) throw error;
+                navigate(`/dashboard/${book.id}`);
+              })}><PenLine className="w-4 h-4 mr-2" />Start writing the book</Button>
+            </div>}
             <p className="text-xs text-muted-foreground">5. Once approved and Progressive Planning is on, write from the book page. Each section is checked before it is accepted; anything held shows up under Review.</p>
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function EditableText({ label, value, editable, onSave, busy }: { label: string; value: string; editable: boolean; onSave: (v: string) => Promise<void>; busy: boolean }) {
+  const [v, setV] = useState(value); const [editing, setEditing] = useState(false);
+  useEffect(() => setV(value), [value]);
+  if (!value && !editable) return null;
+  return (
+    <div className="text-sm">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {editing ? <div className="space-y-2 mt-1"><Textarea rows={4} value={v} onChange={(e) => setV(e.target.value)} />
+        <div className="flex gap-2"><Button size="sm" disabled={busy || !v.trim()} onClick={async () => { await onSave(v); setEditing(false); }}>Save</Button><Button size="sm" variant="ghost" onClick={() => { setV(value); setEditing(false); }}>Cancel</Button></div></div>
+        : <p className="whitespace-pre-wrap">{value || <span className="text-muted-foreground">—</span>}{editable && <button className="ml-2 text-xs text-primary" onClick={() => setEditing(true)}>Edit</button>}</p>}
+    </div>
+  );
+}
+
+function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats }: { ch: number; rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onSections: () => void; onBeats: () => void }) {
+  const [open, setOpen] = useState(ch === 0);
+  const chap = rows.find((p) => p.plan_level === "CHAPTER");
+  const secs = rows.filter((p) => p.plan_level === "SECTION").sort((a, b) => a.subsection_index - b.subsection_index);
+  const beats = rows.filter((p) => p.plan_level === "BEATS");
+  const c = chap?.content ?? {};
+  const edit = (row: Row, fields: Row) => run(`e-${row.id}`, async () => { const r = await callPlanBook({ action: "edit_plan", bookId: row.book_id ?? undefined, planId: row.id, fields }); if (!r.ok) throw new Error(r.data.error); toast.success("Saved"); await refresh(); });
+  const status = (lv: string) => { const rs = rows.filter((p) => p.plan_level === lv); return rs.length ? (rs.every((p) => p.plan_status === "READY") ? "approved" : "planned") : "—"; };
+  return (
+    <div className="border border-border rounded-md">
+      <button onClick={() => setOpen(!open)} className="w-full flex flex-wrap items-center gap-2 p-3 text-left">
+        <span className="font-medium">Chapter {ch + 1}</span>
+        <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">{c.chapter?.objective}</span>
+        {["CHAPTER", "SECTION", "BEATS"].map((lv) => <Badge key={lv} variant={status(lv) === "approved" ? "default" : status(lv) === "planned" ? "secondary" : "outline"}>{lv === "BEATS" ? "scene beats" : lv.toLowerCase()} {status(lv)}</Badge>)}
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && chap && <div className="border-t border-border p-3 space-y-3">
+        <EditableText label="Chapter summary" value={c.chapter?.objective ?? ""} editable={chap.plan_status === "PLANNED"} busy={!!busy} onSave={(v) => edit(chap, { objective: v })} />
+        <EditableText label="What's at stake" value={c.stakes ?? ""} editable={chap.plan_status === "PLANNED"} busy={!!busy} onSave={(v) => edit(chap, { stakes: v })} />
+        <EditableText label="Focus" value={c.focus ?? ""} editable={chap.plan_status === "PLANNED"} busy={!!busy} onSave={(v) => edit(chap, { focus: v })} />
+        <p className="text-xs text-muted-foreground">About {c.chapter?.targetWords?.toLocaleString?.() ?? "?"} words · {(c.chapter?.sections ?? []).length} sections</p>
+        <div className="space-y-2">
+          {secs.length === 0 && <Button size="sm" variant="outline" disabled={!!busy} onClick={onSections}>Explode into section summaries</Button>}
+          {secs.map((s) => { const d = s.content?.detail ?? {}; const ed = s.plan_status === "PLANNED"; const b = beats.find((x) => x.subsection_index === s.subsection_index);
+            return <div key={s.id} className="rounded-md bg-muted/30 border border-border p-3 space-y-2">
+              <p className="text-xs font-medium">Section {s.subsection_index + 1} · about {s.content?.section?.targetWords ?? "?"} words {s.plan_status === "READY" && <CheckCircle2 className="w-3 h-3 inline text-primary" />}</p>
+              <EditableText label="Section summary" value={s.content?.section?.objective ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { objective: v })} />
+              <EditableText label="Opens with" value={d.entry ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { entry: v })} />
+              <EditableText label="Turns on" value={d.focus ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { focus: v })} />
+              <EditableText label="Ends with" value={d.outcome ?? ""} editable={ed} busy={!!busy} onSave={(v) => edit(s, { outcome: v })} />
+              {b && (b.content?.beats ?? []).length > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Scene beats ({b.content.beats.length})</summary><ol className="list-decimal ml-5 mt-1 space-y-0.5">{(b.content.beats as Row[]).map((x, i) => <li key={i}>{x.goal ?? x.description ?? x.text ?? JSON.stringify(x)}</li>)}</ol></details>}
+            </div>; })}
+          {secs.length > 0 && beats.length === 0 && <Button size="sm" variant="outline" disabled={!!busy} onClick={onBeats}>Add scene beats</Button>}
+        </div>
+      </div>}
     </div>
   );
 }
