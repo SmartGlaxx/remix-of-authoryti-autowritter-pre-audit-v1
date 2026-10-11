@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
+import { generateOpenAIImage } from "../_shared/ai/openaiImage.ts";
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
@@ -165,24 +166,14 @@ Return ONLY valid JSON:
 
     const charactersWithPortraits = [];
     
+    const imgAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     if (isChildrensBook) {
       for (const character of characters.slice(0, 5)) {
         try {
           const portraitPrompt = `Create a character reference sheet portrait for a children's book character.\n\nCHARACTER: ${character.name}\nVISUAL DESCRIPTION: ${character.visualDescription}\nSTYLE: ${visualStyleGuide}\n\nRequirements:\n- Clean, clear character portrait\n- Soft watercolor style, warm colors\n- White background\n- No text`;
 
-          const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: "google/gemini-3-pro-image-preview", messages: [{ role: "user", content: portraitPrompt }], modalities: ["image", "text"] }),
-          });
-
-          if (imageResponse.ok) {
-            const imageData = await imageResponse.json();
-            const portraitUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-            charactersWithPortraits.push(portraitUrl ? { ...character, portraitUrl } : character);
-          } else {
-            charactersWithPortraits.push(character);
-          }
+          const portraitUrl = await generateOpenAIImage({ admin: imgAdmin, userId: auth.user.id, prompt: portraitPrompt, size: "1024x1024" }).catch((e) => { console.error("portrait failed", e); return null; });
+          charactersWithPortraits.push(portraitUrl ? { ...character, portraitUrl } : character);
           await new Promise(r => setTimeout(r, 1000));
         } catch (err) {
           console.error(`Error generating portrait for ${character.name}:`, err);
