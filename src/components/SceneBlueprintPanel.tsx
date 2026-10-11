@@ -46,7 +46,7 @@ export function SceneBlueprintPanel({ bookId, chapterIndex, subsectionIndex }: {
       if (b?.narrator_identity_id) {
         const { data: kr } = await supabase.from("knowledge_acquisitions").select("*").eq("identity_id", b.narrator_identity_id).limit(2000);
         if (!live) return;
-        knowledge = sceneKnowledge(kr ?? [], b, plan?.content?.section ?? plan?.content ?? null, chapterIndex, subsectionIndex);
+        knowledge = sceneKnowledge(kr ?? [], b, (plan?.content as Row | null)?.section ?? (plan?.content as Row | null) ?? null, chapterIndex, subsectionIndex);
       }
       setData({ plan, beats: rows.find((r) => r.plan_level === "BEATS") ?? null, anchors: a.data ?? [], knowledge });
     })();
