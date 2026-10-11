@@ -502,7 +502,9 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
       <Dialog open={studioOpen} onOpenChange={(o) => { setStudioOpen(o); if (!o) refreshLibrary(); }}>
         <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto p-0">
           <DialogTitle className="sr-only">Persona Studio</DialogTitle>
-          <PersonaStudioView embedded onBack={() => { setStudioOpen(false); refreshLibrary(); }} />
+          <PersonaStudioView embedded onBack={() => { setStudioOpen(false); refreshLibrary(); }}
+            bookLink={{ castIdentityIds: st.cast.map((c) => c.identityId).filter(Boolean) as string[], universeId: st.universeId ?? null, locked,
+              onAdd: ({ id, name }) => { const ex = st.cast.find((c) => !c.identityId && c.name.toLowerCase() === name.toLowerCase()); if (ex) setCast(ex.key, { identityId: id, lightweight: false }); else addCast({ name, identityId: id, lightweight: false }); toast.success(`${name} added to this book`); } }} />
         </DialogContent>
       </Dialog>
     </div>
