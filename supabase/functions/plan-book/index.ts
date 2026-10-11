@@ -11,7 +11,7 @@ import type { ChapterPlan, MasterPlanSkeleton } from "../_shared/narrative/plann
 import {
   STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, assertConceptsEligible, buildConceptsPrompt, parseConcepts, conceptGuidance, type NonfictionConcept, buildAlternativesPrompt, buildBeatsPrompt, buildChapterPrompt, buildMasterPrompt,
   buildSectionPrompt, parseAlternatives, summaryBand, parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, runChapterBatch, runWithRepair,
-  buildAdjustPremisePrompt, parseAdjustedPremise, PREMISE_ADJUSTMENTS, type PremiseAdjustment, type Prompt,
+  buildAdjustPremisePrompt, parseAdjustedPremise, PREMISE_ADJUSTMENTS, type PremiseAdjustment,
   type AlternativeCount, type BookBrief, type MasterContext, type ModelCall, type Prompt, type StoryAlternative,
 } from "../_shared/narrative/planning/aiPlanning.ts";
 import {
