@@ -5,8 +5,8 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
-type ScreenKey = "idea" | "twists" | "cast" | "narration";
-const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name" };
+type ScreenKey = "idea" | "twists" | "cast" | "narration" | "writer";
+const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name", writer: "Writer & voice" };
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
+import { WriterPicker } from "@/components/WriterPicker";
 import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
@@ -198,7 +199,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   });
 
   const locked = hasProse;
-  const screens = (isFiction ? ["idea", "twists", "cast", "narration"] : ["idea", "cast", "narration"]) as ScreenKey[];
+  const screens = (isFiction ? ["idea", "twists", "cast", "narration", "writer"] : ["idea", "cast", "narration", "writer"]) as ScreenKey[];
   const cur = screens[Math.min(screen, screens.length - 1)];
   const isLast = screen >= screens.length - 1;
   const go = (d: 1 | -1) => {
