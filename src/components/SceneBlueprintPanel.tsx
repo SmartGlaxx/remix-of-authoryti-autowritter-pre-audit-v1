@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { callReview, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
+import { sceneKnowledge } from "../../supabase/functions/_shared/narrative/sceneKnowledge";
 
 type Row = Record<string, any>;
 const txt = (v: unknown) => (typeof v === "string" ? v : v && typeof v === "object" ? String((v as Row).text ?? (v as Row).description ?? (v as Row).goal ?? (v as Row).kind ?? "") : "");
@@ -34,11 +35,20 @@ export function SceneBlueprintPanel({ bookId, chapterIndex, subsectionIndex }: {
       const [p, a, k] = await Promise.all([
         supabase.from("book_progressive_plans").select("plan_level, plan_status, subsection_index, content").eq("book_id", bookId).eq("chapter_index", chapterIndex).in("plan_level", ["SECTION", "BEATS"]).eq("subsection_index", subsectionIndex).order("version", { ascending: false }),
         supabase.from("narrative_exact_anchors").select("anchor_key, anchor_type, exact_text, effective_chapter_index").eq("book_id", bookId).eq("is_active", true).eq("canon_status", "ESTABLISHED").lte("effective_chapter_index", chapterIndex).limit(60),
-        supabase.from("knowledge_acquisitions").select("claim, certainty, learned_chapter_index, truth_status").eq("book_id", bookId).lte("learned_chapter_index", chapterIndex).is("superseded_by", null).order("learned_chapter_index", { ascending: false }).limit(25),
+        supabase.from("books").select("narrator_identity_id, narrative_vantage, narrator_telling_date").eq("id", bookId).maybeSingle(),
       ]);
       if (!live) return;
       const rows = p.data ?? [];
-      setData({ plan: rows.find((r) => r.plan_level === "SECTION") ?? null, beats: rows.find((r) => r.plan_level === "BEATS") ?? null, anchors: a.data ?? [], knowledge: k.data ?? [] });
+      const plan = rows.find((r) => r.plan_level === "SECTION") ?? null;
+      // Same scene-chronology filter the writer uses (story date, flashbacks, narrative vantage) — never chapter order alone.
+      let knowledge: Row[] = [];
+      const b = k.data as Row | null;
+      if (b?.narrator_identity_id) {
+        const { data: kr } = await supabase.from("knowledge_acquisitions").select("*").eq("identity_id", b.narrator_identity_id).limit(2000);
+        if (!live) return;
+        knowledge = sceneKnowledge(kr ?? [], b, plan?.content?.section ?? plan?.content ?? null, chapterIndex, subsectionIndex);
+      }
+      setData({ plan, beats: rows.find((r) => r.plan_level === "BEATS") ?? null, anchors: a.data ?? [], knowledge });
     })();
     return () => { live = false; };
   }, [bookId, chapterIndex, subsectionIndex]);
