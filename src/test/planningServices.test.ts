@@ -36,9 +36,10 @@ describe("Phase D story alternatives", () => {
     expect(() => assertAlternativesEligible("novel", 4)).toThrow();
     for (const c of STORY_ALTERNATIVE_COUNTS) expect(buildAlternativesPrompt(brief("novel"), c).user).toContain(`exactly ${c} complete story alternatives`);
   });
-  it("rejects nonfiction and true-story books", () => {
-    expect(() => assertAlternativesEligible("business", 3)).toThrow();
-    expect(() => assertAlternativesEligible("memoir", 3)).toThrow();
+  it("allows brainstorming alternatives for every book type, nonfiction without inventing facts", () => {
+    expect(() => assertAlternativesEligible("business", 3)).not.toThrow();
+    expect(() => assertAlternativesEligible("memoir", 3)).not.toThrow();
+    expect(buildAlternativesPrompt(brief("self-help"), 3).user).toMatch(/Invent no facts/);
   });
   it("accepts the right count of ~500-word distinct stories, rejects wrong count and near-duplicates", () => {
     expect(parseAlternatives(JSON.stringify({ alternatives: [1, 2, 3, 4, 5].map(alt) }), 5).ok).toBe(true);
