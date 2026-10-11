@@ -2,7 +2,7 @@
 // they feed the existing master planner as planner-only guidance; twists become scheduled reveals,
 // never narrator knowledge. Shared by browser, plan-book and tests.
 import { adapterForBookType } from "./adapters.ts";
-import { STORY_ALTERNATIVE_COUNTS, extractJson, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
+import { STORY_ALTERNATIVE_COUNTS, extractJson, summaryBand, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
 import { resolveIdentity, type KnownIdentity, type IdentityMatch } from "../identityResolution.ts";
 
 export const SETUP_SCHEMA = 1;
