@@ -6,6 +6,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { reusablePersonaProfile } from "../_shared/narrative/personaReuse.ts";
+import { generateOpenAIImage, ImageError } from "../_shared/ai/openaiImage.ts";
+import { personaLibraryState, portraitOptionCount } from "../_shared/narrative/personaControls.ts";
 import { gateCreation, resolveIdentity, type KnownIdentity, type ResolutionDecision } from "../_shared/narrative/identityResolution.ts";
 import {
   buildPersonaPrompt, checkLifeChronology, isDomain, isRole, mockPersonaModel, parsePersonaOutput,
@@ -106,6 +108,30 @@ Deno.serve(async (req) => {
       return json({ status: "ok", identityId: r.identityId, personaId: persona.id, reused: r.reused });
     }
 
+    if (action === "portrait") {
+      if (body.testMode === true || req.headers.get("x-ai-test-mode") === "1") return json({ error: "test_mode_blocked" }, 403);
+      if (!portraitOptionCount(body.optionCount)) return json({ error: "Choose between one and five pictures." }, 400);
+      const id = uuidOrNull(body.personaId);
+      const { data: persona } = await db.from("personas").select("identity_id").eq("id", id).eq("user_id", userId).maybeSingle();
+      if (!persona) return json({ error: "Persona not found" }, 404);
+      const prompt = str(body.prompt, 4000);
+      if (!prompt) return json({ error: "Describe the character's appearance first." }, 400);
+      const { data: allowed, error: rateError } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "persona_portrait", _max_per_hour: 30, _max_per_day: 100 });
+      if (rateError || !allowed) return json({ error: "Too many portrait requests. Please try again later." }, 429);
+      try {
+        const imageUrl = await generateOpenAIImage({ admin: db, userId, prompt: `Create one character profile portrait. Head and shoulders, face clearly visible, no text. ${prompt}`, size: "1024x1024" });
+        return json({ imageUrl });
+      } catch (e) { if (e instanceof ImageError) return json({ error: e.message }, e.status); throw e; }
+    }
+
+    if (action === "demote") {
+      const id = uuidOrNull(body.personaId);
+      if (!id) return json({ error: "Invalid personaId" }, 400);
+      const { data, error } = await db.from("personas").update(personaLibraryState(true)).eq("id", id).eq("user_id", userId).select("id").maybeSingle();
+      if (error) return json({ error: error.message }, 400);
+      return data ? json({ status: "ok" }) : json({ error: "Persona not found" }, 404);
+    }
+
     if (action === "reuse_deleted") {
       const id = uuidOrNull(body.identityId);
       if (!id) return json({ error: "Invalid identityId" }, 400);
@@ -141,7 +167,10 @@ Deno.serve(async (req) => {
       if (!ident) return json({ error: "Not found" }, 404);
       await db.from("narrative_identities").update({ level: "independent_persona" }).eq("id", id).eq("user_id", userId);
       const { data: p } = await db.from("personas").select("id").eq("identity_id", id).maybeSingle();
-      if (p) return json({ status: "ok", identityId: id, personaId: p.id });
+      if (p) {
+        const { error } = await db.from("personas").update(personaLibraryState(false)).eq("id", p.id).eq("user_id", userId);
+        return error ? json({ error: error.message }, 400) : json({ status: "ok", identityId: id, personaId: p.id });
+      }
       const { data: np, error } = await db.from("personas").insert({ user_id: userId, identity_id: id, creation_mode: "promoted", category: isDomain(body.domain) ? body.domain : "general" }).select("id").single();
       return error ? json({ error: error.message }, 400) : json({ status: "ok", identityId: id, personaId: np.id });
     }
@@ -163,7 +192,10 @@ Deno.serve(async (req) => {
       }
       await db.from("narrative_identities").update({ level: "independent_persona" }).eq("id", identityId).eq("user_id", userId);
       const { data: p } = await db.from("personas").select("id").eq("identity_id", identityId).maybeSingle();
-      if (p) return json({ status: "ok", identityId, personaId: p.id });
+      if (p) {
+        const { error } = await db.from("personas").update(personaLibraryState(false)).eq("id", p.id).eq("user_id", userId);
+        return error ? json({ error: error.message }, 400) : json({ status: "ok", identityId, personaId: p.id });
+      }
       const { data: np, error } = await db.from("personas").insert({ user_id: userId, identity_id: identityId, creation_mode: "promoted", category: isDomain(body.domain) ? body.domain : "general" }).select("id").single();
       return error ? json({ error: error.message }, 400) : json({ status: "ok", identityId, personaId: np.id });
     }
