@@ -35,7 +35,7 @@ const storyLive = () => Deno.env.get("STORY_AI_ENGINE") !== "mock";
 export const PLAN_BOOK_BUILD = "p4-failclosed-1";
 const s = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
 
-Deno.serve(async (req) => {
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
@@ -393,6 +393,33 @@ Deno.serve(async (req) => {
     console.error("plan-book error:", msg);
     return json({ error: msg }, statusForAIError(e) || 500);
   }
+}
+
+// AI planning calls can think for minutes in silence; the platform drops a request after 150s with no bytes.
+// For those actions we send a space every 15s (valid leading JSON whitespace), then the real JSON body.
+// The real HTTP status travels in the body as `__status` because headers are already sent.
+const LONG_ACTIONS = new Set(["alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats"]);
+Deno.serve(async (req) => {
+  if (req.method !== "POST") return handle(req);
+  let action = "";
+  try { action = JSON.parse(await req.clone().text())?.action ?? ""; } catch { /* handle() reports it */ }
+  if (!LONG_ACTIONS.has(action)) return handle(req);
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const beat = setInterval(() => { try { controller.enqueue(enc.encode(" ")); } catch { /* closed */ } }, 15_000);
+      try {
+        const res = await handle(req);
+        const text = await res.text();
+        let data: unknown; try { data = JSON.parse(text); } catch { data = { error: text || "Request failed" }; }
+        const out = data && typeof data === "object" && !Array.isArray(data) ? { ...(data as Record<string, unknown>), __status: res.status } : { data, __status: res.status };
+        controller.enqueue(enc.encode(JSON.stringify(out)));
+      } catch (e) {
+        controller.enqueue(enc.encode(JSON.stringify({ error: e instanceof Error ? e.message : "Request failed", __status: 500 })));
+      } finally { clearInterval(beat); controller.close(); }
+    },
+  });
+  return new Response(stream, { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
 
 class DryRunStop extends Error { constructor() { super("dry run"); } }
