@@ -5,6 +5,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { createAIDeps } from "../_shared/ai/server.ts";
+import { reusablePersonaProfile } from "../_shared/narrative/personaReuse.ts";
 import { gateCreation, resolveIdentity, type KnownIdentity, type ResolutionDecision } from "../_shared/narrative/identityResolution.ts";
 import {
   buildPersonaPrompt, checkLifeChronology, isDomain, isRole, mockPersonaModel, parsePersonaOutput,
@@ -103,6 +104,34 @@ Deno.serve(async (req) => {
       }).select("id").single();
       if (error) return json({ error: error.message }, 400);
       return json({ status: "ok", identityId: r.identityId, personaId: persona.id, reused: r.reused });
+    }
+
+    if (action === "reuse_deleted") {
+      const id = uuidOrNull(body.identityId);
+      if (!id) return json({ error: "Invalid identityId" }, 400);
+      const { data: source } = await db.from("narrative_identities").select("*").eq("id", id).eq("user_id", userId).is("merged_into_id", null).maybeSingle();
+      if (!source?.seed_details?.deleted_book_title) return json({ error: "Deleted-book character not found" }, 404);
+      const bookId = uuidOrNull(body.bookId);
+      if (body.bookId && !bookId) return json({ error: "Invalid bookId" }, 400);
+      let universeId: string | null = null;
+      if (bookId) {
+        const { data: book } = await db.from("books").select("universe_id").eq("id", bookId).eq("user_id", userId).maybeSingle();
+        if (!book) return json({ error: "Book not found" }, 404);
+        universeId = book.universe_id ?? null;
+      }
+      const { data: profile } = await db.from("personas").select("*").eq("identity_id", id).eq("user_id", userId).maybeSingle();
+      const copy = reusablePersonaProfile(source, profile);
+      const newId = crypto.randomUUID();
+      const { error: identityError } = await db.from("narrative_identities").insert({ id: newId, user_id: userId, universe_id: universeId,
+        display_name: str(body.displayName) || copy.displayName, aliases: copy.aliases, kind: copy.kind,
+        level: "independent_persona", origin_book_id: bookId, seed_details: copy.seedDetails });
+      if (identityError) return json({ error: identityError.message }, 400);
+      const { data: persona, error } = await db.from("personas").insert({ ...copy.profile, user_id: userId, identity_id: newId }).select("id").single();
+      if (error) {
+        await db.from("narrative_identities").delete().eq("id", newId).eq("user_id", userId);
+        return json({ error: error.message }, 400);
+      }
+      return json({ status: "ok", identityId: newId, personaId: persona.id });
     }
 
     if (action === "promote") {

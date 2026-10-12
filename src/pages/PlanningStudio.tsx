@@ -97,7 +97,7 @@ export default function PlanningStudio() {
           <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild>
             <button type="button" aria-label="What is Progressive Planning?" className="text-muted-foreground hover:text-primary"><Info className="w-4 h-4" /></button>
           </TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
-            Progressive Planning plans the whole book first (story summary, then chapters, then scenes) and writes each scene from that plan. It keeps characters, places and facts consistent, hides twists until their planned moment, and holds back any draft that contradicts what's already written so you can review it. Turn it off to write the classic way, one section at a time.
+            Plan your book before writing: start with the big idea, then shape the chapters and scenes. As you write, the app checks for mixed-up details and keeps twists for the right moment. You review drafts that need attention. Turn this off to write one section at a time without this planning flow.
           </TooltipContent></Tooltip></TooltipProvider>
           <Switch checked={progressive} disabled={!!busy} onCheckedChange={(on) => run("toggle", async () => {
             const controls = { ...(book.controls ?? {}), planning_pipeline: on ? "progressive" : "standard" };
