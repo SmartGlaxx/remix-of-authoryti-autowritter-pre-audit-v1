@@ -1,6 +1,6 @@
 // Phase 4 — optional advanced Book Setup inside Planning Studio. Every step is skippable; the
 // server validates and stores the setup apart from prose, and the master planner reads it.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { PersonaStudioView } from "@/pages/PersonaStudio";
 import { toast } from "sonner";
@@ -59,6 +59,8 @@ async function callPersona(body: Row) {
 
 export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
+  const premiseRef = useRef<HTMLTextAreaElement>(null);
+  const [premiseExpanded, setPremiseExpanded] = useState(false);
   const [screen, setScreen] = useState(0);
   const [studioOpen, setStudioOpen] = useState(false);
   const draftKey = `book-setup-draft:${book.id}`;
@@ -159,6 +161,27 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   };
 
   const issues = useMemo(() => (st ? validateSetup(st, { bookType: book.book_type, penNames: pens as any, chapterCount }) : []), [st, pens, chapterCount, book.book_type]);
+  useLayoutEffect(() => {
+    const textarea = premiseRef.current;
+    if (!textarea) return;
+    const resize = () => {
+      textarea.style.height = "160px";
+      if (premiseExpanded) {
+        textarea.style.height = `${Math.max(160, textarea.scrollHeight + textarea.offsetHeight - textarea.clientHeight)}px`;
+      }
+    };
+    resize();
+    let width = textarea.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = textarea.getBoundingClientRect().width;
+      if (nextWidth !== width) {
+        width = nextWidth;
+        resize();
+      }
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [premiseExpanded, st?.premise, screen]);
   if (!st) return <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>;
   const up = (patch: Partial<BookSetup>) => setSt({ ...st, ...patch });
   const run = async (label: string, fn: () => Promise<void>) => { setBusy(label); try { await fn(); } catch (e) { toast.error(e instanceof Error ? e.message : "Something went wrong"); } finally { setBusy(null); } };
@@ -287,7 +310,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
               <p className="text-xs text-muted-foreground">{st.twistsEnabled ? "Every story option will be built around one big twist from the very first page, with clues planted along the way." : "Story options will follow clean arcs with no engineered shock reversal."} Choose this before making your options.</p></div>
           </div>}
           {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0], exFiction && (st.twistsEnabled ? "plot twist mode" : "no twist")].filter(Boolean).join(" · ")}</span></p>}
-          <Textarea rows={3} value={st.premise} disabled={locked} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
+          <Textarea ref={premiseRef} rows={6} className="h-40 min-h-40 resize-none box-border" aria-label="Initial book idea" value={st.premise} disabled={locked} onFocus={() => setPremiseExpanded(true)} onBlur={() => setPremiseExpanded(false)} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
           {!locked && <div className="flex flex-wrap justify-end items-center gap-2">
             <Select value={adjustKey} onValueChange={setAdjustKey}><SelectTrigger className="w-56 h-9" aria-label="What to change"><SelectValue placeholder="What should change?" /></SelectTrigger>
               <SelectContent>{ADJUSTMENTS.filter((o) => exFiction ? o.value !== "practical" : !["twists", "romance", "darker"].includes(o.value)).map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select>
