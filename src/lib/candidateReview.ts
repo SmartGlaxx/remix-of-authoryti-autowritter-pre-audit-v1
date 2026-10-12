@@ -19,7 +19,12 @@ export async function callPlanBook<T = any>(body: Record<string, unknown>): Prom
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({ error: res.status === 504 ? "Planning took too long. Please try again." : "Unexpected response" }));
+  // Long AI actions are kept alive by streaming; their real status arrives in the body.
+  if (data && typeof data.__status === "number") {
+    const status = data.__status; delete data.__status;
+    return { ok: status >= 200 && status < 300, status, data };
+  }
   return { ok: res.ok, status: res.status, data };
 }
 
