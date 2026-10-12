@@ -20,6 +20,7 @@ import {
 import { PersonaAvatar, ImageLightbox, PersonaDetailDialog, PersonaEditDialog, ConfirmDelete, UniverseDetailDialog } from "@/components/persona/PersonaExtras";
 import { emptySetup, normalizeSetup } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 import { PromotionCard, PromoteButton } from "@/components/persona/PromotionCard";
+import { PortraitPicker } from "@/components/persona/PortraitPicker";
 
 type Row = Record<string, any>;
 type DateVal = { precision: string; year?: number; month?: number; day?: number } | null;
@@ -86,8 +87,11 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
   const [motivation, setMotivation] = useState(""); const [voice, setVoice] = useState(""); const [seed, setSeed] = useState("");
   const [suggestions, setSuggestions] = useState<PersonaSuggestion[]>([]); const [rejected, setRejected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [resolution, setResolution] = useState<IdentityResolution | null>(null);
+  const [portrait, setPortrait] = useState<File | null>(null); const [portraitBusy, setPortraitBusy] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null); const [zoom, setZoom] = useState<string | null>(null);
+  useEffect(() => { if (!portrait) { setPreview(null); return; } const u = URL.createObjectURL(portrait); setPreview(u); return () => URL.revokeObjectURL(u); }, [portrait]);
 
-  const reset = () => { setMode("manual"); setName(""); setAliases(""); setDomain("general"); setUniverseId(NONE); setBirth(null); setDeath(null); setValues(""); setFlaw(""); setFear(""); setMotivation(""); setVoice(""); setSeed(""); setSuggestions([]); setRejected([]); };
+  const reset = () => { setMode("manual"); setName(""); setAliases(""); setDomain("general"); setUniverseId(NONE); setBirth(null); setDeath(null); setValues(""); setFlaw(""); setFear(""); setMotivation(""); setVoice(""); setSeed(""); setSuggestions([]); setRejected([]); setPortrait(null); };
   const authorFacts = (): AuthorFact[] => {
     const f: AuthorFact[] = [];
     if (name.trim()) f.push({ field: "displayName", value: name.trim() });
@@ -137,6 +141,14 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
     setBusy(false);
     if (httpStatus === 409 && data.status === "needs_confirmation") return setResolution(data.resolution);
     if (data.error) return toast.error(data.error === "CHRONOLOGY_VIOLATION" ? "Dates are out of order." : data.error);
+    if (portrait && data.personaId) {
+      const { data: auth } = await supabase.auth.getUser();
+      const ext = portrait.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${auth.user?.id}/${data.personaId}-${Date.now()}.${ext}`;
+      const up = await supabase.storage.from("persona-portraits").upload(path, portrait, { upsert: true, contentType: portrait.type });
+      if (up.error) toast.error("Persona saved, but the picture could not be uploaded.");
+      else await supabase.from("personas").update({ portrait_path: path } as any).eq("id", data.personaId);
+    }
     toast.success(data.reused ? "Persona profile attached to the existing character." : "Persona saved.");
     setResolution(null); reset(); onSaved(); onClose();
   };
@@ -160,6 +172,12 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
               <SelectContent><SelectItem value={NONE}>No shared universe</SelectItem>{universes.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>
           </div>
         </div>
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <Label>Profile picture</Label>
+          {preview && <button type="button" onClick={() => setZoom(preview)} aria-label="View chosen picture"><img src={preview} alt="Chosen portrait" className="h-16 w-16 rounded-full border-2 border-primary/40 object-cover" /></button>}
+          <PortraitPicker description={[name, aliases && `also known as ${aliases}`, seed].filter(Boolean).join(". ")} onSelect={setPortrait} onOpen={setZoom} onBusy={setPortraitBusy} />
+        </div>
+        <ImageLightbox url={zoom} alt={name || "Portrait"} onClose={() => setZoom(null)} />
         <p className="text-xs text-muted-foreground">Domain is the persona's lasting field. Their role (protagonist, mentor…) is chosen per book.</p>
         {mode !== "ai" && (
           <div className="grid gap-3">
@@ -196,7 +214,7 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
             ))}
           </div>
         )}
-        <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => save()} disabled={busy}>Save persona</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => save()} disabled={busy || portraitBusy}>Save persona</Button></DialogFooter>
         <ConfirmIdentity resolution={resolution} onCancel={() => setResolution(null)} onDecide={(d, id) => save(d, id)} />
       </DialogContent>
     </Dialog>
@@ -232,7 +250,7 @@ export default function PersonaStudio() {
 }
 
 /** One Persona Studio for both the standalone page and the in-book-setup window. */
-export interface BookLink { bookId?: string; castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void }
+export interface BookLink { bookId?: string; castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void; penNameId?: string | null; onUniverse?: (id: string | null) => void; onPenName?: (id: string | null) => void }
 export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBack: () => void; embedded?: boolean; bookLink?: BookLink }) {
   const { user } = useAuth();
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
@@ -410,8 +428,8 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
           </TabsContent>
 
           <TabsContent value="universes"><UniverseTab universes={universes} identities={identities} books={books} onChange={load} userId={user?.id} personaByIdentity={personaByIdentity}
-            onOpenPersona={(iid) => { const p = personaByIdentity[iid]; if (p) setDetailId(p.id); }} /></TabsContent>
-          <TabsContent value="pennames"><PenNameTab penNames={penNames} books={books} onChange={load} userId={user?.id} /></TabsContent>
+            onOpenPersona={(iid) => { const p = personaByIdentity[iid]; if (p) setDetailId(p.id); }} bookLink={bookLink} /></TabsContent>
+          <TabsContent value="pennames"><PenNameTab penNames={penNames} books={books} onChange={load} userId={user?.id} bookLink={bookLink} /></TabsContent>
 
           <TabsContent value="promote" className="space-y-3">
             <p className="text-sm text-muted-foreground">Characters from your books. Promoting keeps the same character and all their links; it just adds a full persona profile.</p>
@@ -479,7 +497,7 @@ async function personaStudioSetupSave(bookId: string, setup: unknown) {
   return { data: await response.json() };
 }
 
-function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void }) {
+function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona, bookLink }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void; bookLink?: BookLink }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = universes.find((u) => u.id === openId) ?? null;
   const [name, setName] = useState(""); const [desc, setDesc] = useState(""); const [genre, setGenre] = useState("");
@@ -516,10 +534,12 @@ function UniverseTab({ universes, identities, books, onChange, userId, personaBy
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary">{inBooks.length} books</Badge><Badge variant="secondary">{cast.length} characters</Badge><Badge variant="secondary">{(u.locations ?? []).length} locations</Badge>
               </div>
-              <div onClick={(e) => e.stopPropagation()}>
-              <Select value="" onValueChange={(v) => assign(v, u.id)}><SelectTrigger className="w-64"><SelectValue placeholder="Add a book to this universe" /></SelectTrigger>
-                <SelectContent>{books.filter((b) => b.universe_id !== u.id).map((b) => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent></Select>
-              </div>
+              {bookLink?.onUniverse && <div onClick={(e) => e.stopPropagation()}>
+                {(bookLink.universeId ?? null) === u.id
+                  ? <div className="flex flex-wrap gap-2"><Badge className="h-8 px-3"><Check className="w-4 h-4 mr-1" />This book's universe</Badge>
+                      <Button size="sm" variant="ghost" disabled={bookLink.locked} onClick={() => bookLink.onUniverse!(null)}>Make standalone</Button></div>
+                  : <Button size="sm" disabled={bookLink.locked} onClick={() => bookLink.onUniverse!(u.id)}><Plus className="w-4 h-4" />Put this book here</Button>}
+              </div>}
             </CardContent></Card>
         );
       })}
@@ -529,17 +549,29 @@ function UniverseTab({ universes, identities, books, onChange, userId, personaBy
   );
 }
 
-function PenNameTab({ penNames, books, onChange, userId }: { penNames: Row[]; books: Row[]; onChange: () => void; userId?: string }) {
+function PenNameTab({ penNames, books, onChange, userId, bookLink }: { penNames: Row[]; books: Row[]; onChange: () => void; userId?: string; bookLink?: BookLink }) {
   const [pen, setPen] = useState(""); const [bio, setBio] = useState(""); const [genres, setGenres] = useState("");
+  const [edit, setEdit] = useState<Row | null>(null); const [delId, setDelId] = useState<string | null>(null);
+  const splitGenres = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
   const add = async () => {
     if (!pen.trim() || !userId) return;
-    const { error } = await supabase.from("author_identities").insert({ user_id: userId, pen_name: pen.trim(), bio: bio || null, genres: genres.split(",").map((s) => s.trim()).filter(Boolean) });
+    const { error } = await supabase.from("author_identities").insert({ user_id: userId, pen_name: pen.trim(), bio: bio || null, genres: splitGenres(genres) });
     if (error) return toast.error(error.message);
     setPen(""); setBio(""); setGenres(""); toast.success("Pen name added."); onChange();
   };
-  const assign = async (bookId: string, id: string) => {
-    const { error } = await supabase.from("books").update({ author_identity_id: id } as any).eq("id", bookId);
-    if (error) return toast.error(error.message); onChange();
+  const saveEdit = async () => {
+    if (!edit?.pen_name?.trim()) return toast.error("Pen name is required.");
+    const { error } = await supabase.from("author_identities").update({ pen_name: edit.pen_name.trim(), bio: edit.bio || null, genres: splitGenres(edit.genresText ?? "") }).eq("id", edit.id);
+    if (error) return toast.error(error.message);
+    setEdit(null); toast.success("Pen name updated."); onChange();
+  };
+  const remove = async (id: string) => {
+    const { error: e1 } = await supabase.from("books").update({ author_identity_id: null } as any).eq("author_identity_id", id);
+    if (e1) return toast.error(e1.message);
+    const { error } = await supabase.from("author_identities").update({ is_archived: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    if (bookLink?.penNameId === id) bookLink.onPenName?.(null);
+    setDelId(null); toast.success("Pen name deleted. Your books and their text are untouched."); onChange();
   };
   return (
     <div className="space-y-4">
@@ -550,15 +582,42 @@ function PenNameTab({ penNames, books, onChange, userId }: { penNames: Row[]; bo
         <Button onClick={add} disabled={!pen.trim()}><Plus className="w-4 h-4" />Add pen name</Button>
         <Textarea className="sm:col-span-3" rows={2} placeholder="Author bio (optional)" value={bio} onChange={(e) => setBio(e.target.value)} />
       </CardContent></Card>
-      {penNames.map((p) => (
-        <Card key={p.id}><CardHeader className="pb-2"><CardTitle className="text-base">{p.pen_name}</CardTitle>{p.bio && <p className="text-sm text-muted-foreground">{p.bio}</p>}</CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex flex-wrap gap-1">{(p.genres ?? []).map((g: string) => <Badge key={g} variant="secondary">{g}</Badge>)}</div>
-            <div><span className="text-muted-foreground">Books: </span>{books.filter((b) => b.author_identity_id === p.id).map((b) => b.title).join(", ") || "none yet"}</div>
-            <Select value="" onValueChange={(v) => assign(v, p.id)}><SelectTrigger className="w-64"><SelectValue placeholder="Publish a book under this name" /></SelectTrigger>
-              <SelectContent>{books.filter((b) => b.author_identity_id !== p.id).map((b) => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent></Select>
-          </CardContent></Card>
-      ))}
+      {penNames.length === 0 && <p className="text-sm text-muted-foreground">No pen names yet. Books use your account name until you add one.</p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {penNames.map((p) => {
+          const active = !!bookLink && bookLink.penNameId === p.id;
+          return (
+            <Card key={p.id} className={active ? "border-primary ring-1 ring-primary" : "opacity-90"}>
+              <CardHeader className="pb-2 flex-row items-start gap-2 space-y-0">
+                <div className="min-w-0 flex-1"><CardTitle className="text-base flex items-center gap-2"><Feather className="w-4 h-4 text-primary" />{p.pen_name}</CardTitle>
+                  {p.bio && <p className="text-sm text-muted-foreground mt-1">{p.bio}</p>}</div>
+                {bookLink?.onPenName && <Badge variant={active ? "default" : "outline"}>{active ? "Active" : "Inactive"}</Badge>}
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex flex-wrap gap-1">{(p.genres ?? []).map((g: string) => <Badge key={g} variant="secondary">{g}</Badge>)}</div>
+                <div><span className="text-muted-foreground">Books: </span>{books.filter((b) => b.author_identity_id === p.id).map((b) => b.title).join(", ") || "none yet"}</div>
+                <div className="flex flex-wrap gap-2">
+                  {bookLink?.onPenName && (active
+                    ? <Button size="sm" variant="ghost" onClick={() => bookLink.onPenName!(null)}>Use my account name instead</Button>
+                    : <Button size="sm" onClick={() => bookLink.onPenName!(p.id)}><Check className="w-4 h-4" />Use for this book</Button>)}
+                  <Button size="icon" variant="ghost" aria-label="Edit pen name" onClick={() => setEdit({ ...p, genresText: (p.genres ?? []).join(", ") })}><Pencil className="w-4 h-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="Delete pen name" className="text-destructive" onClick={() => setDelId(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit pen name</DialogTitle></DialogHeader>
+          <Label>Pen name</Label><Input value={edit?.pen_name ?? ""} onChange={(e) => setEdit((x) => x && { ...x, pen_name: e.target.value })} />
+          <Label>Genres (comma separated)</Label><Input value={edit?.genresText ?? ""} onChange={(e) => setEdit((x) => x && { ...x, genresText: e.target.value })} />
+          <Label>Author bio</Label><Textarea rows={3} value={edit?.bio ?? ""} onChange={(e) => setEdit((x) => x && { ...x, bio: e.target.value })} />
+          <DialogFooter><Button variant="ghost" onClick={() => setEdit(null)}>Cancel</Button><Button onClick={saveEdit}>Save</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDelete open={!!delId} title="Delete this pen name?" body="Books using it go back to your account name. No written text changes." onCancel={() => setDelId(null)} onConfirm={() => delId && remove(delId)} />
     </div>
   );
 }
