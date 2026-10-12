@@ -78,6 +78,7 @@ export default function PlanningStudio() {
 
   if (!book) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   const progressive = (book.controls as Row)?.planning_pipeline === "progressive";
+  const liveTitle = liveTitleState;
   const openCount = review.candidates.length + review.logs.filter((l) => l.decision === "PENDING").length;
 
   return (
@@ -85,7 +86,7 @@ export default function PlanningStudio() {
       <header className="h-16 border-b border-border flex items-center gap-3 px-4 md:px-8">
         <Link to="/dashboard" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="w-5 h-5" /></Link>
         <div className="min-w-0">
-          <h1 className="font-display text-lg truncate">{book.title}</h1>
+          <h1 className="font-display text-lg truncate">{liveTitle ?? book.title}</h1>
           <p className="text-xs text-muted-foreground">Planning Studio</p>
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm">
@@ -106,7 +107,7 @@ export default function PlanningStudio() {
         </ol>
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div key={tab} custom={dir} initial={{ opacity: 0, x: dir * 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -60 }} transition={{ duration: 0.3, ease: "easeOut" }}>
-            {tab === "setup" && <BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} onContinue={(o) => { setCarry(o); goTab("writer"); }} />}
+            {tab === "setup" && <BookSetupTab book={book} isFiction={isFiction} onSaved={refresh} onTitleChange={setLiveTitle} onContinue={(o) => { setCarry(o); goTab("writer"); }} />}
             {tab === "writer" && <WriterStep book={book} onBack={() => goTab("setup")} onNext={() => goTab("plan")} onSaved={refresh} />}
             {tab === "plan" && <div className="space-y-2">
               <Button variant="ghost" size="sm" className="mt-2" onClick={() => goTab("writer")}><ArrowLeft className="w-4 h-4 mr-1" />Back to writer & voice</Button>

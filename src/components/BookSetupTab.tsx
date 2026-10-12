@@ -57,7 +57,7 @@ async function callPersona(body: Row) {
   return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void }) {
+export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onTitleChange }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void; onTitleChange?: (title: string) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
   const premiseRef = useRef<HTMLTextAreaElement>(null);
   const [premiseExpanded, setPremiseExpanded] = useState(false);
@@ -184,6 +184,14 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
   }, [premiseExpanded, st?.premise, screen]);
   if (!st) return <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>;
   const up = (patch: Partial<BookSetup>) => setSt({ ...st, ...patch });
+  // The book title follows the chosen story immediately — shown at once, then stored quietly.
+  const applyTitle = (a: Row) => {
+    const title = String(a?.title ?? "").trim().slice(0, 120);
+    if (!title) return;
+    onTitleChange?.(title);
+    supabase.from("books").update({ title, theme: String(a.logline || a.summary || "").slice(0, 1000) || book.theme }).eq("id", book.id)
+      .then(({ error }) => { if (error) toast.error("Couldn't update the book title"); else onSaved(); });
+  };
   const run = async (label: string, fn: () => Promise<void>) => { setBusy(label); try { await fn(); } catch (e) { toast.error(e instanceof Error ? e.message : "Something went wrong"); } finally { setBusy(null); } };
   const universeIds = identities.filter((i) => (i.universe_id ?? null) === st.universeId);
   const libraryHits = search.trim() ? universeIds.filter((i) => i.display_name.toLowerCase().includes(search.toLowerCase()) && !st.cast.some((c) => c.identityId === i.id)).slice(0, 8) : [];
@@ -193,7 +201,10 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
     if (!r.ok) throw new Error(r.data.message ?? r.data.issues?.filter((i: Row) => i.blocking).map((i: Row) => i.message).join(" ") ?? r.data.error ?? "Couldn't save");
     // A fresh "Untitled book" draft takes its title, type and description from the chosen story.
     const pick = st.selectedIndex != null ? st.alternatives[st.selectedIndex] : null;
-    if (book.title === "Untitled book" && (pick || st.premise.trim())) {
+    if (pick && pick.title && pick.title !== book.title) {
+      await supabase.from("books").update({ title: pick.title.trim().slice(0, 120) }).eq("id", book.id);
+      onTitleChange?.(pick.title.trim().slice(0, 120));
+    } else if (book.title === "Untitled book" && (pick || st.premise.trim())) {
       const title = (pick?.title || st.premise.split(/\n| — /)[0]).trim().slice(0, 120) || "Untitled book";
       await supabase.from("books").update({ title, book_type: exType, theme: (pick?.logline || st.premise).slice(0, 1000), ...(exGenre ? { genre: exGenre } : {}), ...(exAudience ? { audience: exAudience } : {}) }).eq("id", book.id);
     }
@@ -360,7 +371,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1"><h4 className="font-medium">{a.title}</h4><p className="text-sm text-muted-foreground">{a.logline}</p></div>
                   {!locked && <Button size="icon" variant="ghost" aria-label="Regenerate this option" disabled={!!busy} onClick={() => genAlternatives(i)}>{busy === `alt${i}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}</Button>}
-                  <Button size="sm" disabled={locked} variant={st.selectedIndex === i ? "default" : "outline"} onClick={() => up({ selectedIndex: i, storyMode: "explore", stage: isFiction ? "twists" : "cast", ...(st.selectedIndex !== i ? { twists: [] } : {}) })}>{st.selectedIndex === i ? "Selected" : "Choose"}</Button>
+                  <Button size="sm" disabled={locked} variant={st.selectedIndex === i ? "default" : "outline"} onClick={() => { up({ selectedIndex: i, storyMode: "explore", stage: isFiction ? "twists" : "cast", ...(st.selectedIndex !== i ? { twists: [] } : {}) }); applyTitle(a); }}>{st.selectedIndex === i ? "Selected" : "Choose"}</Button>
                 </div>
                 <details className="mt-2"><summary className="text-xs cursor-pointer text-muted-foreground">Read the whole story</summary><p className="text-sm whitespace-pre-wrap mt-2">{a.summary}</p>{a.ending && <p className="text-sm mt-2"><span className="text-muted-foreground">Ending:</span> {a.ending}</p>}</details>
               </div>
