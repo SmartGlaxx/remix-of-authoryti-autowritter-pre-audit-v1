@@ -58,6 +58,7 @@ export default function PlanningStudio() {
   const ORDER = ["setup", "writer", "plan", "review", "memory"];
   const goTab = (t: string) => { setDir(ORDER.indexOf(t) >= ORDER.indexOf(tab) ? 1 : -1); setTab(t); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const [carry, setCarry] = useState<{ chapterCount: number; targetWords: number } | null>(null);
+  const [liveTitleState, setLiveTitle] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const isFiction = useMemo(() => { try { return book ? adapterForBookType(book.book_type).isFiction : true; } catch { return true; } }, [book]);
