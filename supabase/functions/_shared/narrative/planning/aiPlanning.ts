@@ -51,7 +51,8 @@ const EPIC_GENRE = /fantasy|thriller|mystery|crime|sci-?fi|science fiction|epic|
 export function summaryBand(bookType: string, genre?: string | null): SummaryBand {
   if (bookType === "comic") return { min: 150, max: 350 };
   if (["children", "short-story", "poetry"].includes(bookType)) return { min: 200, max: 400 };
-  if (["novel", "fiction-serial", "drama", "biography", "memoir"].includes(bookType)) return EPIC_GENRE.test(genre ?? "") && bookType !== "biography" && bookType !== "memoir" ? { min: 450, max: 500 } : { min: 450, max: 500 };
+  if (bookType === "novel") return { min: 300, max: 350 };
+  if (["fiction-serial", "drama", "biography", "memoir"].includes(bookType)) return EPIC_GENRE.test(genre ?? "") && bookType !== "biography" && bookType !== "memoir" ? { min: 450, max: 500 } : { min: 450, max: 500 };
   return { min: 350, max: 500 };
 }
 /** Series books: each book summary is 450–500 words regardless of type. */
