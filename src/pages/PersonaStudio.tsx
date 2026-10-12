@@ -18,6 +18,7 @@ import {
   type IdentityResolution, type PersonaSuggestion, type AuthorFact,
 } from "@/lib/personaStudio";
 import { PersonaAvatar, ImageLightbox, PersonaDetailDialog, PersonaEditDialog, ConfirmDelete, UniverseDetailDialog } from "@/components/persona/PersonaExtras";
+import { emptySetup, normalizeSetup } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
 type Row = Record<string, any>;
 type DateVal = { precision: string; year?: number; month?: number; day?: number } | null;
@@ -230,7 +231,7 @@ export default function PersonaStudio() {
 }
 
 /** One Persona Studio for both the standalone page and the in-book-setup window. */
-export interface BookLink { castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void }
+export interface BookLink { bookId?: string; castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void }
 export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBack: () => void; embedded?: boolean; bookLink?: BookLink }) {
   const { user } = useAuth();
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
@@ -242,6 +243,43 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
   const [editorOpen, setEditorOpen] = useState(false); const [relFor, setRelFor] = useState<Row | null>(null);
   const [search, setSearch] = useState(""); const [domainFilter, setDomainFilter] = useState("all"); const [uniFilter, setUniFilter] = useState("all");
   const [promoteRes, setPromoteRes] = useState<{ id: string; resolution: IdentityResolution } | null>(null);
+  const [reuseSource, setReuseSource] = useState<Row | null>(null);
+  const [reuseBook, setReuseBook] = useState("library");
+  const [reuseName, setReuseName] = useState("");
+  const [reuseBusy, setReuseBusy] = useState(false);
+  const [reuseCreated, setReuseCreated] = useState<string | null>(null);
+  const openReuse = (source: Row) => { setReuseSource(source); setReuseName(source.display_name); setReuseBook(bookLink?.bookId ?? "library"); setReuseCreated(null); };
+  const reuse = async () => {
+    if (!reuseSource || !reuseName.trim()) return;
+    setReuseBusy(true);
+    try {
+      const bookId = reuseBook === "library" ? null : reuseBook;
+      let identityId = reuseCreated;
+      if (!identityId) {
+        const { data } = await personaStudio("reuse_deleted", { identityId: reuseSource.id, bookId, displayName: reuseName });
+        if (data.error) throw new Error(data.error);
+        identityId = data.identityId;
+        setReuseCreated(identityId);
+      }
+      if (!identityId) throw new Error("Could not create the persona.");
+      if (bookId) {
+        if (bookLink?.bookId === bookId && (bookById[bookId]?.universe_id ?? null) === bookLink.universeId) {
+          if (bookLink.locked) throw new Error("This book's cast is locked.");
+          bookLink.onAdd({ id: identityId, name: reuseName.trim() });
+        } else {
+          const { data: book, error } = await supabase.from("books").select("story_setup").eq("id", bookId).single();
+          if (error) throw error;
+          const setup = normalizeSetup(book.story_setup ?? emptySetup());
+          if (!setup.cast.some((c) => c.identityId === identityId)) setup.cast.push({ key: crypto.randomUUID(), name: reuseName.trim(), role: "supporting", identityId, lightweight: false });
+          const { data } = await personaStudioSetupSave(bookId, setup);
+          if (data.error) throw new Error(data.error);
+        }
+      }
+      toast.success(bookId ? "New persona added to the book." : "New persona saved for a future book.");
+      setReuseSource(null); setReuseCreated(null); await load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not reuse this persona."); }
+    finally { setReuseBusy(false); }
+  };
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -341,7 +379,9 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
                       {p.psychology?.motivation && <div className="line-clamp-2">{p.psychology.motivation}</div>}
                       {featured.size > 0 && <div className="text-xs"><span className="text-muted-foreground">Books: </span>{[...featured].map((id) => bookById[id]?.title).filter(Boolean).join(", ")}</div>}
                       {rels.length > 0 && <div className="text-xs text-muted-foreground">{rels.length} relationship{rels.length > 1 ? "s" : ""}</div>}
+                      {p.identity.seed_details?.deleted_book_title && <div className="text-xs text-destructive">{p.identity.seed_details.deleted_book_title} · Book deleted</div>}
                       <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                        {p.identity.seed_details?.deleted_book_title && <Button size="sm" variant="outline" onClick={() => openReuse(p.identity)}><Plus className="w-4 h-4" />Reuse in a book</Button>}
                         <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Relationship</Button>
                         <Button size="icon" variant="ghost" aria-label="Edit persona" onClick={() => setEditId(p.id)}><Pencil className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" aria-label="Delete persona" className="text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="w-4 h-4" /></Button>
@@ -381,9 +421,10 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
               <div key={title} className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium text-destructive"><BookOpen className="w-4 h-4" />{title}<Badge variant="destructive">Book deleted</Badge></div>
                 {list.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between rounded-md border border-destructive/30 bg-background p-2">
+                  <div key={c.id} className="flex flex-wrap gap-2 items-center justify-between rounded-md border border-destructive/30 bg-background p-2">
                     <div className="font-medium truncate text-destructive">{c.display_name}</div>
-                    <Button size="sm" variant="outline" onClick={() => promoteIdentity(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
+                    <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => promoteIdentity(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
+                    <Button size="sm" onClick={() => openReuse(c)}><Plus className="w-4 h-4" />Reuse in a book</Button></div>
                   </div>
                 ))}
               </div>
@@ -398,10 +439,31 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
       <ConfirmDelete open={!!deleteId} title="Delete this persona?" body="The persona profile is removed. The character itself stays in any books it already appears in." onCancel={() => setDeleteId(null)} onConfirm={() => deleteId && deletePersona(deleteId)} />
       <ImageLightbox url={zoom?.url ?? null} alt={zoom?.name ?? ""} onClose={() => setZoom(null)} />
       <PersonaEditor open={editorOpen} onClose={() => setEditorOpen(false)} universes={universes} onSaved={load} />
+      <Dialog open={!!reuseSource} onOpenChange={(o) => { if (!o && !reuseBusy) setReuseSource(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Give this character a new story</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Keep their profile and picture as a starting point. This creates a separate persona; old relationships and story events stay behind.</p>
+          <Label htmlFor="reuse-name">Persona name</Label><Input id="reuse-name" value={reuseName} disabled={reuseBusy || !!reuseCreated} onChange={(e) => setReuseName(e.target.value)} />
+          <Label>Use in</Label><Select value={reuseBook} disabled={reuseBusy || !!reuseCreated} onValueChange={setReuseBook}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+            <SelectItem value="library">Save for a new book later</SelectItem>
+            {books.map((b) => <SelectItem key={b.id} value={b.id}>{b.title}{b.id === bookLink?.bookId ? " (this book)" : ""}</SelectItem>)}
+          </SelectContent></Select>
+          <DialogFooter><Button variant="ghost" disabled={reuseBusy} onClick={() => setReuseSource(null)}>Cancel</Button><Button disabled={reuseBusy || !reuseName.trim() || (bookLink?.locked && reuseBook === bookLink.bookId)} onClick={reuse}>{reuseBusy ? "Saving…" : reuseCreated ? "Retry adding to book" : reuseBook === "library" ? "Create new persona" : "Create & add to book"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <RelationshipDialog subject={relFor} identities={identities} onClose={() => setRelFor(null)} onSaved={load} />
       <ConfirmIdentity resolution={promoteRes?.resolution ?? null} onCancel={() => setPromoteRes(null)} onDecide={(d, id) => promoteRes && promote(promoteRes.id, d, id)} />
     </div>
   );
+}
+
+async function personaStudioSetupSave(bookId: string, setup: unknown) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plan-book`, {
+    method: "POST", headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session?.access_token ?? ""}` },
+    body: JSON.stringify({ action: "setup_save", bookId, setup }),
+  });
+  return { data: await response.json() };
 }
 
 function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void }) {
