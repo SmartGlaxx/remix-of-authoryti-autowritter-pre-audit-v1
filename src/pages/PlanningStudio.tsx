@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, CheckCircle2, AlertTriangle, Pause, Play, PenLine, Settings2, Users, ChevronDown } from "lucide-react";
@@ -92,6 +94,11 @@ export default function PlanningStudio() {
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm">
           <span className="text-muted-foreground hidden sm:inline">Progressive Planning</span>
+          <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild>
+            <button type="button" aria-label="What is Progressive Planning?" className="text-muted-foreground hover:text-primary"><Info className="w-4 h-4" /></button>
+          </TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+            Progressive Planning plans the whole book first (story summary, then chapters, then scenes) and writes each scene from that plan. It keeps characters, places and facts consistent, hides twists until their planned moment, and holds back any draft that contradicts what's already written so you can review it. Turn it off to write the classic way, one section at a time.
+          </TooltipContent></Tooltip></TooltipProvider>
           <Switch checked={progressive} disabled={!!busy} onCheckedChange={(on) => run("toggle", async () => {
             const controls = { ...(book.controls ?? {}), planning_pipeline: on ? "progressive" : "standard" };
             const { error } = await supabase.from("books").update({ controls }).eq("id", bookId);
