@@ -111,9 +111,12 @@ Deno.serve(async (req) => {
     if (action === "portrait") {
       if (body.testMode === true || req.headers.get("x-ai-test-mode") === "1") return json({ error: "test_mode_blocked" }, 403);
       if (!portraitOptionCount(body.optionCount)) return json({ error: "Choose between one and five pictures." }, 400);
-      const id = uuidOrNull(body.personaId);
-      const { data: persona } = await db.from("personas").select("identity_id").eq("id", id).eq("user_id", userId).maybeSingle();
-      if (!persona) return json({ error: "Persona not found" }, 404);
+      // A portrait can be made before the persona exists (new-persona form); if an id is given it must be the caller's.
+      if (body.personaId) {
+        const id = uuidOrNull(body.personaId);
+        const { data: persona } = await db.from("personas").select("identity_id").eq("id", id).eq("user_id", userId).maybeSingle();
+        if (!persona) return json({ error: "Persona not found" }, 404);
+      }
       const prompt = str(body.prompt, 4000);
       if (!prompt) return json({ error: "Describe the character's appearance first." }, 400);
       const { data: allowed, error: rateError } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "persona_portrait", _max_per_hour: 30, _max_per_day: 100 });

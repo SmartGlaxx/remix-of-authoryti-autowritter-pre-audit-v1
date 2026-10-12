@@ -474,10 +474,15 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
               <Select value={st.universeId ?? "none"} disabled={locked} onValueChange={(v) => { const u = v === "none" ? null : v; if (st.cast.some((c) => c.identityId)) { toast.error("Remove library characters first — characters never move between universes."); return; } up({ universeId: u }); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Standalone book</SelectItem>{universes.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>
               {!locked && <Button size="sm" variant="link" className="px-0" onClick={() => run("uni", async () => { const name = window.prompt("Name of the new universe"); if (!name?.trim()) return; const { data: u } = await supabase.auth.getUser(); const { error } = await supabase.from("fictional_universes").insert({ user_id: u.user!.id, name: name.trim() }); if (error) throw error; await load(); })}>+ New universe</Button>}</label>
-            <label className="space-y-1 text-sm"><span className="text-muted-foreground">Pen name (printed as author)</span>
-              <Select value={st.penNameId ?? "none"} onValueChange={(v) => up({ penNameId: v === "none" ? null : v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">My account name</SelectItem>{pens.map((p) => <SelectItem key={p.id} value={p.id}>{p.pen_name}</SelectItem>)}</SelectContent></Select>
-              <Button size="sm" variant="link" className="px-0" onClick={() => run("pen", async () => { const name = window.prompt("New pen name"); if (!name?.trim()) return; const { data: u } = await supabase.auth.getUser(); const { error } = await supabase.from("author_identities").insert({ user_id: u.user!.id, pen_name: name.trim() }); if (error) throw error; await load(); })}>+ New pen name</Button></label>
+            <div className="space-y-2 text-sm sm:col-span-2"><span className="text-muted-foreground">Pen name (printed as author) — tap a card to make it active</span>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[{ id: null as string | null, pen_name: "My account name" }, ...pens].map((p) => { const active = (st.penNameId ?? null) === p.id; return (
+                  <button type="button" key={p.id ?? "none"} onClick={() => up({ penNameId: p.id })} aria-pressed={active}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${active ? "border-primary bg-primary/10" : "border-border opacity-70 hover:opacity-100"}`}>
+                    <span className="font-medium truncate">{p.pen_name}</span><Badge variant={active ? "default" : "outline"}>{active ? "Active" : "Inactive"}</Badge>
+                  </button>); })}
+              </div>
+              <Button size="sm" variant="link" className="px-0" onClick={() => setStudioOpen(true)}>Manage pen names (add, edit, delete)</Button></div>
           </div>
           {st.universeId && <p className="text-xs text-muted-foreground">Established dates, ages, deaths and relationships from this universe will be respected. Ideas in this setup never become universe facts until they're written and accepted.</p>}
         </CardContent>
@@ -538,6 +543,9 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
           <DialogTitle className="sr-only">Persona Studio</DialogTitle>
           <PersonaStudioView embedded onBack={() => { setStudioOpen(false); refreshLibrary(); }}
             bookLink={{ bookId: book.id, castIdentityIds: st.cast.map((c) => c.identityId).filter(Boolean) as string[], universeId: st.universeId ?? null, locked,
+              penNameId: st.penNameId ?? null,
+              onPenName: (id) => { up({ penNameId: id }); toast.success(id ? "Pen name set for this book" : "Using your account name"); },
+              onUniverse: (id) => { if (st.cast.some((c) => c.identityId)) { toast.error("Remove library characters first — characters never move between universes."); return; } up({ universeId: id }); toast.success(id ? "Book moved to this universe" : "Book is now standalone"); },
               onAdd: ({ id, name }) => { const ex = st.cast.find((c) => !c.identityId && c.name.toLowerCase() === name.toLowerCase()); if (ex) setCast(ex.key, { identityId: id, lightweight: false }); else addCast({ name, identityId: id, lightweight: false }); toast.success(`${name} added to this book`); } }} />
         </DialogContent>
       </Dialog>

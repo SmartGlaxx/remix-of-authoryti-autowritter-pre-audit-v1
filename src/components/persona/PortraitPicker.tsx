@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { MAX_PORTRAIT_OPTIONS } from "../../../supabase/functions/_shared/narrative/personaControls";
 
 export function PortraitPicker({ personaId, description, onSelect, onOpen, onBusy }: {
-  personaId: string; description: string; onSelect: (file: File) => void; onOpen: (url: string) => void; onBusy: (busy: boolean) => void;
+  personaId?: string; description: string; onSelect: (file: File) => void; onOpen: (url: string) => void; onBusy: (busy: boolean) => void;
 }) {
   const [prompt, setPrompt] = useState(description);
   const [count, setCount] = useState("1");
@@ -17,6 +17,7 @@ export function PortraitPicker({ personaId, description, onSelect, onOpen, onBus
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  useEffect(() => { setPrompt(description); }, [description]);
   useEffect(() => () => choices.forEach((c) => URL.revokeObjectURL(c.url)), [choices]);
   const generate = async () => {
     if (!prompt.trim()) return;

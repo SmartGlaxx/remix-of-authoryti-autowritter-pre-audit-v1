@@ -20,6 +20,7 @@ import {
 import { PersonaAvatar, ImageLightbox, PersonaDetailDialog, PersonaEditDialog, ConfirmDelete, UniverseDetailDialog } from "@/components/persona/PersonaExtras";
 import { emptySetup, normalizeSetup } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 import { PromotionCard, PromoteButton } from "@/components/persona/PromotionCard";
+import { PortraitPicker } from "@/components/persona/PortraitPicker";
 
 type Row = Record<string, any>;
 type DateVal = { precision: string; year?: number; month?: number; day?: number } | null;
@@ -86,8 +87,11 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
   const [motivation, setMotivation] = useState(""); const [voice, setVoice] = useState(""); const [seed, setSeed] = useState("");
   const [suggestions, setSuggestions] = useState<PersonaSuggestion[]>([]); const [rejected, setRejected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [resolution, setResolution] = useState<IdentityResolution | null>(null);
+  const [portrait, setPortrait] = useState<File | null>(null); const [portraitBusy, setPortraitBusy] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null); const [zoom, setZoom] = useState<string | null>(null);
+  useEffect(() => { if (!portrait) { setPreview(null); return; } const u = URL.createObjectURL(portrait); setPreview(u); return () => URL.revokeObjectURL(u); }, [portrait]);
 
-  const reset = () => { setMode("manual"); setName(""); setAliases(""); setDomain("general"); setUniverseId(NONE); setBirth(null); setDeath(null); setValues(""); setFlaw(""); setFear(""); setMotivation(""); setVoice(""); setSeed(""); setSuggestions([]); setRejected([]); };
+  const reset = () => { setMode("manual"); setName(""); setAliases(""); setDomain("general"); setUniverseId(NONE); setBirth(null); setDeath(null); setValues(""); setFlaw(""); setFear(""); setMotivation(""); setVoice(""); setSeed(""); setSuggestions([]); setRejected([]); setPortrait(null); };
   const authorFacts = (): AuthorFact[] => {
     const f: AuthorFact[] = [];
     if (name.trim()) f.push({ field: "displayName", value: name.trim() });
@@ -137,6 +141,14 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
     setBusy(false);
     if (httpStatus === 409 && data.status === "needs_confirmation") return setResolution(data.resolution);
     if (data.error) return toast.error(data.error === "CHRONOLOGY_VIOLATION" ? "Dates are out of order." : data.error);
+    if (portrait && data.personaId) {
+      const { data: auth } = await supabase.auth.getUser();
+      const ext = portrait.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${auth.user?.id}/${data.personaId}-${Date.now()}.${ext}`;
+      const up = await supabase.storage.from("persona-portraits").upload(path, portrait, { upsert: true, contentType: portrait.type });
+      if (up.error) toast.error("Persona saved, but the picture could not be uploaded.");
+      else await supabase.from("personas").update({ portrait_path: path } as any).eq("id", data.personaId);
+    }
     toast.success(data.reused ? "Persona profile attached to the existing character." : "Persona saved.");
     setResolution(null); reset(); onSaved(); onClose();
   };
@@ -160,6 +172,12 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
               <SelectContent><SelectItem value={NONE}>No shared universe</SelectItem>{universes.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>
           </div>
         </div>
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <Label>Profile picture</Label>
+          {preview && <button type="button" onClick={() => setZoom(preview)} aria-label="View chosen picture"><img src={preview} alt="Chosen portrait" className="h-16 w-16 rounded-full border-2 border-primary/40 object-cover" /></button>}
+          <PortraitPicker description={[name, aliases && `also known as ${aliases}`, seed].filter(Boolean).join(". ")} onSelect={setPortrait} onOpen={setZoom} onBusy={setPortraitBusy} />
+        </div>
+        <ImageLightbox url={zoom} alt={name || "Portrait"} onClose={() => setZoom(null)} />
         <p className="text-xs text-muted-foreground">Domain is the persona's lasting field. Their role (protagonist, mentor…) is chosen per book.</p>
         {mode !== "ai" && (
           <div className="grid gap-3">
@@ -196,7 +214,7 @@ function PersonaEditor({ open, onClose, universes, onSaved }: { open: boolean; o
             ))}
           </div>
         )}
-        <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => save()} disabled={busy}>Save persona</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => save()} disabled={busy || portraitBusy}>Save persona</Button></DialogFooter>
         <ConfirmIdentity resolution={resolution} onCancel={() => setResolution(null)} onDecide={(d, id) => save(d, id)} />
       </DialogContent>
     </Dialog>
@@ -232,7 +250,7 @@ export default function PersonaStudio() {
 }
 
 /** One Persona Studio for both the standalone page and the in-book-setup window. */
-export interface BookLink { bookId?: string; castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void }
+export interface BookLink { bookId?: string; castIdentityIds: string[]; universeId: string | null; locked?: boolean; onAdd: (p: { id: string; name: string }) => void; penNameId?: string | null; onUniverse?: (id: string | null) => void; onPenName?: (id: string | null) => void }
 export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBack: () => void; embedded?: boolean; bookLink?: BookLink }) {
   const { user } = useAuth();
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
@@ -410,8 +428,8 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
           </TabsContent>
 
           <TabsContent value="universes"><UniverseTab universes={universes} identities={identities} books={books} onChange={load} userId={user?.id} personaByIdentity={personaByIdentity}
-            onOpenPersona={(iid) => { const p = personaByIdentity[iid]; if (p) setDetailId(p.id); }} /></TabsContent>
-          <TabsContent value="pennames"><PenNameTab penNames={penNames} books={books} onChange={load} userId={user?.id} /></TabsContent>
+            onOpenPersona={(iid) => { const p = personaByIdentity[iid]; if (p) setDetailId(p.id); }} bookLink={bookLink} /></TabsContent>
+          <TabsContent value="pennames"><PenNameTab penNames={penNames} books={books} onChange={load} userId={user?.id} bookLink={bookLink} /></TabsContent>
 
           <TabsContent value="promote" className="space-y-3">
             <p className="text-sm text-muted-foreground">Characters from your books. Promoting keeps the same character and all their links; it just adds a full persona profile.</p>
