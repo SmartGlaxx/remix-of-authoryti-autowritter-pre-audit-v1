@@ -36,8 +36,11 @@ export function PortraitPicker({ personaId, description, onSelect, onOpen, onBus
         made.push({ url: URL.createObjectURL(blob), file });
       }
       setChoices(made);
+      // Show the first picture in the profile straight away; the author can pick another.
+      if (made.length) { setSelected(0); onSelect(made[0].file); }
     } catch (e) {
       setChoices(made);
+      if (made.length) { setSelected(0); onSelect(made[0].file); }
       toast.error(e instanceof Error ? e.message : "Could not generate portraits.");
     } finally { setBusy(false); onBusy(false); }
   };
@@ -53,7 +56,7 @@ export function PortraitPicker({ personaId, description, onSelect, onOpen, onBus
         <input type="file" accept="image/*" disabled={busy} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) return toast.error("Pictures must be under 5 MB."); if (!file.type.startsWith("image/")) return toast.error("Choose an image file."); setSelected(null); onSelect(file); }} />
       </Label>
     </div>
-    <p className="text-xs text-muted-foreground">AI pictures use paid image credits. Choose your favourite, then save changes.</p>
+    <p className="text-xs text-muted-foreground">AI pictures use paid image credits. The first picture is chosen for you — tap another to switch, then save.</p>
     {choices.length > 0 && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {choices.map((c, i) => <div key={c.url} className="relative">
         <Button variant="outline" className={`h-auto w-full rounded-md p-1 ${selected === i ? "border-primary ring-2 ring-ring" : ""}`} aria-label={`Select portrait ${i + 1}`} aria-pressed={selected === i} onClick={() => { setSelected(i); onSelect(c.file); }}>

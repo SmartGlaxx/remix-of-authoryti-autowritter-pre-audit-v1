@@ -157,8 +157,8 @@ describe("book type sub-categories", () => {
 import { summaryBand, SERIES_BOOK_BAND, buildMasterPrompt } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
 describe("elastic summary lengths", () => {
   it("comic summaries are 150–350 words", () => expect(summaryBand("comic")).toEqual({ min: 150, max: 350 }));
-  it("novel summaries are 450–500 words", () => expect(summaryBand("novel", "Literary")).toEqual({ min: 450, max: 500 }));
-  it("epic thrillers are capped at 500", () => expect(summaryBand("novel", "Thriller & Suspense").max).toBe(500));
+  it("novel summaries are 300–350 words", () => expect(summaryBand("novel", "Literary")).toEqual({ min: 300, max: 350 }));
+  it("novel thrillers are capped at 350", () => expect(summaryBand("novel", "Thriller & Suspense").max).toBe(350));
   it("series books are 450–500 each", () => expect(SERIES_BOOK_BAND).toEqual({ min: 450, max: 500 }));
   it("no summary band exceeds 500 words", () => {
     for (const t of ["comic", "children", "short-story", "poetry", "novel", "fiction-serial", "drama", "biography", "memoir", "self-help", "business", "cookbook", "textbook"])
