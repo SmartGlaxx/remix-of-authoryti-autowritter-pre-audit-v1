@@ -254,6 +254,7 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
     setReuseBusy(true);
     try {
       const bookId = reuseBook === "library" ? null : reuseBook;
+      if (bookId === bookLink?.bookId && (bookById[bookId]?.universe_id ?? null) !== bookLink?.universeId) throw new Error("Save your book's universe choice first, then reuse this character.");
       let identityId = reuseCreated;
       if (!identityId) {
         const { data } = await personaStudio("reuse_deleted", { identityId: reuseSource.id, bookId, displayName: reuseName });
@@ -267,9 +268,10 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
           if (bookLink.locked) throw new Error("This book's cast is locked.");
           bookLink.onAdd({ id: identityId, name: reuseName.trim() });
         } else {
-          const { data: book, error } = await supabase.from("books").select("story_setup").eq("id", bookId).single();
+          const { data: book, error } = await supabase.from("books").select("story_setup, universe_id").eq("id", bookId).single();
           if (error) throw error;
           const setup = normalizeSetup(book.story_setup ?? emptySetup());
+          setup.universeId = book.universe_id ?? null;
           if (!setup.cast.some((c) => c.identityId === identityId)) setup.cast.push({ key: crypto.randomUUID(), name: reuseName.trim(), role: "supporting", identityId, lightweight: false });
           const { data } = await personaStudioSetupSave(bookId, setup);
           if (data.error) throw new Error(data.error);
