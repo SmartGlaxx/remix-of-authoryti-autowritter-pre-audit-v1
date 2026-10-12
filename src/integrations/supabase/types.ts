@@ -1452,6 +1452,7 @@ export type Database = {
           genre: string | null
           id: string
           is_archived: boolean
+          locations: Json
           name: string
           updated_at: string
           user_id: string
@@ -1463,6 +1464,7 @@ export type Database = {
           genre?: string | null
           id?: string
           is_archived?: boolean
+          locations?: Json
           name: string
           updated_at?: string
           user_id: string
@@ -1474,6 +1476,7 @@ export type Database = {
           genre?: string | null
           id?: string
           is_archived?: boolean
+          locations?: Json
           name?: string
           updated_at?: string
           user_id?: string
@@ -2400,6 +2403,7 @@ export type Database = {
           identity_id: string
           is_archived: boolean
           milestones: Json
+          portrait_path: string | null
           psychology: Json
           updated_at: string
           user_facts: Json
@@ -2417,6 +2421,7 @@ export type Database = {
           identity_id: string
           is_archived?: boolean
           milestones?: Json
+          portrait_path?: string | null
           psychology?: Json
           updated_at?: string
           user_facts?: Json
@@ -2434,6 +2439,7 @@ export type Database = {
           identity_id?: string
           is_archived?: boolean
           milestones?: Json
+          portrait_path?: string | null
           psychology?: Json
           updated_at?: string
           user_facts?: Json
