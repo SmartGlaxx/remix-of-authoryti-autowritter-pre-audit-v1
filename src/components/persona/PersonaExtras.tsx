@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { labelOf } from "@/lib/personaStudio";
+import { PortraitPicker } from "./PortraitPicker";
 
 type Row = Record<string, any>;
 const BUCKET = "persona-portraits";
@@ -23,7 +24,8 @@ export function usePortraitUrl(path?: string | null) {
   const [url, setUrl] = useState<string | null>(path ? urlCache.get(path) ?? null : null);
   useEffect(() => {
     if (!path) { setUrl(null); return; }
-    if (urlCache.has(path)) { setUrl(urlCache.get(path)!); return; }
+    const cached = urlCache.get(path);
+    if (cached) { setUrl(cached); return; }
     let live = true;
     supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7).then(({ data }) => {
       if (data?.signedUrl && live) { urlCache.set(path, data.signedUrl); setUrl(data.signedUrl); }
@@ -138,6 +140,10 @@ export function PersonaEditDialog({ persona, userId, onClose, onSaved }: { perso
   const [f, setF] = useState<Row>({});
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [portraitBusy, setPortraitBusy] = useState(false);
+  const [zoom, setZoom] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => { if (!file) { setPreview(null); return; } const url = URL.createObjectURL(file); setPreview(url); return () => URL.revokeObjectURL(url); }, [file]);
   useEffect(() => {
     if (!persona) return;
     const p = persona.psychology ?? {};
@@ -172,16 +178,13 @@ export function PersonaEditDialog({ persona, userId, onClose, onSaved }: { perso
     } catch (e: any) { toast.error(e.message ?? "Could not save"); } finally { setBusy(false); }
   };
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !portraitBusy && onClose()}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit {persona.identity.display_name}</DialogTitle></DialogHeader>
         <div className="flex items-center gap-3">
-          {file ? <img src={URL.createObjectURL(file)} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-primary/40" /> : <PersonaAvatar path={persona.portrait_path} name={f.name || "?"} />}
-          <Label className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-secondary">
-            <Camera className="w-4 h-4" />{persona.portrait_path || file ? "Change picture" : "Add picture"}
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x && x.size > 5 * 1024 * 1024) return toast.error("Pictures must be under 5 MB."); setFile(x ?? null); }} />
-          </Label>
+          {preview ? <Button size="icon" variant="ghost" className="h-14 w-14 rounded-full" aria-label="View chosen portrait" onClick={() => setZoom(preview)}><img src={preview} alt={f.name} className="w-14 h-14 rounded-full object-cover border-2 border-primary/40" /></Button> : <PersonaAvatar path={persona.portrait_path} name={f.name || "?"} onOpen={setZoom} />}
         </div>
+        <PortraitPicker personaId={persona.id} description={`${persona.identity.display_name}. ${persona.identity.seed_details?.visualDescription ?? ""}`} onSelect={setFile} onOpen={setZoom} onBusy={setPortraitBusy} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1"><Label>Name</Label><Input value={f.name ?? ""} onChange={set("name")} /></div>
           <div className="space-y-1"><Label>Also known as</Label><Input value={f.aliases ?? ""} onChange={set("aliases")} /></div>
@@ -192,7 +195,8 @@ export function PersonaEditDialog({ persona, userId, onClose, onSaved }: { perso
         </div>
         <div className="space-y-1"><Label>Backstory</Label><Textarea rows={3} value={f.backstory ?? ""} onChange={set("backstory")} /></div>
         <div className="space-y-1"><Label>Voice sample</Label><Textarea rows={2} value={f.voice ?? ""} onChange={set("voice")} /></div>
-        <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy}>Save changes</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" disabled={portraitBusy || busy} onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || portraitBusy}>Save changes</Button></DialogFooter>
+        <ImageLightbox url={zoom} alt={f.name ?? "Portrait"} onClose={() => setZoom(null)} />
       </DialogContent>
     </Dialog>
   );
