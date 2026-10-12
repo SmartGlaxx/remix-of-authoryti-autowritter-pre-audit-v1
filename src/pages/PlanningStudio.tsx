@@ -110,7 +110,7 @@ export default function PlanningStudio() {
             {tab === "writer" && <WriterStep book={book} onBack={() => goTab("setup")} onNext={() => goTab("plan")} onSaved={refresh} />}
             {tab === "plan" && <div className="space-y-2">
               <Button variant="ghost" size="sm" className="mt-2" onClick={() => goTab("writer")}><ArrowLeft className="w-4 h-4 mr-1" />Back to writer & voice</Button>
-              <PlanTab key={carry ? `${carry.chapterCount}-${carry.targetWords}` : "p"} book={book} carry={carry} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} />
+              <PlanTab key={`${carry ? `${carry.chapterCount}-${carry.targetWords}` : "p"}-${(book.story_setup as Row)?.selectedIndex ?? "n"}-${(book.story_setup as Row)?.updatedAt ?? ""}`} book={book} carry={carry} isFiction={isFiction} plans={plans} busy={busy} run={run} refresh={refresh} />
             </div>}
             {tab === "review" && <div className="space-y-6"><ReviewTab bookId={bookId} review={review} busy={busy} run={run} refresh={refresh} /><IdentityReviewPanel bookId={bookId} /></div>}
             {tab === "memory" && <MemoryTab bookId={bookId} busy={busy} run={run} />}

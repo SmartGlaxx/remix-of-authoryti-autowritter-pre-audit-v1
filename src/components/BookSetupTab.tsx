@@ -238,7 +238,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
     await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
     const r = await callPlanBook({ action: "twists", bookId: book.id, count: 3, premise: st.premise, chapterCount });
     if (!r.ok) throw new Error(r.data.error ?? "Couldn't propose twists");
-    const keep = st.twists.filter((t) => t.status === "approved");
+    const keep = st.twists.filter((t) => t.status === "approved").slice(0, 1);
     up({ twists: [...keep, ...r.data.twists.map((t: Row, i: number) => ({ ...t, id: `t${Date.now()}${i}` }))], stage: "twists" });
   });
 
@@ -360,7 +360,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1"><h4 className="font-medium">{a.title}</h4><p className="text-sm text-muted-foreground">{a.logline}</p></div>
                   {!locked && <Button size="icon" variant="ghost" aria-label="Regenerate this option" disabled={!!busy} onClick={() => genAlternatives(i)}>{busy === `alt${i}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}</Button>}
-                  <Button size="sm" disabled={locked} variant={st.selectedIndex === i ? "default" : "outline"} onClick={() => up({ selectedIndex: i, storyMode: "explore", stage: isFiction ? "twists" : "cast" })}>{st.selectedIndex === i ? "Selected" : "Choose"}</Button>
+                  <Button size="sm" disabled={locked} variant={st.selectedIndex === i ? "default" : "outline"} onClick={() => up({ selectedIndex: i, storyMode: "explore", stage: isFiction ? "twists" : "cast", ...(st.selectedIndex !== i ? { twists: [] } : {}) })}>{st.selectedIndex === i ? "Selected" : "Choose"}</Button>
                 </div>
                 <details className="mt-2"><summary className="text-xs cursor-pointer text-muted-foreground">Read the whole story</summary><p className="text-sm whitespace-pre-wrap mt-2">{a.summary}</p>{a.ending && <p className="text-sm mt-2"><span className="text-muted-foreground">Ending:</span> {a.ending}</p>}</details>
               </div>
@@ -381,7 +381,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue }: {
                 <span className="text-muted-foreground">Reveal in chapter</span>
                 <Input type="number" className="w-20" min={1} disabled={locked} value={t.revealChapter === null ? "" : t.revealChapter + 1} onChange={(e) => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, revealChapter: e.target.value ? Math.max(0, +e.target.value - 1) : null } : x) })} />
                 <Badge variant={t.status === "approved" ? "default" : t.status === "rejected" ? "destructive" : "secondary"}>{t.status}</Badge>
-                {!locked && <><Button size="sm" variant="outline" onClick={() => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, status: "approved" } : x) })}><Check className="w-3 h-3 mr-1" />Approve</Button>
+                {!locked && <><Button size="sm" variant={t.status === "approved" ? "default" : "outline"} onClick={() => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, status: "approved" } : x.status === "approved" ? { ...x, status: "proposed" } : x) })}><Check className="w-3 h-3 mr-1" />{t.status === "approved" ? "Selected" : "Select this twist"}</Button>
                 <Button size="sm" variant="ghost" onClick={() => up({ twists: st.twists.map((x) => x.id === t.id ? { ...x, status: "rejected" } : x) })}>Reject</Button></>}
               </div>
               {t.clues.length > 0 && <p className="text-xs text-muted-foreground">Clues: {t.clues.join(" · ")}</p>}
