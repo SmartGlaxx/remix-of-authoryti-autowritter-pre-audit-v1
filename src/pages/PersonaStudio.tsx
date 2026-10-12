@@ -479,7 +479,7 @@ async function personaStudioSetupSave(bookId: string, setup: unknown) {
   return { data: await response.json() };
 }
 
-function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void }) {
+function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona, bookLink }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void; bookLink?: BookLink }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = universes.find((u) => u.id === openId) ?? null;
   const [name, setName] = useState(""); const [desc, setDesc] = useState(""); const [genre, setGenre] = useState("");
@@ -516,10 +516,12 @@ function UniverseTab({ universes, identities, books, onChange, userId, personaBy
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary">{inBooks.length} books</Badge><Badge variant="secondary">{cast.length} characters</Badge><Badge variant="secondary">{(u.locations ?? []).length} locations</Badge>
               </div>
-              <div onClick={(e) => e.stopPropagation()}>
-              <Select value="" onValueChange={(v) => assign(v, u.id)}><SelectTrigger className="w-64"><SelectValue placeholder="Add a book to this universe" /></SelectTrigger>
-                <SelectContent>{books.filter((b) => b.universe_id !== u.id).map((b) => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent></Select>
-              </div>
+              {bookLink?.onUniverse && <div onClick={(e) => e.stopPropagation()}>
+                {(bookLink.universeId ?? null) === u.id
+                  ? <div className="flex flex-wrap gap-2"><Badge className="h-8 px-3"><Check className="w-4 h-4 mr-1" />This book's universe</Badge>
+                      <Button size="sm" variant="ghost" disabled={bookLink.locked} onClick={() => bookLink.onUniverse!(null)}>Make standalone</Button></div>
+                  : <Button size="sm" disabled={bookLink.locked} onClick={() => bookLink.onUniverse!(u.id)}><Plus className="w-4 h-4" />Put this book here</Button>}
+              </div>}
             </CardContent></Card>
         );
       })}
