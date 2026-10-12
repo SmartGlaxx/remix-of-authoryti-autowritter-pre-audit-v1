@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Sparkles, Users, Globe2, Feather, ArrowUpCircle, Check, X, Link2 } from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Users, Globe2, Feather, ArrowUpCircle, Check, X, Link2, Pencil, Trash2, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   personaStudio, PERSONA_DOMAINS, labelOf, checkLifeChronology,
   type IdentityResolution, type PersonaSuggestion, type AuthorFact,
 } from "@/lib/personaStudio";
+import { PersonaAvatar, ImageLightbox, PersonaDetailDialog, PersonaEditDialog, ConfirmDelete, UniverseDetailDialog } from "@/components/persona/PersonaExtras";
 
 type Row = Record<string, any>;
 type DateVal = { precision: string; year?: number; month?: number; day?: number } | null;
@@ -235,22 +236,26 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
   const [identities, setIdentities] = useState<Row[]>([]); const [personas, setPersonas] = useState<Row[]>([]);
   const [universes, setUniverses] = useState<Row[]>([]); const [penNames, setPenNames] = useState<Row[]>([]);
   const [relationships, setRelationships] = useState<Row[]>([]); const [characters, setCharacters] = useState<Row[]>([]);
-  const [books, setBooks] = useState<Row[]>([]);
+  const [books, setBooks] = useState<Row[]>([]); const [roles, setRoles] = useState<Row[]>([]);
+  const [detailId, setDetailId] = useState<string | null>(null); const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null); const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
   const [editorOpen, setEditorOpen] = useState(false); const [relFor, setRelFor] = useState<Row | null>(null);
   const [search, setSearch] = useState(""); const [domainFilter, setDomainFilter] = useState("all"); const [uniFilter, setUniFilter] = useState("all");
   const [promoteRes, setPromoteRes] = useState<{ id: string; resolution: IdentityResolution } | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
-    const [i, p, u, n, r, c, b] = await Promise.all([
+    const [i, p, u, n, r, c, b, br] = await Promise.all([
       supabase.from("narrative_identities").select("*").is("merged_into_id", null).order("display_name"),
       supabase.from("personas").select("*").eq("is_archived", false),
       supabase.from("fictional_universes").select("*").eq("is_archived", false).order("name"),
       supabase.from("author_identities").select("*").eq("is_archived", false).order("pen_name"),
       supabase.from("narrative_relationships").select("*"),
       supabase.from("story_characters").select("id, book_id, name, role, narrative_identity_id").eq("is_active", true).limit(500),
-      supabase.from("books").select("id, title, universe_id, author_identity_id"),
+      supabase.from("books").select("id, title, universe_id, author_identity_id, cover_url"),
+      supabase.from("book_identity_roles").select("book_id, identity_id, narrative_role"),
     ]);
+    setRoles(br.data ?? []);
     setIdentities(i.data ?? []); setPersonas(p.data ?? []); setUniverses(u.data ?? []); setPenNames(n.data ?? []);
     setRelationships(r.data ?? []); setCharacters(c.data ?? []); setBooks(b.data ?? []);
   }, [user]);
@@ -268,6 +273,22 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
   const personaIds = new Set(personas.map((p) => p.identity_id));
   const promotable = characters.filter((c) => !c.narrative_identity_id || !personaIds.has(c.narrative_identity_id));
 
+  const promoteGroups = promotable.reduce<Record<string, Row[]>>((g, c) => { (g[c.book_id] ??= []).push(c); return g; }, {});
+  const orphans = identities.filter((i) => i.seed_details?.deleted_book_title && !personaIds.has(i.id));
+  const orphanGroups = orphans.reduce<Record<string, Row[]>>((g, i) => { (g[i.seed_details.deleted_book_title] ??= []).push(i); return g; }, {});
+  const personaById = useMemo(() => Object.fromEntries(personas.map((p: any) => [p.id, { ...p, identity: idById[p.identity_id] }])), [personas, idById]);
+  const personaByIdentity = useMemo(() => Object.fromEntries(personas.map((p) => [p.identity_id, p])), [personas]);
+  const detail = detailId ? personaById[detailId] : null;
+  const promoteIdentity = async (identityId: string) => {
+    const { data } = await personaStudio("promote", { identityId });
+    if (data.error) return toast.error(data.error);
+    toast.success("Promoted to persona."); load();
+  };
+  const deletePersona = async (id: string) => {
+    const { error } = await supabase.from("personas").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    setDeleteId(null); setDetailId(null); toast.success("Persona deleted. The character stays in any books it appears in."); load();
+  };
   const promote = async (scId: string, decision?: string, existingId?: string) => {
     const { httpStatus, data } = await personaStudio("promote_character", { storyCharacterId: scId, decision, existingId });
     if (httpStatus === 409 && data.status === "needs_confirmation") return setPromoteRes({ id: scId, resolution: data.resolution });
@@ -305,21 +326,25 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {library.map((p) => {
                 const rels = relationships.filter((r) => r.subject_identity_id === p.identity_id || r.target_identity_id === p.identity_id);
+                const featured = new Set(roles.filter((r) => r.identity_id === p.identity_id).map((r) => r.book_id));
                 return (
-                  <Card key={p.id}>
-                    <CardHeader className="pb-2"><CardTitle className="text-base">{p.identity.display_name}</CardTitle>
-                      <div className="flex flex-wrap gap-1"><Badge variant="secondary">{labelOf(p.category)}</Badge><Badge variant="outline">{labelOf(p.creation_mode)}</Badge>
-                        {p.identity.universe_id && <Badge variant="outline">{uniById[p.identity.universe_id]?.name}</Badge>}</div>
+                  <Card key={p.id} className="cursor-pointer transition-colors hover:border-primary/60" onClick={() => setDetailId(p.id)}>
+                    <CardHeader className="pb-2 flex-row items-center gap-3 space-y-0">
+                      <PersonaAvatar path={p.portrait_path} name={p.identity.display_name} onOpen={(url) => setZoom({ url, name: p.identity.display_name })} />
+                      <div className="min-w-0 flex-1"><CardTitle className="text-base truncate">{p.identity.display_name}</CardTitle>
+                      <div className="mt-1 flex flex-wrap gap-1"><Badge variant="secondary">{labelOf(p.category)}</Badge>
+                        {p.identity.universe_id && <Badge variant="outline">{uniById[p.identity.universe_id]?.name}</Badge>}</div></div>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="text-muted-foreground">Born {fmtDate(p.birth_date)}{p.death_date ? ` · Died ${fmtDate(p.death_date)}` : ""}</div>
+                      {(p.identity.aliases ?? []).length > 0 && <div className="text-xs text-muted-foreground truncate">Also: {p.identity.aliases.join(", ")}</div>}
                       {p.psychology?.motivation && <div className="line-clamp-2">{p.psychology.motivation}</div>}
-                      <div className="space-y-1">{rels.map((r) => {
-                        const other = idById[r.subject_identity_id === p.identity_id ? r.target_identity_id : r.subject_identity_id];
-                        return <div key={r.id} className="text-xs text-muted-foreground">{labelOf(r.relationship_type)} · {other?.display_name}</div>;
-                      })}</div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Add relationship</Button>
+                      {featured.size > 0 && <div className="text-xs"><span className="text-muted-foreground">Books: </span>{[...featured].map((id) => bookById[id]?.title).filter(Boolean).join(", ")}</div>}
+                      {rels.length > 0 && <div className="text-xs text-muted-foreground">{rels.length} relationship{rels.length > 1 ? "s" : ""}</div>}
+                      <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Relationship</Button>
+                        <Button size="icon" variant="ghost" aria-label="Edit persona" onClick={() => setEditId(p.id)}><Pencil className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" aria-label="Delete persona" className="text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="w-4 h-4" /></Button>
                         {bookLink && (() => {
                           const inBook = bookLink.castIdentityIds.includes(p.identity_id);
                           const wrongUniverse = (bookLink.universeId ?? null) !== (p.identity.universe_id ?? null);
@@ -334,21 +359,44 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
             </div>
           </TabsContent>
 
-          <TabsContent value="universes"><UniverseTab universes={universes} identities={identities} books={books} onChange={load} userId={user?.id} /></TabsContent>
+          <TabsContent value="universes"><UniverseTab universes={universes} identities={identities} books={books} onChange={load} userId={user?.id} personaByIdentity={personaByIdentity}
+            onOpenPersona={(iid) => { const p = personaByIdentity[iid]; if (p) setDetailId(p.id); }} /></TabsContent>
           <TabsContent value="pennames"><PenNameTab penNames={penNames} books={books} onChange={load} userId={user?.id} /></TabsContent>
 
           <TabsContent value="promote" className="space-y-3">
             <p className="text-sm text-muted-foreground">Characters from your books. Promoting keeps the same character and all their links; it just adds a full persona profile.</p>
-            {promotable.length === 0 && <p className="text-sm text-muted-foreground">No characters to promote yet.</p>}
-            {promotable.map((c) => (
-              <div key={c.id} className="flex items-center justify-between rounded-md border border-border p-3">
-                <div className="min-w-0"><div className="font-medium truncate">{c.name}</div><div className="text-xs text-muted-foreground truncate">{bookById[c.book_id]?.title ?? "Book"}{c.role ? ` · ${c.role}` : ""}</div></div>
-                <Button size="sm" variant="outline" onClick={() => promote(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
+            {promotable.length === 0 && orphans.length === 0 && <p className="text-sm text-muted-foreground">No characters to promote yet.</p>}
+            {Object.entries(promoteGroups).map(([bookId, list]) => (
+              <div key={bookId} className="rounded-lg border border-border bg-card/40 p-3 space-y-2">
+                <div className="flex items-center gap-2 font-medium"><BookOpen className="w-4 h-4 text-primary" />{bookById[bookId]?.title ?? "Book"}<Badge variant="secondary">{list.length}</Badge></div>
+                {list.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-md border border-border bg-background p-2">
+                    <div className="min-w-0"><div className="font-medium truncate">{c.name}</div>{c.role && <div className="text-xs text-muted-foreground">{labelOf(c.role)}</div>}</div>
+                    <Button size="sm" variant="outline" onClick={() => promote(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {Object.entries(orphanGroups).map(([title, list]) => (
+              <div key={title} className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-2">
+                <div className="flex items-center gap-2 font-medium text-destructive"><BookOpen className="w-4 h-4" />{title}<Badge variant="destructive">Book deleted</Badge></div>
+                {list.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-md border border-destructive/30 bg-background p-2">
+                    <div className="font-medium truncate text-destructive">{c.display_name}</div>
+                    <Button size="sm" variant="outline" onClick={() => promoteIdentity(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
+                  </div>
+                ))}
               </div>
             ))}
           </TabsContent>
         </Tabs>
       </main>
+      {detail && <PersonaDetailDialog persona={detail} fmtDate={fmtDate} universeName={detail.identity?.universe_id ? uniById[detail.identity.universe_id]?.name : undefined}
+        relationships={relationships.filter((r) => r.subject_identity_id === detail.identity_id || r.target_identity_id === detail.identity_id)} idById={idById}
+        books={books} roles={roles} onClose={() => setDetailId(null)} onEdit={() => setEditId(detail.id)} onDelete={() => setDeleteId(detail.id)} />}
+      <PersonaEditDialog persona={editId ? personaById[editId] ?? null : null} userId={user?.id} onClose={() => setEditId(null)} onSaved={load} />
+      <ConfirmDelete open={!!deleteId} title="Delete this persona?" body="The persona profile is removed. The character itself stays in any books it already appears in." onCancel={() => setDeleteId(null)} onConfirm={() => deleteId && deletePersona(deleteId)} />
+      <ImageLightbox url={zoom?.url ?? null} alt={zoom?.name ?? ""} onClose={() => setZoom(null)} />
       <PersonaEditor open={editorOpen} onClose={() => setEditorOpen(false)} universes={universes} onSaved={load} />
       <RelationshipDialog subject={relFor} identities={identities} onClose={() => setRelFor(null)} onSaved={load} />
       <ConfirmIdentity resolution={promoteRes?.resolution ?? null} onCancel={() => setPromoteRes(null)} onDecide={(d, id) => promoteRes && promote(promoteRes.id, d, id)} />
@@ -356,7 +404,9 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
   );
 }
 
-function UniverseTab({ universes, identities, books, onChange, userId }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string }) {
+function UniverseTab({ universes, identities, books, onChange, userId, personaByIdentity, onOpenPersona }: { universes: Row[]; identities: Row[]; books: Row[]; onChange: () => void; userId?: string; personaByIdentity: Record<string, Row>; onOpenPersona: (id: string) => void }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = universes.find((u) => u.id === openId) ?? null;
   const [name, setName] = useState(""); const [desc, setDesc] = useState(""); const [genre, setGenre] = useState("");
   const add = async () => {
     if (!name.trim() || !userId) return;
@@ -370,8 +420,8 @@ function UniverseTab({ universes, identities, books, onChange, userId }: { unive
     onChange();
   };
   return (
-    <div className="space-y-4">
-      <Card><CardContent className="pt-6 grid gap-2 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Card className="sm:col-span-2"><CardContent className="pt-6 grid gap-2 sm:grid-cols-3">
         <Input placeholder="Universe name" value={name} onChange={(e) => setName(e.target.value)} />
         <Input placeholder="Genre (optional)" value={genre} onChange={(e) => setGenre(e.target.value)} />
         <Button onClick={add} disabled={!name.trim()}><Plus className="w-4 h-4" />Create universe</Button>
@@ -381,15 +431,25 @@ function UniverseTab({ universes, identities, books, onChange, userId }: { unive
         const cast = identities.filter((i) => i.universe_id === u.id);
         const inBooks = books.filter((b) => b.universe_id === u.id);
         return (
-          <Card key={u.id}><CardHeader className="pb-2"><CardTitle className="text-base">{u.name}</CardTitle>{u.description && <p className="text-sm text-muted-foreground">{u.description}</p>}</CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div><span className="text-muted-foreground">Characters: </span>{cast.map((c) => c.display_name).join(", ") || "none yet"}</div>
-              <div><span className="text-muted-foreground">Books: </span>{inBooks.map((b) => b.title).join(", ") || "none yet"}</div>
+          <Card key={u.id} className="cursor-pointer transition-colors hover:border-primary/60" onClick={() => setOpenId(u.id)}>
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Globe2 className="w-4 h-4 text-primary" />{u.name}</CardTitle>{u.description && <p className="text-sm text-muted-foreground line-clamp-2">{u.description}</p>}</CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {inBooks.length > 0 && <div className="flex gap-2 overflow-hidden">{inBooks.slice(0, 8).map((b) => (
+                <div key={b.id} className="aspect-[2/3] w-12 shrink-0 overflow-hidden rounded-sm border border-border bg-secondary" title={b.title}>
+                  {b.cover_url ? <img src={b.cover_url} alt={b.title} className="w-full h-full object-cover" /> : <div className="flex h-full items-center justify-center p-0.5 text-center text-[8px] leading-tight text-primary">{b.title}</div>}
+                </div>))}</div>}
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary">{inBooks.length} books</Badge><Badge variant="secondary">{cast.length} characters</Badge><Badge variant="secondary">{(u.locations ?? []).length} locations</Badge>
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
               <Select value="" onValueChange={(v) => assign(v, u.id)}><SelectTrigger className="w-64"><SelectValue placeholder="Add a book to this universe" /></SelectTrigger>
                 <SelectContent>{books.filter((b) => b.universe_id !== u.id).map((b) => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent></Select>
+              </div>
             </CardContent></Card>
         );
       })}
+      {open && <UniverseDetailDialog universe={open} books={books.filter((b) => b.universe_id === open.id)} cast={identities.filter((i) => i.universe_id === open.id)}
+        personaByIdentity={personaByIdentity} onClose={() => setOpenId(null)} onChanged={onChange} onOpenPersona={(id) => { setOpenId(null); onOpenPersona(id); }} />}
     </div>
   );
 }
