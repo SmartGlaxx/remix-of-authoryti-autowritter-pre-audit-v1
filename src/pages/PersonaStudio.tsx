@@ -531,17 +531,29 @@ function UniverseTab({ universes, identities, books, onChange, userId, personaBy
   );
 }
 
-function PenNameTab({ penNames, books, onChange, userId }: { penNames: Row[]; books: Row[]; onChange: () => void; userId?: string }) {
+function PenNameTab({ penNames, books, onChange, userId, bookLink }: { penNames: Row[]; books: Row[]; onChange: () => void; userId?: string; bookLink?: BookLink }) {
   const [pen, setPen] = useState(""); const [bio, setBio] = useState(""); const [genres, setGenres] = useState("");
+  const [edit, setEdit] = useState<Row | null>(null); const [delId, setDelId] = useState<string | null>(null);
+  const splitGenres = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
   const add = async () => {
     if (!pen.trim() || !userId) return;
-    const { error } = await supabase.from("author_identities").insert({ user_id: userId, pen_name: pen.trim(), bio: bio || null, genres: genres.split(",").map((s) => s.trim()).filter(Boolean) });
+    const { error } = await supabase.from("author_identities").insert({ user_id: userId, pen_name: pen.trim(), bio: bio || null, genres: splitGenres(genres) });
     if (error) return toast.error(error.message);
     setPen(""); setBio(""); setGenres(""); toast.success("Pen name added."); onChange();
   };
-  const assign = async (bookId: string, id: string) => {
-    const { error } = await supabase.from("books").update({ author_identity_id: id } as any).eq("id", bookId);
-    if (error) return toast.error(error.message); onChange();
+  const saveEdit = async () => {
+    if (!edit?.pen_name?.trim()) return toast.error("Pen name is required.");
+    const { error } = await supabase.from("author_identities").update({ pen_name: edit.pen_name.trim(), bio: edit.bio || null, genres: splitGenres(edit.genresText ?? "") }).eq("id", edit.id);
+    if (error) return toast.error(error.message);
+    setEdit(null); toast.success("Pen name updated."); onChange();
+  };
+  const remove = async (id: string) => {
+    const { error: e1 } = await supabase.from("books").update({ author_identity_id: null } as any).eq("author_identity_id", id);
+    if (e1) return toast.error(e1.message);
+    const { error } = await supabase.from("author_identities").update({ is_archived: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    if (bookLink?.penNameId === id) bookLink.onPenName?.(null);
+    setDelId(null); toast.success("Pen name deleted. Your books and their text are untouched."); onChange();
   };
   return (
     <div className="space-y-4">
@@ -552,15 +564,42 @@ function PenNameTab({ penNames, books, onChange, userId }: { penNames: Row[]; bo
         <Button onClick={add} disabled={!pen.trim()}><Plus className="w-4 h-4" />Add pen name</Button>
         <Textarea className="sm:col-span-3" rows={2} placeholder="Author bio (optional)" value={bio} onChange={(e) => setBio(e.target.value)} />
       </CardContent></Card>
-      {penNames.map((p) => (
-        <Card key={p.id}><CardHeader className="pb-2"><CardTitle className="text-base">{p.pen_name}</CardTitle>{p.bio && <p className="text-sm text-muted-foreground">{p.bio}</p>}</CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex flex-wrap gap-1">{(p.genres ?? []).map((g: string) => <Badge key={g} variant="secondary">{g}</Badge>)}</div>
-            <div><span className="text-muted-foreground">Books: </span>{books.filter((b) => b.author_identity_id === p.id).map((b) => b.title).join(", ") || "none yet"}</div>
-            <Select value="" onValueChange={(v) => assign(v, p.id)}><SelectTrigger className="w-64"><SelectValue placeholder="Publish a book under this name" /></SelectTrigger>
-              <SelectContent>{books.filter((b) => b.author_identity_id !== p.id).map((b) => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent></Select>
-          </CardContent></Card>
-      ))}
+      {penNames.length === 0 && <p className="text-sm text-muted-foreground">No pen names yet. Books use your account name until you add one.</p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {penNames.map((p) => {
+          const active = !!bookLink && bookLink.penNameId === p.id;
+          return (
+            <Card key={p.id} className={active ? "border-primary ring-1 ring-primary" : "opacity-90"}>
+              <CardHeader className="pb-2 flex-row items-start gap-2 space-y-0">
+                <div className="min-w-0 flex-1"><CardTitle className="text-base flex items-center gap-2"><Feather className="w-4 h-4 text-primary" />{p.pen_name}</CardTitle>
+                  {p.bio && <p className="text-sm text-muted-foreground mt-1">{p.bio}</p>}</div>
+                {bookLink?.onPenName && <Badge variant={active ? "default" : "outline"}>{active ? "Active" : "Inactive"}</Badge>}
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex flex-wrap gap-1">{(p.genres ?? []).map((g: string) => <Badge key={g} variant="secondary">{g}</Badge>)}</div>
+                <div><span className="text-muted-foreground">Books: </span>{books.filter((b) => b.author_identity_id === p.id).map((b) => b.title).join(", ") || "none yet"}</div>
+                <div className="flex flex-wrap gap-2">
+                  {bookLink?.onPenName && (active
+                    ? <Button size="sm" variant="ghost" onClick={() => bookLink.onPenName!(null)}>Use my account name instead</Button>
+                    : <Button size="sm" onClick={() => bookLink.onPenName!(p.id)}><Check className="w-4 h-4" />Use for this book</Button>)}
+                  <Button size="icon" variant="ghost" aria-label="Edit pen name" onClick={() => setEdit({ ...p, genresText: (p.genres ?? []).join(", ") })}><Pencil className="w-4 h-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="Delete pen name" className="text-destructive" onClick={() => setDelId(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit pen name</DialogTitle></DialogHeader>
+          <Label>Pen name</Label><Input value={edit?.pen_name ?? ""} onChange={(e) => setEdit((x) => x && { ...x, pen_name: e.target.value })} />
+          <Label>Genres (comma separated)</Label><Input value={edit?.genresText ?? ""} onChange={(e) => setEdit((x) => x && { ...x, genresText: e.target.value })} />
+          <Label>Author bio</Label><Textarea rows={3} value={edit?.bio ?? ""} onChange={(e) => setEdit((x) => x && { ...x, bio: e.target.value })} />
+          <DialogFooter><Button variant="ghost" onClick={() => setEdit(null)}>Cancel</Button><Button onClick={saveEdit}>Save</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDelete open={!!delId} title="Delete this pen name?" body="Books using it go back to your account name. No written text changes." onCancel={() => setDelId(null)} onConfirm={() => delId && remove(delId)} />
     </div>
   );
 }
