@@ -292,7 +292,7 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
       supabase.from("fictional_universes").select("*").eq("is_archived", false).order("name"),
       supabase.from("author_identities").select("*").eq("is_archived", false).order("pen_name"),
       supabase.from("narrative_relationships").select("*"),
-      supabase.from("story_characters").select("id, book_id, name, role, narrative_identity_id").eq("is_active", true).limit(500),
+      supabase.from("story_characters").select("id, book_id, name, role, narrative_identity_id, source_key").eq("is_active", true).limit(500),
       supabase.from("books").select("id, title, universe_id, author_identity_id, cover_url, characters"),
       supabase.from("book_identity_roles").select("book_id, identity_id, narrative_role"),
     ]);

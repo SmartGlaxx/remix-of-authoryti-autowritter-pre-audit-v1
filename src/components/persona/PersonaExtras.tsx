@@ -183,10 +183,6 @@ export function PersonaEditDialog({ persona, userId, onClose, onSaved }: { perso
         <DialogHeader><DialogTitle>Edit {persona.identity.display_name}</DialogTitle></DialogHeader>
         <div className="flex items-center gap-3">
           {preview ? <Button size="icon" variant="ghost" className="h-14 w-14 rounded-full" aria-label="View chosen portrait" onClick={() => setZoom(preview)}><img src={preview} alt={f.name} className="w-14 h-14 rounded-full object-cover border-2 border-primary/40" /></Button> : <PersonaAvatar path={persona.portrait_path} name={f.name || "?"} onOpen={setZoom} />}
-          <Label className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-secondary">
-            <Camera className="w-4 h-4" />{persona.portrait_path || file ? "Change picture" : "Add picture"}
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x && x.size > 5 * 1024 * 1024) return toast.error("Pictures must be under 5 MB."); setFile(x ?? null); }} />
-          </Label>
         </div>
         <PortraitPicker personaId={persona.id} description={`${persona.identity.display_name}. ${persona.identity.seed_details?.visualDescription ?? ""}`} onSelect={setFile} onOpen={setZoom} onBusy={setPortraitBusy} />
         <div className="grid gap-3 sm:grid-cols-2">
