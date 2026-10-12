@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Sparkles, Users, Globe2, Feather, ArrowUpCircle, Check, X, Link2, Pencil, Trash2, BookOpen } from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Users, Globe2, Feather, ArrowUpCircle, ArrowDownCircle, Check, X, Link2, Pencil, Trash2, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/personaStudio";
 import { PersonaAvatar, ImageLightbox, PersonaDetailDialog, PersonaEditDialog, ConfirmDelete, UniverseDetailDialog } from "@/components/persona/PersonaExtras";
 import { emptySetup, normalizeSetup } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
+import { PromotionCard, PromoteButton } from "@/components/persona/PromotionCard";
 
 type Row = Record<string, any>;
 type DateVal = { precision: string; year?: number; month?: number; day?: number } | null;
@@ -287,12 +288,12 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
     if (!user) return;
     const [i, p, u, n, r, c, b, br] = await Promise.all([
       supabase.from("narrative_identities").select("*").is("merged_into_id", null).order("display_name"),
-      supabase.from("personas").select("*").eq("is_archived", false),
+      supabase.from("personas").select("*"),
       supabase.from("fictional_universes").select("*").eq("is_archived", false).order("name"),
       supabase.from("author_identities").select("*").eq("is_archived", false).order("pen_name"),
       supabase.from("narrative_relationships").select("*"),
       supabase.from("story_characters").select("id, book_id, name, role, narrative_identity_id").eq("is_active", true).limit(500),
-      supabase.from("books").select("id, title, universe_id, author_identity_id, cover_url"),
+      supabase.from("books").select("id, title, universe_id, author_identity_id, cover_url, characters"),
       supabase.from("book_identity_roles").select("book_id, identity_id, narrative_role"),
     ]);
     setRoles(br.data ?? []);
@@ -305,12 +306,13 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
   const uniById = useMemo(() => Object.fromEntries(universes.map((u) => [u.id, u])), [universes]);
   const bookById = useMemo(() => Object.fromEntries(books.map((b) => [b.id, b])), [books]);
   const library = personas
+    .filter((p) => !p.is_archived)
     .map((p: any) => ({ ...p, identity: idById[p.identity_id] }) as any)
     .filter((p) => p.identity)
     .filter((p) => domainFilter === "all" || p.category === domainFilter)
     .filter((p) => uniFilter === "all" || (p.identity.universe_id ?? NONE) === uniFilter)
     .filter((p) => !search.trim() || [p.identity.display_name, ...(p.identity.aliases ?? [])].some((n: string) => n.toLowerCase().includes(search.toLowerCase())));
-  const personaIds = new Set(personas.map((p) => p.identity_id));
+  const personaIds = new Set(personas.filter((p) => !p.is_archived).map((p) => p.identity_id));
   const promotable = characters.filter((c) => !c.narrative_identity_id || !personaIds.has(c.narrative_identity_id));
 
   const promoteGroups = promotable.reduce<Record<string, Row[]>>((g, c) => { (g[c.book_id] ??= []).push(c); return g; }, {});
@@ -323,6 +325,11 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
     const { data } = await personaStudio("promote", { identityId });
     if (data.error) return toast.error(data.error);
     toast.success("Promoted to persona."); load();
+  };
+  const demote = async (id: string) => {
+    const { data } = await personaStudio("demote", { personaId: id });
+    if (data.error) return toast.error(data.error);
+    setDetailId(null); toast.success("Demoted. Profile, picture and book links are kept."); await load();
   };
   const deletePersona = async (id: string) => {
     const { error } = await supabase.from("personas").delete().eq("id", id);
@@ -386,6 +393,7 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
                         {p.identity.seed_details?.deleted_book_title && <Button size="sm" variant="outline" onClick={() => openReuse(p.identity)}><Plus className="w-4 h-4" />Reuse in a book</Button>}
                         <Button size="sm" variant="outline" onClick={() => setRelFor(p.identity)}><Link2 className="w-4 h-4" />Relationship</Button>
                         <Button size="icon" variant="ghost" aria-label="Edit persona" onClick={() => setEditId(p.id)}><Pencil className="w-4 h-4" /></Button>
+                        <Button size="sm" variant="outline" title="Undo promotion. Keeps the character, picture and profile for later." onClick={() => demote(p.id)}><ArrowDownCircle className="w-4 h-4" />Demote</Button>
                         <Button size="icon" variant="ghost" aria-label="Delete persona" className="text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="w-4 h-4" /></Button>
                         {bookLink && (() => {
                           const inBook = bookLink.castIdentityIds.includes(p.identity_id);
@@ -407,15 +415,16 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
 
           <TabsContent value="promote" className="space-y-3">
             <p className="text-sm text-muted-foreground">Characters from your books. Promoting keeps the same character and all their links; it just adds a full persona profile.</p>
-            {promotable.length === 0 && orphans.length === 0 && <p className="text-sm text-muted-foreground">No characters to promote yet.</p>}
+            {promotable.length === 0 && orphans.length === 0 && !personas.some((p) => p.is_archived) && <p className="text-sm text-muted-foreground">No characters to promote yet.</p>}
             {Object.entries(promoteGroups).map(([bookId, list]) => (
               <div key={bookId} className="rounded-lg border border-border bg-card/40 p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium"><BookOpen className="w-4 h-4 text-primary" />{bookById[bookId]?.title ?? "Book"}<Badge variant="secondary">{list.length}</Badge></div>
                 {list.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between rounded-md border border-border bg-background p-2">
-                    <div className="min-w-0"><div className="font-medium truncate">{c.name}</div>{c.role && <div className="text-xs text-muted-foreground">{labelOf(c.role)}</div>}</div>
-                    <Button size="sm" variant="outline" onClick={() => promote(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
-                  </div>
+                  <PromotionCard key={c.id} name={c.name} identity={idById[c.narrative_identity_id]} profile={personaByIdentity[c.narrative_identity_id]}
+                    character={(Array.isArray(bookById[bookId]?.characters) ? bookById[bookId].characters : []).find((x: Row) => x.id === c.source_key || x.name === c.name)}
+                    onOpen={(url) => setZoom({ url, name: c.name })}>
+                    {c.role && <Badge variant="secondary">{labelOf(c.role)}</Badge>}<PromoteButton onClick={() => promote(c.id)} />
+                  </PromotionCard>
                 ))}
               </div>
             ))}
@@ -423,14 +432,16 @@ export function PersonaStudioView({ onBack, embedded = false, bookLink }: { onBa
               <div key={title} className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium text-destructive"><BookOpen className="w-4 h-4" />{title}<Badge variant="destructive">Book deleted</Badge></div>
                 {list.map((c) => (
-                  <div key={c.id} className="flex flex-wrap gap-2 items-center justify-between rounded-md border border-destructive/30 bg-background p-2">
-                    <div className="font-medium truncate text-destructive">{c.display_name}</div>
-                    <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => promoteIdentity(c.id)}><ArrowUpCircle className="w-4 h-4" />Promote</Button>
-                    <Button size="sm" onClick={() => openReuse(c)}><Plus className="w-4 h-4" />Reuse in a book</Button></div>
-                  </div>
+                  <PromotionCard key={c.id} name={c.display_name} identity={c} profile={personaByIdentity[c.id]} onOpen={(url) => setZoom({ url, name: c.display_name })}>
+                    <PromoteButton onClick={() => promoteIdentity(c.id)} /><Button size="sm" onClick={() => openReuse(c)}><Plus className="w-4 h-4" />Reuse in a book</Button>
+                  </PromotionCard>
                 ))}
               </div>
             ))}
+            {personas.filter((p) => p.is_archived && !characters.some((c) => c.narrative_identity_id === p.identity_id) && !orphans.some((i) => i.id === p.identity_id)).map((p) => {
+              const id = idById[p.identity_id]; if (!id) return null;
+              return <PromotionCard key={p.id} name={id.display_name} profile={p} identity={id} onOpen={(url) => setZoom({ url, name: id.display_name })}><Badge variant="secondary">Demoted</Badge><PromoteButton onClick={() => promoteIdentity(id.id)} /><Button size="sm" variant="outline" onClick={() => setEditId(p.id)}><Pencil className="w-4 h-4" />Edit</Button></PromotionCard>;
+            })}
           </TabsContent>
         </Tabs>
       </main>
