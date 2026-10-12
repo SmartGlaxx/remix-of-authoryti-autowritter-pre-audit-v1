@@ -124,6 +124,7 @@
 - [x] Approving the whole-book summary goes straight on to chapter/section summaries
 
 # Phase 5
+- [ ] Simplify planning tooltip and allow deleted-book characters to be copied as fresh personas into another book; verify with free tests.
 - [x] Stage A: Scene plan panel, inline held-draft review (save edit before checks, full fenced acceptance), plan cards + Start writing handoff
 - [x] Stage A: click-through of setup reopen + writing-desk Plan tab (fixed crash on books with an incomplete plan)
 - [x] Stage B: Plan tab follows scene chronology
