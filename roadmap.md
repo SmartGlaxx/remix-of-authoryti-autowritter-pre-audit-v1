@@ -124,6 +124,7 @@
 - [x] Approving the whole-book summary goes straight on to chapter/section summaries
 
 # Phase 5
+- [ ] AI portrait choices (up to five), uploads, richer promotion cards and reversible demotion; free verification only.
 - [x] Simplified planning tooltip; deleted-book characters can become fresh personas for another book or future use. Live browser reuse-to-saved-cast verified, temporary records cleaned up, 529/529 free regression tests passed.
 - [x] Stage A: Scene plan panel, inline held-draft review (save edit before checks, full fenced acceptance), plan cards + Start writing handoff
 - [x] Stage A: click-through of setup reopen + writing-desk Plan tab (fixed crash on books with an incomplete plan)
