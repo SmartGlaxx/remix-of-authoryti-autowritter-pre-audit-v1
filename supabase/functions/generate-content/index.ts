@@ -745,8 +745,9 @@ serve(async (req) => {
         .replace(/\[\/?(?:HOOK|TEASER|SCENE|BEAT|NOTE)\]/gi, "");
 
     async function* all(): AsyncGenerator<string> {
-      if (!first.done) yield first.value;
+      let firstSeen = false;
       for await (const c of chunks) {
+        if (!firstSeen) { firstSeen = true; console.log(`[generate-content] model=${aiMeta.model} via=${aiMeta.provider} source=${aiMeta.credentialSource} fallback=${aiMeta.usedFallback}`); }
         // A worker that lost its lease stops writing immediately; nothing it produced is saved.
         if (heartbeat?.lost()) throw new Error("STALE_GENERATION_LEASE_REJECTED: this section is now being written elsewhere");
         yield c;
@@ -829,7 +830,7 @@ serve(async (req) => {
       }
     }, (e) => { heartbeat?.stop(); if (lease) adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {}); console.error("[generate-content] stream error:", e instanceof Error ? e.message : e); });
 
-    return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+    return new Response(withKeepalive(stream), { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {
     console.error("generate-content error:", error);
     return new Response(
@@ -838,3 +839,21 @@ serve(async (req) => {
     );
   }
 });
+
+/** Passes the stream through, emitting SSE comments while it is silent so the 150s idle limit never fires. */
+function withKeepalive(inner: ReadableStream<Uint8Array>, everyMs = 15_000): ReadableStream<Uint8Array> {
+  const ping = new TextEncoder().encode(": keepalive\n\n");
+  const reader = inner.getReader();
+  let timer: number | undefined;
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      timer = setInterval(() => { try { controller.enqueue(ping); } catch { /* closed */ } }, everyMs);
+    },
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) { clearInterval(timer); try { controller.close(); } catch { /* closed */ } return; }
+      controller.enqueue(value);
+    },
+    cancel(reason) { clearInterval(timer); return reader.cancel(reason); },
+  });
+}
