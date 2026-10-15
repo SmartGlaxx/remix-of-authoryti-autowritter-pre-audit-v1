@@ -351,16 +351,18 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         const jsonStr = line.slice(6).trim();
         if (jsonStr === "[DONE]") break;
 
+        let parsed: any;
         try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullContent += content;
-            setState(s => ({ ...s, streamingContent: fullContent }));
-          }
+          parsed = JSON.parse(jsonStr);
         } catch {
           buffer = line + "\n" + buffer;
           break;
+        }
+        if (parsed?.error) throw new Error(String(parsed.error));
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+          setState(s => ({ ...s, streamingContent: fullContent }));
         }
       }
 

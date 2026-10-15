@@ -711,20 +711,8 @@ serve(async (req) => {
       request: { system: systemPrompt, user: userPrompt, reasoning: "medium" },
     }, createAIDeps(adminSupabase, auth.user.id), aiMeta);
 
-    // Prime the first chunk so provider failures return a clean JSON error instead of a broken stream.
-    let first: IteratorResult<string>;
-    try {
-      first = await chunks.next();
-    } catch (e) {
-      heartbeat?.stop();
-      if (lease) await adminSupabase.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: lease.worker, p_token: lease.fencing_token }).then(() => {}, () => {});
-      const status = statusForAIError(e);
-      console.error("[generate-content] AI error:", e instanceof Error ? e.message : e);
-      return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "AI error" }), {
-        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    console.log(`[generate-content] model=${aiMeta.model} via=${aiMeta.provider} source=${aiMeta.credentialSource} fallback=${aiMeta.usedFallback}`);
+    // The first chunk can take minutes on reasoning models; the response opens immediately and
+    // keepalive comments flow until it arrives (provider errors arrive as an SSE error event).
 
     // ── Helper: append generated text to book.full_text and invalidate cache ──
     const finalizeFullText = async (newContent: string) => {
