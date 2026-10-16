@@ -197,7 +197,12 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-characters", {
-        body: { book, outline, ieltsBand },
+        // Send only what the character extractor reads — never written prose or images (keeps it under the size limit).
+        body: {
+          book: { id: (book as any).id, title: book.title, theme: String((book as any).theme ?? "").slice(0, 2000), bookType: (book as any).bookType, audience: (book as any).audience },
+          outline: { chapters: (outline?.chapters ?? []).map((ch: any) => ({ title: ch.title, summary: String(ch.summary ?? "").slice(0, 1200), subsections: (ch.subsections ?? []).map((s: any) => ({ title: s.title, goal: String(s.goal ?? "").slice(0, 400) })) })) },
+          ieltsBand,
+        },
       });
 
       if (error) throw error;
