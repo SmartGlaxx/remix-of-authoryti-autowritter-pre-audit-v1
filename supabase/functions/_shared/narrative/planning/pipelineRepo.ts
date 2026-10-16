@@ -24,7 +24,7 @@ export async function loadProgressiveState(db: Db, bookId: string, userId: strin
   for (const r of [m, p, a, l, acc]) if (r?.error) throw new Error(r.error.message);
   const master = m.data?.[0] ?? null;
   // Progressive rows keep the section plan in `content`; planningContext reads it as plan_skeleton.
-  const readyPlans = (p.data ?? []).map((r: Row) => ({ ...r, plan_skeleton: r.content }));
+  const readyPlans = (p.data ?? []).map((r: Row) => ({ ...r, plan_skeleton: r.content?.section?.objective ? { ...r.content.section, detail: r.content.detail } : r.content }));
   const anchorRows = a.data ?? [];
   const anchors = scopedAnchors(anchorRows as AnchorRow[], ch);
   let prior = prev ? priorFromAcceptances(acc.data ?? []) : null;
