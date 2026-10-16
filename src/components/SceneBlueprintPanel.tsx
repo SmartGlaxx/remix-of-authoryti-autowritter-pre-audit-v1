@@ -106,12 +106,19 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
       {held.map(({ c, pending }) => {
         const reason = (c.findings as Row[] ?? []).find((f) => f.severity !== "info")?.message;
         const text = edits[c.id] ?? c.draft_text;
+        const repair = (c.findings as Row[] ?? []).find((f) => f.code === "BROAD_REWRITE_PROPOSED" && typeof f.proposed_text === "string" && f.proposed_text.trim())?.proposed_text as string | undefined;
         return (
           <Card key={c.id} className="border-destructive/50">
             <CardContent className="p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-destructive" />
                 <span className="text-sm font-medium flex-1 min-w-0">Section {c.subsection_index + 1} draft is held{reason ? `: ${reason}` : ""}</span>
+                {repair && (
+                  <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => {
+                    setEdits({ ...edits, [c.id]: repair }); setOpen(c.id);
+                    toast.info("Suggested repair loaded — review it, then press “Re-run checks & accept”.");
+                  }}>Use suggested repair</Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => setOpen(open === c.id ? null : c.id)}>{open === c.id ? "Close" : "Review & correct"}</Button>
                 <Button size="sm" variant="ghost" asChild><Link to={`/books/${bookId}/plan`}>Open in Planning Studio</Link></Button>
               </div>
