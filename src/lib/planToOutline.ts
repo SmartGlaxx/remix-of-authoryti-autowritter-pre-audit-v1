@@ -39,7 +39,7 @@ export function buildOutlineFromPlans(master: Row, plans: Row[], previous?: Row 
         goal: outcome || objective || undefined,
         teaser: firstSentence(entry || summary, 160) || undefined,
         targetWords: ss.targetWords,
-        ...(content ? { content, status: prevSub.status ?? "completed" } : { status: "pending" as const }),
+        content, status: (content ? prevSub.status ?? "completed" : "pending") as string,
       };
     });
     const done = sections.length > 0 && sections.every((s) => s.status === "completed");
