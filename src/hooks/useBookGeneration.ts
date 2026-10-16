@@ -1036,7 +1036,14 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         const message = err instanceof Error ? err.message : "Generation failed";
         setState(s => ({ ...s, phase: "error", error: message }));
         toast.error(`Generation stopped: ${message}`);
-        onUpdateBook(book.id, { status: "paused", currentChapterIndex: chapterIndex, currentSubsectionIndex: subIdx });
+        // Clear the "writing" spinner on this section so its card (or held-draft review) shows again.
+        const chs = [...outline.chapters];
+        const subs = [...chs[chapterIndex].subsections];
+        if (subs[subIdx]?.status === "writing") subs[subIdx] = { ...subs[subIdx], status: "pending" };
+        chs[chapterIndex] = { ...chs[chapterIndex], subsections: subs };
+        outline = { ...outline, chapters: chs };
+        if (/held for your review/.test(message)) window.dispatchEvent(new Event("candidate-drafts-changed"));
+        onUpdateBook(book.id, { outline, status: "paused", currentChapterIndex: chapterIndex, currentSubsectionIndex: subIdx });
         return;
       }
     }
