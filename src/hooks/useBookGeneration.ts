@@ -870,7 +870,12 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       subsectionCounter++;
 
       try {
-        const content = await retryWithBackoff(
+        const startedAt = new Date(Date.now() - 5000).toISOString();
+        const progressiveBook = isProgressiveBook(book.controls);
+        // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
+        const prior = progressiveBook && !subsection.content ? await priorSectionOutcome(book.id, chapterIndex, subIdx) : { state: "pending" as const };
+        if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+        let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
           () => streamContent(
             { ...currentBook, outline, tonalAnchors },
             chapterIndex,
@@ -880,6 +885,15 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           ),
           MAX_RETRIES,
         );
+        // Progressive: wait for the server's checks to accept the section before moving on,
+        // so the next section never starts before this one is accepted and remembered.
+        if (progressiveBook) {
+          const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chapterIndex, subIdx, startedAt);
+          if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — try again in a minute");
+          if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          if (outcome.state === "pending") throw new Error("checks on this section did not finish; try again shortly");
+          if (outcome.text) content = outcome.text;
+        }
 
         chapterContent += content + "\n\n";
         const wordCount = content.split(/\s+/).length;
