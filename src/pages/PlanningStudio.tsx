@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
+import { buildOutlineFromPlans } from "@/lib/planToOutline";
 
 type Row = Record<string, any>;
 
@@ -252,7 +253,9 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
               <CheckCircle2 className="w-5 h-5 text-primary" /><span className="text-sm flex-1">The whole book is planned and approved. Writing will follow these exact summaries, section by section.</span>
               <Button disabled={!!busy} onClick={() => run("write", async () => {
                 const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive" };
-                const { error } = await supabase.from("books").update({ controls }).eq("id", book.id); if (error) throw error;
+                const outline = buildOutlineFromPlans(master, mine, book.outline);
+                const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
+                const { error } = await supabase.from("books").update({ controls, outline: outline as any, ...(hasProse ? {} : { status: "ready_to_write", current_chapter_index: 0, current_subsection_index: 0 }) }).eq("id", book.id); if (error) throw error;
                 navigate(`/dashboard/${book.id}`);
               })}><PenLine className="w-4 h-4 mr-2" />Start writing the book</Button>
             </div>}
