@@ -590,7 +590,16 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         }
 
         const subsection = chapter.subsections[subIdx];
+        // Already written: never rewrite (the server protects accepted sections anyway).
+        if (subsection.status === "completed" || (subsection.content && subsection.content.trim())) {
+          chapterContent += (subsection.content || "") + "\n\n";
+          previousSummary = subsection.summary || previousSummary;
+          previousRawContent = (subsection.content || "").split(/\s+/).slice(-1000).join(" ");
+          continue;
+        }
         subsectionCounter++;
+        setState(s => ({ ...s, phase: "writing", streamingContent: "", currentChapter: chIdx, currentSubsection: subIdx, totalChapters: outline!.chapters.length, totalSubsections: outline!.chapters.reduce((n, c) => n + c.subsections.length, 0) }));
+        onUpdateBook(book.id, { status: "writing", currentChapterIndex: chIdx, currentSubsectionIndex: subIdx });
 
         try {
           const startedAt = new Date(Date.now() - 5000).toISOString();
@@ -881,7 +890,23 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         previousRawContent = subsection.content || "";
         continue;
       }
+      if (subsection.content && subsection.content.trim()) {
+        chapterContent += subsection.content + "\n\n";
+        previousSummary = subsection.summary || previousSummary;
+        previousRawContent = subsection.content.split(/\s+/).slice(-1000).join(" ");
+        continue;
+      }
       subsectionCounter++;
+      // Show exactly which section is being written.
+      setState(s => ({ ...s, phase: "writing", streamingContent: "", currentChapter: chapterIndex, currentSubsection: subIdx, totalChapters: outline!.chapters.length, totalSubsections: outline!.chapters.reduce((n, c) => n + c.subsections.length, 0) }));
+      {
+        const chs = [...outline.chapters];
+        const subs = [...chs[chapterIndex].subsections];
+        subs[subIdx] = { ...subs[subIdx], status: "writing" };
+        chs[chapterIndex] = { ...chs[chapterIndex], subsections: subs, status: "writing" };
+        outline = { ...outline, chapters: chs };
+        onUpdateBook(book.id, { outline, status: "writing", currentChapterIndex: chapterIndex, currentSubsectionIndex: subIdx });
+      }
 
       try {
         const startedAt = new Date(Date.now() - 5000).toISOString();
@@ -1011,7 +1036,14 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         const message = err instanceof Error ? err.message : "Generation failed";
         setState(s => ({ ...s, phase: "error", error: message }));
         toast.error(`Generation stopped: ${message}`);
-        onUpdateBook(book.id, { status: "paused", currentChapterIndex: chapterIndex, currentSubsectionIndex: subIdx });
+        // Clear the "writing" spinner on this section so its card (or held-draft review) shows again.
+        const chs = [...outline.chapters];
+        const subs = [...chs[chapterIndex].subsections];
+        if (subs[subIdx]?.status === "writing") subs[subIdx] = { ...subs[subIdx], status: "pending" };
+        chs[chapterIndex] = { ...chs[chapterIndex], subsections: subs };
+        outline = { ...outline, chapters: chs };
+        if (/held for your review/.test(message)) window.dispatchEvent(new Event("candidate-drafts-changed"));
+        onUpdateBook(book.id, { outline, status: "paused", currentChapterIndex: chapterIndex, currentSubsectionIndex: subIdx });
         return;
       }
     }
