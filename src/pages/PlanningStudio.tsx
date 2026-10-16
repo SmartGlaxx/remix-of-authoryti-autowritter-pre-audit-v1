@@ -374,7 +374,13 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
               <Textarea rows={10} value={text} onChange={(e) => setEdits({ ...edits, [c.id]: e.target.value })} />
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!!busy || pending} onClick={() => run(`a-${c.id}`, async () => {
-                  const r = await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
+                  let r = await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
+                  if (r.data?.error === "ACCEPTED_SECTION_PROTECTED") {
+                    if (!window.confirm("This section already has accepted text in your book. Replace it with this draft? (Cancel keeps the current text and removes this draft.)")) {
+                      await callReview({ action: "discard", candidateId: r.candidateId }); toast.success("Kept the accepted text; removed the old draft"); await refresh(); return;
+                    }
+                    r = await saveThenAccept(bookId, r.candidateId, c.draft_text, undefined, true);
+                  }
                   if (r.data.status === "accepted") {
                     toast.success("Accepted — updating story memory");
                     await runNarrativeExtraction(bookId, c.chapter_index, c.subsection_index);
