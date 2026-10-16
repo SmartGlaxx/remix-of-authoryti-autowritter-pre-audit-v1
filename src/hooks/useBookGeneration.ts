@@ -349,6 +349,30 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       }
     }
 
+    // Returns the saved text once an in-progress write of this section finishes; null if none was saved.
+    const waitForExistingWrite = async (): Promise<string | null> => {
+      if (!bookData.id) return null;
+      const started = Date.now();
+      while (Date.now() - started < 180_000) {
+        const { data: lease } = await supabase.from("book_generation_leases").select("status, expires_at")
+          .eq("book_id", bookData.id).eq("chapter_index", chapterIndex).eq("subsection_index", subsectionIndex)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const busy = lease?.status === "ACTIVE" && new Date(lease.expires_at).getTime() > Date.now();
+        if (!busy) break;
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      if (Date.now() - started < 1000) return null; // nothing was in progress
+      const { data: row } = await supabase.from("books").select("outline").eq("id", bookData.id).maybeSingle();
+      const text = (row?.outline as { chapters?: { subsections?: { content?: string }[] }[] } | null)
+        ?.chapters?.[chapterIndex]?.subsections?.[subsectionIndex]?.content;
+      if (text && text.trim()) { setState((st) => ({ ...st, streamingContent: text })); return text; }
+      return null;
+    };
+
+    // Avoid a refused request: if this section is already being written, wait for it instead.
+    const alreadySaved = await waitForExistingWrite();
+    if (alreadySaved) return alreadySaved;
+
     let response = await send();
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
@@ -368,20 +392,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     if (response.status === 409 && bookData.id) {
       const errBody = await response.clone().json().catch(() => ({}));
       if (errBody?.code === "LEASE_HELD") {
-        const started = Date.now();
-        while (Date.now() - started < 180_000) {
-          await new Promise((r) => setTimeout(r, 5000));
-          const { data: lease } = await supabase.from("book_generation_leases").select("status, expires_at")
-            .eq("book_id", bookData.id).eq("chapter_index", chapterIndex).eq("subsection_index", subsectionIndex)
-            .order("created_at", { ascending: false }).limit(1).maybeSingle();
-          const busy = lease?.status === "ACTIVE" && new Date(lease.expires_at).getTime() > Date.now();
-          if (busy) continue;
-          const { data: row } = await supabase.from("books").select("outline").eq("id", bookData.id).maybeSingle();
-          const text = (row?.outline as { chapters?: { subsections?: { content?: string }[] }[] } | null)
-            ?.chapters?.[chapterIndex]?.subsections?.[subsectionIndex]?.content;
-          if (text && text.trim()) { setState((st) => ({ ...st, streamingContent: text })); return text; }
-          break; // earlier write ended without saving: fall through to a fresh attempt below
-        }
+        const saved = await waitForExistingWrite();
+        if (saved) return saved;
         response = await send();
       }
     }
