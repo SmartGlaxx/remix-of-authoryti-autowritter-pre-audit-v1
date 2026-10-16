@@ -336,6 +336,19 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       }
     }
 
+    // Progressive books: a serious contradiction in an earlier section needs the author's decision first.
+    if (bookData.id && (bookData.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") {
+      const { data: pending } = await supabase.from("canon_reconciliation_logs")
+        .select("chapter_index, subsection_index, dedup_key").eq("book_id", bookData.id)
+        .eq("decision", "PENDING").in("severity", ["CRITICAL", "MAJOR"]).limit(50);
+      const here = chapterIndex * 1000 + subsectionIndex;
+      const blocking = (pending ?? []).filter((l) => !String(l.dedup_key ?? "").startsWith("selftest_") && l.chapter_index * 1000 + l.subsection_index < here);
+      if (blocking.length) {
+        window.dispatchEvent(new Event("canon-reconciliation-changed"));
+        throw new Error("A story contradiction needs your decision first — see the red card above the chapters.");
+      }
+    }
+
     let response = await send();
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
