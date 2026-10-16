@@ -379,7 +379,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           const { data: row } = await supabase.from("books").select("outline").eq("id", bookData.id).maybeSingle();
           const text = (row?.outline as { chapters?: { subsections?: { content?: string }[] }[] } | null)
             ?.chapters?.[chapterIndex]?.subsections?.[subsectionIndex]?.content;
-          if (text && text.trim()) { onChunk?.(text); return text; }
+          if (text && text.trim()) { setState((st) => ({ ...st, streamingContent: text })); return text; }
           break; // earlier write ended without saving: fall through to a fresh attempt below
         }
         response = await send();
