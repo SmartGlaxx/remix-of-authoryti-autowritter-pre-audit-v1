@@ -21,6 +21,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { TestimonialModal } from "@/components/TestimonialModal";
 import { BookSearchPanel } from "@/components/BookSearchPanel";
 import { ManuscriptAuditPanel } from "@/components/ManuscriptAuditPanel";
+import { ContradictionReviewCard } from "@/components/ContradictionReviewCard";
 import { exportBookToPdf } from "@/lib/exportPdf";
 import { exportBookToEpub } from "@/lib/exportEpub";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -524,6 +525,8 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
             />
           </motion.div>
         )}
+
+        {hasOutline && <ContradictionReviewCard bookId={book.id} />}
 
         {hasOutline && <ManuscriptAuditPanel bookId={book.id} onNavigateToChapter={(idx) => setSearchNavigateChapter(idx)} />}
 
