@@ -316,17 +316,33 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       },
       body: JSON.stringify(payload),
     });
+    // Progressive books: make sure the previous accepted section's story memory is updated
+    // before asking to write the next one (the server refuses otherwise).
+    const prevPos = (() => {
+      if (subsectionIndex > 0) return { c: chapterIndex, s: subsectionIndex - 1 };
+      for (let c = chapterIndex - 1; c >= 0; c--) {
+        const n = bookData.outline?.chapters?.[c]?.subsections?.length ?? 0;
+        if (n > 0) return { c, s: n - 1 };
+      }
+      return null;
+    })();
+    if (prevPos && bookData.id && (bookData.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") {
+      const { data: acc } = await supabase.from("book_section_acceptances")
+        .select("extraction_status, manuscript_status").eq("book_id", bookData.id)
+        .eq("chapter_index", prevPos.c).eq("subsection_index", prevPos.s);
+      const live = (acc ?? []).filter((r) => r.manuscript_status !== "REVISED");
+      if (live.length && live.every((r) => r.extraction_status !== "EXTRACTED")) {
+        await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000 });
+      }
+    }
+
     let response = await send();
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
     if (response.status === 409) {
       const errBody = await response.clone().json().catch(() => ({}));
       if (errBody?.code === "RECOVER_EXTRACTION" && bookData.id) {
-        let prev: { c: number; s: number } | null = subsectionIndex > 0 ? { c: chapterIndex, s: subsectionIndex - 1 } : null;
-        for (let c = chapterIndex - 1; !prev && c >= 0; c--) {
-          const n = bookData.outline?.chapters?.[c]?.subsections?.length ?? 0;
-          if (n > 0) prev = { c, s: n - 1 };
-        }
+        const prev = prevPos;
         if (prev) {
           const r = await runNarrativeExtraction(bookData.id, prev.c, prev.s, { timeoutMs: 120_000 });
           if (r.status === "completed" || r.status === "skipped") response = await send();
