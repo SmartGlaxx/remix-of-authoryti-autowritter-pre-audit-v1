@@ -363,6 +363,29 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       }
     }
 
+    // The same section is still being written by an earlier request (e.g. after a dropped connection).
+    // Don't start a second paid write: wait for that one to save, then use its text.
+    if (response.status === 409 && bookData.id) {
+      const errBody = await response.clone().json().catch(() => ({}));
+      if (errBody?.code === "LEASE_HELD") {
+        const started = Date.now();
+        while (Date.now() - started < 180_000) {
+          await new Promise((r) => setTimeout(r, 5000));
+          const { data: lease } = await supabase.from("book_generation_leases").select("status, expires_at")
+            .eq("book_id", bookData.id).eq("chapter_index", chapterIndex).eq("subsection_index", subsectionIndex)
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          const busy = lease?.status === "ACTIVE" && new Date(lease.expires_at).getTime() > Date.now();
+          if (busy) continue;
+          const { data: row } = await supabase.from("books").select("outline").eq("id", bookData.id).maybeSingle();
+          const text = (row?.outline as { chapters?: { subsections?: { content?: string }[] }[] } | null)
+            ?.chapters?.[chapterIndex]?.subsections?.[subsectionIndex]?.content;
+          if (text && text.trim()) { onChunk?.(text); return text; }
+          break; // earlier write ended without saving: fall through to a fresh attempt below
+        }
+        response = await send();
+      }
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error || `Error: ${response.status}`;
