@@ -307,7 +307,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       payload.tonalAnchors = payload.tonalAnchors?.slice(-1).map(a => a?.slice(0, 200) || "");
     }
 
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-content`, {
+    const send = () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-content`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -316,6 +316,23 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       },
       body: JSON.stringify(payload),
     });
+    let response = await send();
+
+    // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
+    if (response.status === 409) {
+      const errBody = await response.clone().json().catch(() => ({}));
+      if (errBody?.code === "RECOVER_EXTRACTION" && bookData.id) {
+        let prev: { c: number; s: number } | null = subsectionIndex > 0 ? { c: chapterIndex, s: subsectionIndex - 1 } : null;
+        for (let c = chapterIndex - 1; !prev && c >= 0; c--) {
+          const n = bookData.outline?.chapters?.[c]?.subsections?.length ?? 0;
+          if (n > 0) prev = { c, s: n - 1 };
+        }
+        if (prev) {
+          const r = await runNarrativeExtraction(bookData.id, prev.c, prev.s, { timeoutMs: 120_000 });
+          if (r.status === "completed" || r.status === "skipped") response = await send();
+        }
+      }
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -630,7 +647,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
           // Unresolved contradictions must not become story memory until the author decides.
-          if (cont.status !== "NEEDS_REVIEW") await runNarrativeExtraction(book.id, chIdx, subIdx);
+          if (cont.status !== "NEEDS_REVIEW" || (book.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") await runNarrativeExtraction(book.id, chIdx, subIdx);
 
           // APPROVAL GATES based on automation level
           if (automationLevel === "guided") {
@@ -885,7 +902,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
           // Unresolved contradictions must not become story memory until the author decides.
-          if (cont.status !== "NEEDS_REVIEW") await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+          if (cont.status !== "NEEDS_REVIEW" || (book.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") await runNarrativeExtraction(book.id, chapterIndex, subIdx);
 
         // In guided mode, pause after each section
         if (automationLevel === "guided") {
