@@ -598,16 +598,19 @@ serve(async (req) => {
     const systemPrompt = buildStaticSystemPrompt(book, band, isScreenplay, isChildren, isComic, isNarrative, book.controls, pipeline === "progressive");
     
     // Variable user prompt = changes per subsection (not cached)
+    // Planned books write the full planned section: the Guided 2–3 sentence cap never applies to them.
+    const effLevel = progressive && reqAutomationLevel === "guided" ? "assisted" : reqAutomationLevel;
+    const effTarget = (progressive && Number(subsection?.targetWords) > 0) ? Number(subsection.targetWords) : targetWordsPerSubsection;
     const legacyPrompt = () => buildVariablePrompt(
       book, chapter, subsection,
       previousNovelText,
       previousSummary, previousRawContent, tonalAnchors, teaserStyle,
-      isScreenplay, isChildren, isComic, targetWordsPerSubsection, reqAutomationLevel
+      isScreenplay, isChildren, isComic, effTarget, effLevel
     );
     let userPrompt = engine === "adaptive"
       // Adaptive: prior prose comes only from the assembled context, never from client-sent text.
       ? buildVariablePrompt(book, chapter, subsection, undefined, undefined, undefined, tonalAnchors, teaserStyle,
-          isScreenplay, isChildren, isComic, targetWordsPerSubsection, reqAutomationLevel)
+          isScreenplay, isChildren, isComic, effTarget, effLevel)
       : legacyPrompt();
 
     // ── Pass 2: structured narrative memory (point-in-time, strictly before this section) ──
