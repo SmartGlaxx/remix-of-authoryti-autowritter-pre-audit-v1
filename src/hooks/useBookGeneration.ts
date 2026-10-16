@@ -411,7 +411,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error || `Error: ${response.status}`;
       if (response.status === 402) {
-        throw new Error(msg.includes("Daily") ? msg : `Credit limit reached: ${msg}. Please upgrade your plan.`);
+        throw new Error(msg.includes("Daily") ? "Daily word limit reached for your plan. It resets at midnight UTC, or upgrade to keep writing now" : `Credit limit reached: ${msg}. Please upgrade your plan.`);
       }
       throw new Error(msg);
     }
