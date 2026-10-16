@@ -331,8 +331,17 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         .select("extraction_status, manuscript_status").eq("book_id", bookData.id)
         .eq("chapter_index", prevPos.c).eq("subsection_index", prevPos.s);
       const live = (acc ?? []).filter((r) => r.manuscript_status !== "REVISED");
-      if (live.length && live.every((r) => r.extraction_status !== "EXTRACTED")) {
-        await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000 });
+      let needsMemory = live.length > 0 && live.every((r) => r.extraction_status !== "EXTRACTED");
+      if (!live.length) {
+        // Older sections without an acceptance record: the extraction ledger decides (as on the server).
+        const { data: ex } = await supabase.from("narrative_extractions").select("status")
+          .eq("book_id", bookData.id).eq("chapter_index", prevPos.c).eq("subsection_index", prevPos.s)
+          .order("updated_at", { ascending: false }).limit(1);
+        needsMemory = ex?.[0]?.status !== "completed";
+      }
+      if (needsMemory) {
+        // Idempotent: if an update is already running, this waits/retries until it completes.
+        await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 5 });
       }
     }
 
