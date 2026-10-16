@@ -149,6 +149,10 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const has = (level: string, ch: number) => mine.some((p) => p.plan_level === level && p.chapter_index === ch);
   const chapters = [...new Set(mine.filter((p) => p.plan_level === "CHAPTER").map((p) => p.chapter_index))].sort((a, b) => a - b);
   const brief = { premise, targetWords, chapterCount };
+  // Every chapter of the approved master has chapter, section and beat plans.
+  const planningComplete = master?.status === "APPROVED" && chapters.length > 0
+    && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
+    && chapters.every((c) => ["CHAPTER", "SECTION", "BEATS"].every((lv) => has(lv, c)));
   const allReady = master?.status === "APPROVED" && chapters.length > 0 && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
     && mine.every((p) => p.plan_status === "READY");
@@ -234,9 +238,9 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              <Button onClick={planAll} disabled={!!busy}>{busy === "auto" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Plan the whole book</Button>
+              <Button onClick={planAll} disabled={!!busy || planningComplete}>{busy === "auto" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{planningComplete ? "Whole book planned" : "Plan the whole book"}</Button>
               {progress && <Button variant="outline" onClick={() => { pauseRef.current = !pauseRef.current; setProgress({ ...progress, paused: pauseRef.current }); }}>{progress.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}</Button>}
-              <Button variant="outline" disabled={!!busy || !mine.some((p) => p.plan_status === "PLANNED")} onClick={() => run("approveAll", async () => {
+              <Button variant="outline" disabled={!!busy || !planningComplete || !mine.some((p) => p.plan_status === "PLANNED")} onClick={() => run("approveAll", async () => {
                 const r = await callPlanBook({ action: "approve_plans", ids: mine.filter((p) => p.plan_status === "PLANNED").map((p) => p.id) }); if (!r.ok) throw new Error(r.data.error); toast.success(`${r.data.approved} plans approved`); await refresh();
               })}>4. Approve all planned</Button>
             </div>
