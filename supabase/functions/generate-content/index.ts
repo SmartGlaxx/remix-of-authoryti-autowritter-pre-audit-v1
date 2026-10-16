@@ -600,7 +600,9 @@ serve(async (req) => {
     // Variable user prompt = changes per subsection (not cached)
     // Planned books write the full planned section: the Guided 2–3 sentence cap never applies to them.
     const effLevel = progressive && reqAutomationLevel === "guided" ? "assisted" : reqAutomationLevel;
-    const effTarget = (progressive && Number(subsection?.targetWords) > 0) ? Number(subsection.targetWords) : targetWordsPerSubsection;
+    const plannedWords = Number(serverOutline?.chapters?.[absChapter]?.subsections?.[subsectionIndex]?.targetWords)
+      || Number((progressive?.plan as any)?.section?.targetWords) || Number(subsection?.targetWords) || 0;
+    const effTarget = progressive && plannedWords > 0 ? Math.min(plannedWords, 3000) : targetWordsPerSubsection;
     const legacyPrompt = () => buildVariablePrompt(
       book, chapter, subsection,
       previousNovelText,
