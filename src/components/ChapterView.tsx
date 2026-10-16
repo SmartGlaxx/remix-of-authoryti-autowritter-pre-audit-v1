@@ -1,3 +1,4 @@
+import { PlannedSceneBrief } from "@/components/PlannedSceneBrief";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { sanitizeText } from "@/lib/sanitize";
@@ -342,7 +343,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
                 </div>
               ) : (
                 <div className="pl-11 flex flex-col items-start gap-2">
-                  <p className="text-muted-foreground italic text-sm">No content yet for this section.</p>
+                  <PlannedSceneBrief sub={sub as any} />
                   {isFirstEmpty && onGenerateChapter && (
                     <Button variant="hero" size="sm" onClick={() => onGenerateChapter(chapterIdx)} className="gap-1.5">
                       <Play className="w-3.5 h-3.5" />
@@ -460,7 +461,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
         
         return (
           <div className="pl-11 flex flex-col items-start gap-2">
-            <p className="text-muted-foreground italic text-sm">No content yet for this section.</p>
+            <PlannedSceneBrief sub={sub as any} />
             {isFirstEmpty && onGenerateChapter && (
               <Button variant="hero" size="sm" onClick={() => onGenerateChapter(chapterIdx)} className="gap-1.5">
                 <Play className="w-3.5 h-3.5" />

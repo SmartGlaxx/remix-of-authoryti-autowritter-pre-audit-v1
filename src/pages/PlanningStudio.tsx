@@ -256,7 +256,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
                 const outline = buildOutlineFromPlans(master, mine, book.outline);
                 const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
                 const { error } = await supabase.from("books").update({ controls, outline: outline as any, ...(hasProse ? {} : { status: "ready_to_write", current_chapter_index: 0, current_subsection_index: 0 }) }).eq("id", book.id); if (error) throw error;
-                navigate(`/dashboard/${book.id}`);
+                navigate(`/dashboard/${book.id}?autostart=1`);
               })}><PenLine className="w-4 h-4 mr-2" />Start writing the book</Button>
             </div>}
             <p className="text-xs text-muted-foreground">5. Once approved and Progressive Planning is on, write from the book page. Each section is checked before it is accepted; anything held shows up under Review.</p>

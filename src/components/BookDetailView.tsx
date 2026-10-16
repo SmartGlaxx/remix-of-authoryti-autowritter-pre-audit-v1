@@ -124,6 +124,20 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
   const canGenerateChapter = hasOutline && !isGenerating && !isComplete;
   const nextIncompleteChapter = outlineChapters.findIndex(ch => ch.status !== "completed");
 
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autostart") !== "1") return;
+    if (!canGenerateChapter || nextIncompleteChapter < 0 || isAwaitingApproval) return;
+    autoStartedRef.current = true;
+    params.delete("autostart");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    toast.success(`Writing Chapter ${nextIncompleteChapter + 1} from your approved plan…`);
+    generateChapter(nextIncompleteChapter);
+  }, [canGenerateChapter, nextIncompleteChapter, isAwaitingApproval, generateChapter]);
+
   const handleSaveTitle = () => {
     if (editTitle.trim()) {
       updateBook(book.id, { title: editTitle.trim() });
