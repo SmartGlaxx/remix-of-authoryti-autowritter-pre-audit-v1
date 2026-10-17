@@ -23,7 +23,10 @@ import { GuidedWritingToolbar } from "@/components/GuidedWritingToolbar";
 import { CharacterGallery } from "@/components/CharacterGallery";
 import { Textarea } from "@/components/ui/textarea";
 import { SceneBlueprintPanel, HeldDraftAlert } from "@/components/SceneBlueprintPanel";
-import { isProgressiveBook } from "@/lib/candidateReview";
+import { callReview, isProgressiveBook } from "@/lib/candidateReview";
+import { allIssuesDismissed, displayWritingStatus, type ReviewLog } from "@/lib/reviewDisplay";
+import { RECONCILIATION_EVENT } from "@/components/ContradictionReviewCard";
+import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2, Circle, Loader2, FileText, ChevronDown, Play, Check, X, Users, User, Pencil, Target } from "lucide-react";
 
 interface ChapterViewProps {
@@ -67,7 +70,35 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
   // can pick up where the previous one left off.
   useEffect(() => subscribeRevealed(() => setRevealTick((t) => t + 1)), []);
 
-  const chapters = book.outline?.chapters || [];
+  const [dismissedChecks, setDismissedChecks] = useState<string[]>([]);
+  const progressive = isProgressiveBook(book.controls);
+  useEffect(() => {
+    if (!progressive) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const ids = (book.outline?.chapters ?? []).flatMap((ch) => ch.subsections.flatMap((sub) => sub.continuity?.status === "NEEDS_REVIEW" && sub.continuity.checkId ? [sub.continuity.checkId] : []));
+      if (!ids.length) { setDismissedChecks([]); return; }
+      const [review, checks] = await Promise.all([
+        callReview<{ logs: ReviewLog[] }>({ action: "conflicts", bookId: book.id }),
+        supabase.from("continuity_checks").select("id, chapter_index, subsection_index, issues").eq("book_id", book.id).in("id", ids),
+      ]);
+      if (cancelled) return;
+      if (!review.ok || checks.error) { setDismissedChecks([]); return; }
+      setDismissedChecks((checks.data ?? []).filter((c) => allIssuesDismissed(c.issues, review.data.logs ?? [], c.chapter_index, c.subsection_index)).map((c) => c.id));
+    };
+    void refresh();
+    const h = () => void refresh();
+    window.addEventListener(RECONCILIATION_EVENT, h);
+    window.addEventListener("focus", h);
+    const timer = window.setInterval(h, 15000);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener(RECONCILIATION_EVENT, h); window.removeEventListener("focus", h); };
+  }, [book.id, book.outline, progressive]);
+  // Stale persisted writing flags must not animate when the book is paused.
+  // This is a view of saved state, not a manuscript update.
+  const chapters = (book.outline?.chapters || []).map((ch) => ({
+    ...ch, status: displayWritingStatus(ch.status, book.status),
+    subsections: ch.subsections.map((sub) => ({ ...sub, status: displayWritingStatus(sub.status, book.status) })),
+  }));
 
   // Auto-open the chapter currently being written so new text is visible.
   const writingChapterIdx = book.status === "writing" ? book.currentChapterIndex : null;
@@ -79,7 +110,6 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [writingChapterIdx]);
   const hasCharacters = book.outline?.characters && book.outline.characters.length > 0;
-  const progressive = isProgressiveBook(book.controls);
   const isVisualBook = VISUAL_BOOK_TYPES.includes(book.bookType);
   const selectedTemplate = book.controls?.selectedTemplateId
     ? BOOK_TEMPLATES.find(t => t.id === book.controls.selectedTemplateId)
@@ -255,11 +285,12 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
           <h3 className="font-medium text-lg">{sub.title}</h3>
           {/* Teasers are now woven into the prose itself — no separate display */}
         </div>
-        {sub.status === "completed" && sub.continuity?.status === "NEEDS_REVIEW" && (
+        {sub.status === "completed" && sub.continuity?.status === "NEEDS_REVIEW" && !dismissedChecks.includes(sub.continuity.checkId) && (
           <Badge variant="outline" className="shrink-0 border-warning/50 text-warning" title={`${sub.continuity.issueCount ?? 0} continuity issue(s) could not be fixed automatically`}>
             Continuity: review
           </Badge>
         )}
+        {sub.status === "completed" && dismissedChecks.includes(sub.continuity?.checkId) && <Badge variant="outline" className="shrink-0 text-success">Reviewed by you</Badge>}
         {sub.status === "completed" && sub.continuity?.status === "CHECK_FAILED" && (
           <Badge variant="outline" className="shrink-0 text-muted-foreground" title="The continuity check could not run for this section">
             Not checked
