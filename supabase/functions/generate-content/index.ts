@@ -6,6 +6,7 @@ import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.t
 import { openingDirective } from "../_shared/writers/opening.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
+import { runNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
 import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
@@ -790,7 +791,17 @@ serve(async (req) => {
           const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
           const { evaluate, repair } = modelCallers(cfg, auth.user.id, book.id, createAIDeps(adminSupabase, auth.user.id));
           const warnRatio = Number((book.controls as Record<string, unknown> | null)?.revisionWarnRatio) || undefined;
-          const r = await runPreAcceptance(cleaned, ctx, evaluate, repair, { warnRatio });
+          // Stage C: optional targeted naturalness rewrite of the UNACCEPTED draft ("advise" only).
+          // The result still goes through the full validation + fenced acceptance below.
+          let draftForValidation = cleaned;
+          if (resolveNaturalnessMode(book.controls) === "advise") {
+            try {
+              const nr = await runNaturalnessRewrite(cleaned, { mode: "advise", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
+              draftForValidation = nr.text;
+              runMetrics.naturalness_rewrite = { changed: nr.changed, attempts: nr.attempts };
+            } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
+          }
+          const r = await runPreAcceptance(draftForValidation, ctx, evaluate, repair, { warnRatio });
           finalText = r.text; decision = r.decision;
           Object.assign(runMetrics, { validation_status: r.decision, validation_rounds: r.rounds, validation_input_tokens: r.usage.inputTokens, validation_output_tokens: r.usage.outputTokens, validation_cost_usd: r.usage.costUsd });
           await persistOutcome(r, { db: adminSupabase, bookId: book.id, userId: auth.user.id, chapter: absChapter, sub: subsectionIndex, hash: contentHash(finalText),
