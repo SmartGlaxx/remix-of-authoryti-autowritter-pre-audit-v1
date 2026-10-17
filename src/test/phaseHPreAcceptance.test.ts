@@ -72,7 +72,11 @@ describe("Phase G runtime: combined evaluator", () => {
     const bad = { ...clean, continuity: [{ kind: "fact", severity: "material", message: "Eyes are green in canon", excerpt: "read the first page twice", sourceRef: "f1" }] };
     let fixed = false;
     const evaluate: EvalModel = async () => ({ text: JSON.stringify(fixed ? clean : bad) });
-    const repair: EvalModel = async () => { fixed = true; return { text: JSON.stringify({ replacements: [{ find: "read the first page twice", replace: "read the first page once" }] }) }; };
+    // Only the canon-locked auto-resolve prompt succeeds; the ordinary repair loop cannot fix it.
+    const repair: EvalModel = async (p) => {
+      if (!p.system.includes("conform prose to established canon")) return { text: JSON.stringify({ replacements: [] }) };
+      fixed = true; return { text: JSON.stringify({ replacements: [{ find: "read the first page twice", replace: "read the first page once" }] }) };
+    };
     const r = await runPreAcceptance(DRAFT, ctx(), evaluate, repair);
     expect(r.decision).toBe("accept");
     expect(r.autoResolved).toHaveLength(1);
