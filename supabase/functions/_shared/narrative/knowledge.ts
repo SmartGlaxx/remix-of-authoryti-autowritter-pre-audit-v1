@@ -128,6 +128,8 @@ function hashKey(t: string): string { let h = 5381; for (let i = 0; i < t.length
 export function planKnowledgeWrites(items: ExtractedKnowledge[], o: {
   identities: KnownIdentity[]; universeId: string | null; bookId: string; chapterIndex: number; subsectionIndex: number;
   contentHash: string; sectionDate?: string | null; nonLinear?: boolean;
+  /** Optional knowledge screen; omitted = previous behaviour. */
+  screen?: { sourceCurrent?: boolean; futureSecretTerms?: readonly string[] };
 }): { rows: KnowledgeRow[]; reviews: KnowledgeReview[] } {
   const rows: KnowledgeRow[] = []; const reviews: KnowledgeReview[] = [];
   const sectionKey = `${o.chapterIndex}:${o.subsectionIndex}`;
@@ -136,6 +138,11 @@ export function planKnowledgeWrites(items: ExtractedKnowledge[], o: {
     const base = `${o.bookId}|${sectionKey}|${o.contentHash}|${norm(k.character)}|${norm(k.claim)}`;
     if (holder.status !== "resolved") {
       reviews.push({ character_name: k.character, reason: holder.status, candidate_identity_ids: holder.status === "ambiguous" ? holder.candidates : [], payload: k, dedup_key: `kr_${hashKey(base)}_${base.length}` });
+      continue;
+    }
+    const hold = o.screen ? knowledgeHold(k, o.screen) : null;
+    if (hold) {
+      reviews.push({ character_name: k.character, reason: "knowledge_check", candidate_identity_ids: [holder.identityId], payload: { ...k, hold }, dedup_key: `kr_${hashKey(base)}_${base.length}` });
       continue;
     }
     const from = k.fromCharacter ? resolveKnowledgeHolder(k.fromCharacter, o.identities, o.universeId) : null;
