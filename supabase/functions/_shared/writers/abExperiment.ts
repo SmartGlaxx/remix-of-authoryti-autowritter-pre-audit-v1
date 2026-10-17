@@ -82,16 +82,22 @@ const STARTER_TAILS = ["light shifted", "minutes passed", "kettle cooled", "rain
 /** Adds enough "As the …" openings to clear BOTH starter thresholds (≥4 and ≥15% of sentences). */
 export function injectFlaws(original: string): string {
   const paras = original.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const base = sentences(original).length + 4; // + duplicate and stock sentences added below
-  const need = Math.max(4, Math.ceil((0.2 * base) / 0.8));
-  const out = [...paras];
-  for (let k = 0; k < need; k++) {
-    const i = k % out.length;
-    out[i] = `${INJECTED.starter} ${STARTER_TAILS[k % STARTER_TAILS.length]}${k >= STARTER_TAILS.length ? " again" : ""}, she waited. ${out[i]}`;
+  const build = (need: number) => {
+    const out = [...paras];
+    for (let k = 0; k < need; k++) {
+      const i = k % out.length;
+      out[i] = `${INJECTED.starter} ${STARTER_TAILS[k % STARTER_TAILS.length]}${k >= STARTER_TAILS.length ? " again" : ""}, she waited. ${out[i]}`;
+    }
+    out.splice(1, 0, INJECTED.duplicate);
+    out.push(`${INJECTED.stock[0]} nothing had changed. ${INJECTED.stock[1]} she still had to choose. ${INJECTED.duplicate}`);
+    return out.join("\n\n");
+  };
+  // Deterministically add openings until the checker's own sentence count puts them at ≥18% (margin over 15%).
+  for (let need = 4; need < 60; need++) {
+    const t = build(need); const all = sentences(t);
+    if (all.filter((x) => x.startsWith(INJECTED.starter + " ")).length / all.length >= 0.18) return t;
   }
-  out.splice(1, 0, INJECTED.duplicate);
-  out.push(`${INJECTED.stock[0]} nothing had changed. ${INJECTED.stock[1]} she still had to choose. ${INJECTED.duplicate}`);
-  return out.join("\n\n");
+  return build(60);
 }
 
 /** Free preflight: the flawed copy must trigger starters (≥4), verbatim duplicate and stock phrases. */
