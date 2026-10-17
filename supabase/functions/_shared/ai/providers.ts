@@ -128,6 +128,7 @@ async function* chatCompletions(url: string, headers: Record<string, string>, mo
   const body: Record<string, unknown> = { model: modelId, messages: messagesOf(req), stream: true, stream_options: { include_usage: true }, ...extra };
   if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
   if (req.json) body.response_format = { type: "json_object" };
+  if (req.maxOutputTokens) body.max_completion_tokens = req.maxOutputTokens; // hard provider-side output cap
   // Gemini (direct or via gateway): thinking/effort → reasoning_effort. Pro models cannot fully disable thinking.
   if (ctx.model.provider === "gemini" && body.reasoning_effort == null) {
     const off = /flash/.test(modelId) ? "none" : "low";
@@ -166,6 +167,7 @@ async function* responses(url: string, headers: Record<string, string>, modelId:
   }
   if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
   if (req.json) body.text = { format: { type: "json_object" } };
+  if (req.maxOutputTokens) body.max_output_tokens = req.maxOutputTokens; // includes reasoning tokens
   const res = await post(ctx, url, headers, body, provider);
   for await (const { event, data } of sseEvents(res.body!)) {
     if (!data || data === "[DONE]") continue;

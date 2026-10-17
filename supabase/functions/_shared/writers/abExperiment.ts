@@ -14,7 +14,8 @@ export const EXPERIMENT_MODELS = {
   rewriter: "openai/gpt-6-sol",
   validator: "openai/gpt-6-luna",
 } as const;
-export const MAX_OUTPUT_TOKENS = { writer: 1600, rewriter: 600, validator: 300 } as const;
+// OpenAI output limits include hidden reasoning tokens, so rewriter/validator need headroom.
+export const MAX_OUTPUT_TOKENS = { writer: 1600, rewriter: 2500, validator: 1500 } as const;
 export type ExpRole = keyof typeof EXPERIMENT_MODELS;
 
 export class BudgetExceededError extends Error {

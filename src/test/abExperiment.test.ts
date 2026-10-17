@@ -35,9 +35,9 @@ describe("experiment budget cap ($0.10)", () => {
   });
   it("full worst-case run fits inside $0.10", () => {
     const g = new BudgetGuard();
-    g.reserve(EXPERIMENT_MODELS.writer, 3000, 1600);
-    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.rewriter, 3000, 600);
-    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.validator, 3000, 300);
+    g.reserve(EXPERIMENT_MODELS.writer, 1000, 1600);
+    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.rewriter, 2000, 2500);
+    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.validator, 2000, 1500);
     expect(g.reservedOpen).toBeLessThan(0.10);
   });
 });

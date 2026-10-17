@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const { text, meta } = await generateAIText({
       role: ROLE_FOR[model], userId: uid, bookId: null, maxRetries: 0,
       config: { mode: "single", singleModel: model, fallbacks: {} }, // exact model, no fallback
-      request: { system, user: u, maxOutputTokens },
+      request: { system, user: u, maxOutputTokens, ...(model.startsWith("openai/") ? { reasoning: "low" as const } : {}) },
     }, deps);
     routes.push({ model: meta.model, credentialSource: meta.credentialSource, usedFallback: meta.usedFallback });
     return {
