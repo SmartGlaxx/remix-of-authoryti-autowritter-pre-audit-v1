@@ -7,7 +7,7 @@ import { selectRoute } from "../../supabase/functions/_shared/ai/client";
 import { runNaturalnessRewrite } from "../../supabase/functions/_shared/writers/naturalnessRewrite";
 import { BudgetGuard, runLiteraryBenchmark, literaryBenchmarkWorstCase, LITERARY_BENCHMARK_CAP_USD, LITERARY_BENCHMARK_MODELS, type ExpCaller } from "../../supabase/functions/_shared/writers/abExperiment";
 
-const B = (() => { try { const t = readFileSync("/mnt/documents/naturalness-ab-test-results_v3.txt", "utf8"); const m = t.match(/TEXT B[^\n]*\n[-=]*\n([\s\S]*?)\n[-=]{5,}/); if (m && m[1].length > 4000) return m[1].trim(); } catch { /* fallback */ } return null; })();
+const B = (() => { try { const t = readFileSync("/mnt/documents/naturalness-ab-test-results_v3.txt", "utf8"); const m = t.match(/=== B\. FLAWED ===\n([\s\S]*?)\n=== /); if (m && m[1].length > 4000) return m[1].trim(); } catch { /* fallback */ } return null; })();
 const SYN = Array.from({ length: 10 }, (_, i) => `As the light shifted ${i}, she waited. Mara crossed the room and counted the chairs by the window. "Stay," Theo said. The truth is, nothing had changed in the house.`).join("\n\n");
 const draftB = B ?? SYN;
 const vp = (t: string) => ({ system: "check", user: t });
@@ -90,7 +90,9 @@ describe("prompt and engine", () => {
 });
 
 describe("Astra vs Fable benchmark (mocked, no paid calls)", () => {
+  it("uses the real Draft B when available", () => { if (B) expect(B.length).toBeGreaterThan(5000); });
   it("worst case for Draft B fits $0.21", () => {
+    console.log("WORST_CASE", JSON.stringify(literaryBenchmarkWorstCase(draftB, vp)), "realB:", !!B, draftB.length);
     const w = literaryBenchmarkWorstCase(draftB, vp);
     expect(w.total).toBeLessThanOrEqual(LITERARY_BENCHMARK_CAP_USD);
   });
