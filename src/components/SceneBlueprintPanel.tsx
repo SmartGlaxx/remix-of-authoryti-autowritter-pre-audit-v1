@@ -99,7 +99,18 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
       return { c, pending: r.data.logs.filter((l) => lineage.includes(l.candidate_id) && l.decision === "PENDING").length };
     }));
   }, [bookId, chapterIndex]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const refresh = () => void load();
+    window.addEventListener("candidate-drafts-changed", refresh);
+    window.addEventListener("canon-reconciliation-changed", refresh);
+    const timer = window.setInterval(refresh, 15000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("candidate-drafts-changed", refresh);
+      window.removeEventListener("canon-reconciliation-changed", refresh);
+    };
+  }, [load]);
   // candidate id shown in the card → saved version id awaiting a keep/replace choice
   const [replaceAsk, setReplaceAsk] = useState<Record<string, string>>({});
   const accept = async (c: Row, replace: boolean) => {

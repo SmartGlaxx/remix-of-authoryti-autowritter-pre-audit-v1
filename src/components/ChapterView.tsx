@@ -290,7 +290,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
             Continuity: review
           </Badge>
         )}
-        {sub.status === "completed" && dismissedChecks.includes(sub.continuity?.checkId) && <Badge variant="outline" className="shrink-0 text-success">Reviewed by you</Badge>}
+        {sub.status === "completed" && sub.continuity?.checkId && dismissedChecks.includes(sub.continuity.checkId) && <Badge variant="outline" className="shrink-0 text-success">Reviewed by you</Badge>}
         {sub.status === "completed" && sub.continuity?.status === "CHECK_FAILED" && (
           <Badge variant="outline" className="shrink-0 text-muted-foreground" title="The continuity check could not run for this section">
             Not checked
