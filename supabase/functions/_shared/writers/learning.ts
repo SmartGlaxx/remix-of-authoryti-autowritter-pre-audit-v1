@@ -7,7 +7,7 @@ import { SLIDERS, MAX_ADJUST, type SliderKey } from "./sliders.ts";
 export const LEARNING_SCHEMA_VERSION = 1;
 export const MIN_SECTIONS = 3;
 export const MIN_CHAPTERS = 2;
-export const MIN_CONFIDENCE = 0.5;
+export const MIN_CONFIDENCE = 0.45;
 
 /** finding = a stylistic flag; approved = author-approved correction; proven = rewrite passed full checks and improved;
  *  rejected = discarded/reverted change; detector = heuristic/AI-detector signal (never sufficient alone). */
