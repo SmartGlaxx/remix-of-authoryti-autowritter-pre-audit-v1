@@ -53,6 +53,55 @@ export interface AnalyzeOptions {
 
 const PRELIM = "Preliminary signal, not proof — please judge in context.";
 
+
+export interface VerbatimDuplicate { text: string; count: number }
+
+/** Separate from statistical checks: two exact uses suffice. Normalize layout only;
+ * quoted dialogue, protected motifs and poetry are conservatively exempt. */
+export function verbatimDuplicates(text: string, opts: Pick<AnalyzeOptions, "protectedMotifs" | "bookType"> = {}): {
+  sentences: VerbatimDuplicate[]; paragraphs: VerbatimDuplicate[];
+} {
+  if (opts.bookType === "poetry") return { sentences: [], paragraphs: [] };
+  const layout = (text ?? "").replace(/<(?:br\s*\/?|\/(?:p|div))\s*>/gi, "\n\n").replace(/<[^>]+>/g, " ");
+  const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
+  const motifs = (opts.protectedMotifs ?? []).map((m) => normalize(m).toLowerCase()).filter(Boolean);
+  const prose: string[] = [], paragraphs: string[] = [];
+  let close = "";
+  for (const raw of layout.split(/\n{2,}/)) {
+    let segment = "", dialogue = Boolean(close);
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw[i];
+      if (close) {
+        dialogue = true;
+        if (c === close && (close !== "'" || !/\p{L}/u.test(raw[i + 1] ?? ""))) close = "";
+        continue;
+      }
+      const singleStart = (c === "'" || c === "‘") && !/\p{L}/u.test(raw[i - 1] ?? "");
+      if (c === '"' || c === "“" || singleStart) {
+        if (segment.trim()) prose.push(segment);
+        segment = "";
+        close = c === "“" ? "”" : c === "‘" ? "’" : c;
+        dialogue = true;
+      } else segment += c;
+    }
+    if (segment.trim()) prose.push(segment);
+    if (!dialogue) paragraphs.push(raw);
+  }
+  const collect = (items: string[]): VerbatimDuplicate[] => {
+    const counts = new Map<string, number>();
+    for (const raw of items) {
+      const t = normalize(raw);
+      if (!/\p{L}/u.test(t) || motifs.some((m) => t.toLowerCase().includes(m))) continue;
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return [...counts].filter(([, count]) => count >= 2).map(([text, count]) => ({ text, count }));
+  };
+  return {
+    sentences: collect(prose.flatMap((s) => normalize(s).split(/(?<=[.!?])\s+/))),
+    paragraphs: collect(paragraphs),
+  };
+}
+
 export function analyzeSection(text: string, opts: AnalyzeOptions = {}): NaturalnessFinding[] {
   const out: NaturalnessFinding[] = [];
   const motifs = (opts.protectedMotifs ?? []).map((m) => m.toLowerCase());
@@ -80,7 +129,9 @@ export function analyzeSection(text: string, opts: AnalyzeOptions = {}): Natural
   const starters = repeatedStarters(text).filter((s) => !isMotif(s.starter));
   const p = detectPatterns(text);
   const stock = p.stockPhrases.filter((s) => !isMotif(s));
-  if (starters.length || stock.length || p.triads >= 4) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : ""].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads } });
+  const duplicates = verbatimDuplicates(text, opts);
+  const duplicateNotes = (["sentences", "paragraphs"] as const).flatMap((kind) => duplicates[kind].slice(0, 5).map((d) => `Identical ${kind === "sentences" ? "sentence" : "paragraph"} ×${d.count}: “${d.text.slice(0, 160)}${d.text.length > 160 ? "…" : ""}”.`));
+  if (starters.length || stock.length || p.triads >= 4 || duplicateNotes.length) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : "", ...duplicateNotes].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads, ...(duplicateNotes.length ? { subtype: "verbatim_repetition", duplicates } : {}) } });
 
   return out;
 }

@@ -139,6 +139,7 @@
 - [x] Autonomous conflict-resolution agent: canon-locked auto-resolve round before holding drafts; choices logged + decided automatically; writer canon rule + evaluator desensitized to benign detail — 558 tests
 
 # Naturalness Stage E
+- [x] Independent advisory verbatim duplicate checks with dialogue/motif/poetry exemptions; 615/615 free tests passed, synthetic browser display verified, generate-content/candidate-review deployed. No paid AI or saved-book changes; live paid quality remains unverified.
 - [x] Style-check setting (3 modes), chapter + whole-book style notes, intentional motifs, held-draft check + targeted rewrite with compare, Writer Improvement Studio (approve/undo) — 601 tests
 - [ ] Per-book "pin improvement versions" screen (backend ready)
 - [ ] Optional AI detectors (off; needs your keys + approval)
