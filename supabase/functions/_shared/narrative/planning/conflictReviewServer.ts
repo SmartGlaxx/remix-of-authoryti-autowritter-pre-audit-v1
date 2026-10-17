@@ -1,4 +1,4 @@
-import { bestParagraph, locate, recommend, targetedRewritePrompt, parseEdits, applyTargetedEdits } from "./conflictReview.ts";
+import { bestParagraph, locate, recommend, targetedRewritePrompt, parseEdits, applyTargetedEdits, discussionPrompt, parseDiscussion, type ChatMsg } from "./conflictReview.ts";
 import { contentHash } from "../extraction.ts";
 import { createAIDeps, loadBookModelConfig } from "../../ai/server.ts";
 import { failClosedDeps, generateAIText } from "../../ai/client.ts";
