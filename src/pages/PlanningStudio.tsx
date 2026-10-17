@@ -265,16 +265,21 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
                   onBlueprint={() => run("blueprint", async () => { const r = await callPlanBook({ action: "blueprint", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error([r.data.error, ...(r.data.issues ?? []).slice(0, 3)].join(" · ")); toast.success("Blueprint ready for your review"); await refresh(); })} />
               ))}
             </div>
-            {allReady && <div className="rounded-lg border border-primary p-4 flex flex-wrap items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-primary" /><span className="text-sm flex-1">The whole book is planned and approved. Writing will follow these exact summaries, section by section.</span>
-              <Button disabled={!!busy} onClick={() => run("write", async () => {
+            <div className="border-t border-border pt-4 flex flex-wrap items-center gap-3">
+              {allReady ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <AlertTriangle className="w-5 h-5 text-muted-foreground" />}
+              <span className="text-sm flex-1 min-w-[200px]">{allReady
+                ? "The whole book is planned and approved. Writing will follow these exact summaries, section by section."
+                : blueprintsRequired && planningComplete && chapters.some((c) => !mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === c && p.plan_status === "READY"))
+                  ? "Approve each chapter’s detailed blueprint above before starting to write."
+                  : "Finish planning and approve the remaining plans above before starting to write."}</span>
+              <Button disabled={!!busy || !allReady} onClick={() => run("write", async () => {
                 const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive", ...(!(book.controls as Row)?.planning_pipeline ? { blueprint_mode: "required" } : {}) };
                 const outline = buildOutlineFromPlans(master, mine, book.outline);
                 const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
                 const { error } = await supabase.from("books").update({ controls, outline: outline as any, ...(hasProse ? {} : { status: "ready_to_write", current_chapter_index: 0, current_subsection_index: 0 }) }).eq("id", book.id); if (error) throw error;
                 navigate(`/dashboard/${book.id}?autostart=1`);
               })}><PenLine className="w-4 h-4 mr-2" />Start writing the book</Button>
-            </div>}
+            </div>
             <p className="text-xs text-muted-foreground">5. Once approved and Progressive Planning is on, write from the book page. Each section is checked before it is accepted; anything held shows up under Review.</p>
           </CardContent>
         </Card>
