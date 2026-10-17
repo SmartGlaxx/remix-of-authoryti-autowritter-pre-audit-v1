@@ -7,7 +7,7 @@ const mock = (overrides: Partial<Record<string, string>> = {}): { caller: ExpCal
   const calls: string[] = [];
   return { calls, caller: async (r) => {
     calls.push(r.model);
-    const text = r.model === EXPERIMENT_MODELS.writer ? PARAS : r.model === EXPERIMENT_MODELS.rewriter ? '[{"find":"The truth is, nothing","replace":"Nothing"}]' : "OK";
+    const text = r.model === EXPERIMENT_MODELS.writer ? PARAS : r.model === EXPERIMENT_MODELS.rewriter ? '{"edits":[{"find":"The truth is, nothing","replace":"Nothing"}]}' : "OK";
     return { text, inputTokens: 100, outputTokens: Math.min(50, r.maxOutputTokens), modelUsed: overrides[r.model] ?? r.model };
   } };
 };
