@@ -765,10 +765,17 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           const message = err instanceof Error ? err.message : "Generation failed";
           setState(s => ({ ...s, phase: "error", error: message }));
           toast.error(`Generation stopped: ${message}. No chapters were skipped.`);
-          
+          const pausedChapters = outline.chapters.map((ch, ci) => ci !== chIdx ? ch : {
+            ...ch,
+            status: ch.status === "writing" ? "pending" as const : ch.status,
+            subsections: ch.subsections.map((sub, si) => si === subIdx && sub.status === "writing" ? { ...sub, status: "pending" as const } : sub),
+          });
+          outline = { ...outline, chapters: pausedChapters };
+          window.dispatchEvent(new Event("candidate-drafts-changed"));
           try {
             await retryWithBackoff(async () => {
               onUpdateBook(book.id, {
+                outline,
                 status: "paused",
                 currentChapterIndex: chIdx,
                 currentSubsectionIndex: subIdx,
