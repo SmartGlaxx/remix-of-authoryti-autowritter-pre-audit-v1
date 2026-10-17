@@ -151,8 +151,8 @@ export function analyzeSection(text: string, opts: AnalyzeOptions = {}): Natural
   const duplicates = verbatimDuplicates(text, opts);
   const duplicateNotes = (["sentences", "paragraphs"] as const).flatMap((kind) => duplicates[kind].slice(0, 5).map((d) => `Identical ${kind === "sentences" ? "sentence" : "paragraph"} ×${d.count}: “${d.text.slice(0, 160)}${d.text.length > 160 ? "…" : ""}”.`));
   const templates = repeatedTemplates(text, opts.protectedMotifs);
-  if (templates.length) duplicateNotes.push(...templates.map((t) => `Same sentence shape ×${t.count}: “${t.examples[0].slice(0, 100)}”.`));
-  if (starters.length || stock.length || p.triads >= 4 || duplicateNotes.length) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : "", ...duplicateNotes].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads, templates, ...(duplicateNotes.length ? { subtype: "verbatim_repetition", duplicates } : {}) } });
+  const templateNotes = templates.map((t) => `Same sentence shape ×${t.count}: “${t.examples[0].slice(0, 100)}”.`);
+  if (starters.length || stock.length || p.triads >= 4 || duplicateNotes.length || templates.length) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : "", ...duplicateNotes, ...templateNotes].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads, templates, ...(duplicateNotes.length ? { subtype: "verbatim_repetition", duplicates } : {}) } });
 
   return out;
 }
