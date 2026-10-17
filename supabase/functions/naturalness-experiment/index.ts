@@ -4,7 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { generateAIText } from "../_shared/ai/client.ts";
-import { runExperiment, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
+import { runExperiment, runRewriteOnly, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
 import type { Role } from "../_shared/ai/registry.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -33,7 +33,8 @@ Deno.serve(async (req) => {
   const uid = c?.claims?.sub as string | undefined;
   if (!uid) return json({ error: "Unauthorized" }, 401);
   const body = await req.json().catch(() => ({}));
-  if (body?.confirm !== "RUN_PAID_EXPERIMENT_0.10") return json({ error: "confirmation required" }, 400);
+  const rewriteOnly = body?.confirm === "RUN_REWRITE_ONLY_0.03";
+  if (!rewriteOnly && body?.confirm !== "RUN_PAID_EXPERIMENT_0.10") return json({ error: "confirmation required" }, 400);
 
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const deps = createAIDeps(admin, uid);
@@ -55,6 +56,12 @@ Deno.serve(async (req) => {
     };
   };
 
+  if (rewriteOnly) {
+    const flawed = typeof body.flawed === "string" && body.flawed.length > 500 && body.flawed.length <= 20000 ? body.flawed : null;
+    if (!flawed) return json({ error: "flawed draft B required" }, 400);
+    const r = await runRewriteOnly({ flawed, validatorPrompt, writerVoice: SOPHIA }, caller, new BudgetGuard(0.03));
+    return json({ ...r, routes });
+  }
   // Resume: reuse an already-paid original draft; the cap shrinks by what was already spent.
   const reuse = typeof body.reuseOriginal === "string" && body.reuseOriginal.length <= 20000 ? body.reuseOriginal : undefined;
   const prior = Number(body.priorSpentUSD ?? 0);
