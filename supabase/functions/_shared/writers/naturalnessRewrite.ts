@@ -75,6 +75,8 @@ const capsWords = (s: string) => (s.match(/\b[A-Z][a-z]+\b/g) ?? []).filter((w) 
 const midSentenceCaps = (s: string) => new Set([...s.matchAll(/(?<![.!?"\u201C\u201D\n]\s*)(?<=[\w,;:\u2014-]\s*)\b([A-Z][a-z]+)\b/g)].map((m) => m[1]).filter((w) => !COMMON.has(w)));
 function nameSet(text: string, known: string[] = []) {
   const n = midSentenceCaps(text);
+  // A sentence-start capital counts only if its lowercase form never appears as an ordinary word.
+  for (const w of capsWords(text)) if (!new RegExp(`\\b${w.toLowerCase()}\\b`).test(text)) n.add(w);
   for (const k of known) for (const t of k.split(/\s+/)) if (/^[A-Z]/.test(t)) n.add(t);
   return n;
 }
