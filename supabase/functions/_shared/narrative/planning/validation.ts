@@ -1,3 +1,4 @@
+import { changeRatio } from "../../writers/textDiff.ts";
 // Phase G — Unified Validation (pure). Shared by edge functions and tests.
 // Rules: nothing here bans ordinary words globally; repetition is judged in context;
 // only material canon/factual conflicts route to canon reconciliation; large rewrites
@@ -144,7 +145,6 @@ export const blocksAcceptance = (fs: Finding[]) => fs.some((f) => routeFinding(f
 // ── 6. Revision scope: configurable warning, author approval above it ───────
 export const DEFAULT_REVISION_WARN_RATIO = 0.2;
 
-import { changeRatio } from "../../writers/textDiff.ts";
 function paragraphs(t: string) { return t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean); }
 /** Share of the original actually modified (word-level diff; unchanged text between edits never counts). */
 export function revisionChangeRatio(original: string, revised: string): number {
