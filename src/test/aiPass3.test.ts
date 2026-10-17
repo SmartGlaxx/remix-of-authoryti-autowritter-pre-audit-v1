@@ -187,7 +187,7 @@ describe("Pass 3 — usage and cost", () => {
     let n = 0;
     const f = vi.fn(async () => (++n === 1 ? new Response("slow down", { status: 429 }) : chatSSE("ok")));
     const { deps } = makeDeps(f as never);
-    expect((await generateAIText({ role: "planner", config: null, userId: "u", request: { user: "x" } }, deps)).text).toBe("ok");
+    expect((await generateAIText({ role: "planner", config: { mode: "single", singleModel: "google/gemini-2.5-flash" }, userId: "u", request: { user: "x" } }, deps)).text).toBe("ok");
     expect(f).toHaveBeenCalledTimes(2);
   });
   it("toChatSSE keeps the existing client stream format", async () => {
