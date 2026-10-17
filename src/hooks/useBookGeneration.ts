@@ -1046,7 +1046,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
           // Unresolved contradictions must not become story memory until the author decides.
-          if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book)) await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+          if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book.controls)) await runNarrativeExtraction(book.id, chapterIndex, subIdx);
         }
 
         // In guided mode, pause after each section
