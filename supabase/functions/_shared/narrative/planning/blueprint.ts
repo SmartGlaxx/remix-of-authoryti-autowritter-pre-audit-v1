@@ -8,6 +8,13 @@ import type { ChapterPlan, MasterPlanSkeleton } from "./engine.ts";
 import type { MasterContext, ParseResult, Prompt, SectionDetail, BeatNote } from "./aiPlanning.ts";
 import { extractJson, renderWholeBook } from "./aiPlanning.ts";
 
+/** Generic instructional participants are plan-local roles, never story identities.
+ * Unknown adapters and narrative books remain fail-closed for all proposed people. */
+export function isBlueprintExampleRole(name: string, adapter?: string): boolean {
+  return ["self_help", "business", "finance", "cookbook", "technical"].includes(adapter ?? "")
+    && /^(reader|bill payer|learner|student|customer|employee|manager|cook|user|practitioner)$/i.test(name.trim());
+}
+
 export const BLUEPRINT_SCHEMA_VERSION = 1;
 /** Planning heuristic: one microbeat per ~120 words of prose (a paragraph or narrative unit). */
 export const WORDS_PER_MICROBEAT = 120;
@@ -60,6 +67,7 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
     user: `${renderWholeBook(m, { ...i.expanded, [ch]: chapter })}\n\n` +
       `CHAPTER ${ch + 1} — objective: ${chapter.objective}${i.stakes ? `\nStakes: ${i.stakes}` : ""}${i.focus ? `\nFocus: ${i.focus}` : ""}\nAbout ${chapter.targetWords} words.\nApproved sections:\n${sec}\n\n` +
       `Book cast (use these ids; never create a person outside this list — if the approved plan truly needs someone new, add them to castProposals with a justification and use the proposal id):\n${cast}\n\n` +
+      `For instructional books, generic roles such as Reader or Bill payer are plan-local example participants, not new people: put them in cast with local ids, never castProposals. Named people still require a proposal.\n` +
       `Write the blueprint:\n` +
       `1. keyPoints and conclusion must preserve the chapter's approved objective, plot direction and ending.\n` +
       `2. synopsis: a flowing prose account of the whole chapter from opening to conclusion — as long as completeness needs; no word limit. Names may repeat; every pronoun must be unambiguous.\n` +
@@ -88,7 +96,7 @@ export function validateBlueprint(bp: ChapterBlueprint, i: Pick<BlueprintInput, 
     if (known) issues.push(`"${p.name}" is already in the cast as ${known.id}; use that id`);
   }
   const charIds = new Set(bp.cast.map((c) => c.id));
-  for (const c of bp.cast) if (!castIds.has(c.id) && !proposalIds.has(c.id)) issues.push(`character ${c.id} (${c.name}) is not in the book cast or castProposals`);
+  for (const c of bp.cast) if (!castIds.has(c.id) && !proposalIds.has(c.id) && !isBlueprintExampleRole(c.name, i.m.skeleton.adapter)) issues.push(`character ${c.id} (${c.name}) is not in the book cast or castProposals`);
   const locIds = new Set(bp.locations.map((l) => l.id));
   const evIds = new Set(bp.events.map((e) => e.id));
   const sectionIds = i.details.map((d) => d.id);
@@ -182,9 +190,9 @@ export const resolveBlueprintMode = (controls: unknown): BlueprintMode => {
 };
 
 /** Proposed new people not yet registered in the book's master cast. Listing someone never authorizes them. */
-export function pendingCastProposals(bp: Pick<ChapterBlueprint, "castProposals"> | null | undefined, cast: readonly CastRef[]): CastProposal[] {
+export function pendingCastProposals(bp: Pick<ChapterBlueprint, "castProposals"> | null | undefined, cast: readonly CastRef[], adapter?: string): CastProposal[] {
   const names = new Set(cast.flatMap((c) => [c.name, ...(c.aliases ?? [])]).map(norm));
-  return (bp?.castProposals ?? []).filter((p) => !names.has(norm(p.name)));
+  return (bp?.castProposals ?? []).filter((p) => !names.has(norm(p.name)) && !isBlueprintExampleRole(p.name, adapter));
 }
 
 /** Plan rows a bulk "approve all" may approve: never blueprints (each needs its own review). */
@@ -192,21 +200,21 @@ export const bulkApprovableIds = (rows: readonly { id: string; plan_status: stri
   rows.filter((r) => r.plan_status === "PLANNED" && r.plan_level !== "BLUEPRINT").map((r) => r.id);
 
 /** Why a blueprint may not be approved yet (empty = approvable). */
-export function blueprintApprovalIssues(bp: ChapterBlueprint | null | undefined, cast: readonly CastRef[]): string[] {
+export function blueprintApprovalIssues(bp: ChapterBlueprint | null | undefined, cast: readonly CastRef[], adapter?: string): string[] {
   if (!bp) return ["blueprint content is missing"];
-  return pendingCastProposals(bp, cast).map((p) => `"${p.name}" must be approved and added to the book's cast first`);
+  return pendingCastProposals(bp, cast, adapter).map((p) => `"${p.name}" must be approved and added to the book's cast first`);
 }
 
 export type BlueprintGate = { ok: true; blueprint: ChapterBlueprint | null; planId: string | null; version: number | null }
   | { ok: false; code: "BLUEPRINT_REQUIRED" | "CAST_APPROVAL_REQUIRED"; reason: string };
 
 /** Writing gate for required-blueprint books: the chapter needs an approved blueprint whose people are all registered. */
-export function blueprintGate(mode: BlueprintMode, rows: readonly { id: string; plan_status: string; version?: number; content?: any }[], ch: number, cast: readonly CastRef[]): BlueprintGate {
+export function blueprintGate(mode: BlueprintMode, rows: readonly { id: string; plan_status: string; version?: number; content?: any }[], ch: number, cast: readonly CastRef[], adapter?: string): BlueprintGate {
   if (mode !== "required") return { ok: true, blueprint: null, planId: null, version: null };
   const ready = rows.filter((r) => r.plan_status === "READY").sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0];
   const bp = ready?.content?.blueprint as ChapterBlueprint | undefined;
   if (!ready || !bp) return { ok: false, code: "BLUEPRINT_REQUIRED", reason: `Chapter ${ch + 1} needs an approved detailed blueprint before it can be written.` };
-  const pending = pendingCastProposals(bp, cast);
+  const pending = pendingCastProposals(bp, cast, adapter);
   if (pending.length) return { ok: false, code: "CAST_APPROVAL_REQUIRED", reason: `Approve and add to the cast first: ${pending.map((p) => p.name).join(", ")}.` };
   return { ok: true, blueprint: bp, planId: ready.id, version: Number(ready.version ?? 1) };
 }

@@ -70,8 +70,11 @@ async function handle(req: Request): Promise<Response> {
       const bps = (picked ?? []).filter((r: any) => r.plan_level === "BLUEPRINT" && r.user_id === userId);
       if (bps.length && ids.length > 1) return json({ error: "Blueprints must be approved one at a time", code: "BLUEPRINT_SEPARATE_APPROVAL" }, 409);
       for (const r of bps) {
+        const { data: ownerBook, error: bookError } = await adm.from("books").select("book_type").eq("id", r.book_id).eq("user_id", userId).maybeSingle();
+        if (bookError || !ownerBook) return json({ error: "Book not found" }, 404);
+        const adapter = adapterForBookType(ownerBook.book_type).id;
         const { data: castRows } = await adm.from("story_characters").select("id, name, aliases").eq("book_id", r.book_id).eq("user_id", userId).eq("is_active", true);
-        const issues = blueprintApprovalIssues(r.content?.blueprint, (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] })));
+        const issues = blueprintApprovalIssues(r.content?.blueprint, (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] })), adapter);
         if (issues.length) return json({ error: issues.join(" · "), code: "CAST_APPROVAL_REQUIRED", issues }, 409);
       }
       const { data, error } = await userDb.rpc("approve_progressive_plans", { p_ids: ids });
@@ -90,7 +93,7 @@ async function handle(req: Request): Promise<Response> {
       if (!row || row.plan_level !== "BLUEPRINT" || !prop) return json({ error: "Proposal not found" }, 404);
       const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
       const cast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
-      if (!pendingCastProposals({ castProposals: [prop] }, cast).length) return json({ ok: true, already: true });
+      if (!pendingCastProposals({ castProposals: [prop] }, cast, book ? adapterForBookType(book.book_type).id : undefined).length) return json({ ok: true, already: true });
       const { data: ins, error } = await db.from("story_characters").insert({ book_id: bookId, user_id: userId, name: String(prop.name).slice(0, 200), role: String(prop.role ?? "").slice(0, 500) || null, source_key: `proposal:${row.id}:${prop.id}` }).select("id").single();
       if (error) throw new Error(error.message);
       await ensureCastIdentities(db, userId, bookId, book?.universe_id ?? null).catch(() => {});

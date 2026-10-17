@@ -7,3 +7,5 @@
 - [ ] Stage 3: writer gets blueprint; missing info routes back to planning — waits for go-ahead after Stage 2 sign-off
 - [ ] Stage 4: pre-acceptance flags unplanned people/places/events
 - [ ] Stage 5: versioned plan amendments
+
+- [ ] Correct instructional example roles in blueprint approval; verify without paid AI or manuscript changes
