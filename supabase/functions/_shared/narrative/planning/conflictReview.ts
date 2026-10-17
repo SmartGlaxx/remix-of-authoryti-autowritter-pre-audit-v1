@@ -26,7 +26,7 @@ export interface Location { chapter: number; section: number; chapterTitle: stri
 
 /** Approximate page from words before the paragraph; null when the paragraph wasn't found. */
 export function locate(outline: Row | null, chapter: number, section: number, paragraphIndex: number | null): Location {
-  const chs: Row[] = Array.isArray(outline?.chapters) ? outline!.chapters : [];
+  const chs: Row[] = Array.isArray(outline?.chapters) ? outline?.chapters : [];
   let before = 0;
   for (let c = 0; c < chs.length; c++) {
     const subs: Row[] = Array.isArray(chs[c]?.subsections) ? chs[c].subsections : [];
