@@ -25,7 +25,11 @@ export interface RewriteOptions extends AnalyzeOptions {
 export interface RewriteAttempt { attempt: number; edits: number; accepted: boolean; reason: string; scoreBefore: number; scoreAfter?: number }
 export interface RewriteResult { text: string; changed: boolean; attempts: RewriteAttempt[]; before: NaturalnessFinding[]; after: NaturalnessFinding[] }
 
-export const naturalnessScore = (fs: NaturalnessFinding[]) => fs.reduce((s, f) => s + (f.severity === "advisory" ? 2 : 1), 0);
+/** Lower is better. Counts each flagged item, so fixing one stock phrase inside a finding still counts. */
+export const naturalnessScore = (fs: NaturalnessFinding[]) => fs.reduce((s, f) => {
+  const ev = f.evidence as { stockPhrases?: unknown[]; starters?: unknown[] };
+  return s + (f.severity === "advisory" ? 2 : 1) + (ev?.stockPhrases?.length ?? 0) + (ev?.starters?.length ?? 0);
+}, 0);
 
 export function buildRewritePrompt(text: string, findings: NaturalnessFinding[], o: { writerVoice?: string } = {}): Prompt {
   const issues = findings.map((f, i) => `${i + 1}. [${f.category}] ${f.message}`).join("\n");
