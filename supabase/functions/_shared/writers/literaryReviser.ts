@@ -17,7 +17,9 @@ export type LiteraryModel = typeof LITERARY_MODELS[number];
 export type LiteraryMode = "off" | "on_request" | "automatic";
 export const DEFAULT_LITERARY_CAP_USD = 0.25;
 export const MAX_LITERARY_CAP_USD = 2;
-export const LITERARY_MAX_OUTPUT = 1500;
+/** Output ceiling per literary call. Includes OpenAI reasoning tokens; 12 short edits need ~1,000
+ *  tokens, so 2,500 leaves room without paying for regenerated sections. */
+export const LITERARY_MAX_OUTPUT = 2500;
 
 const isLit = (m: unknown): m is LiteraryModel => typeof m === "string" && (LITERARY_MODELS as readonly string[]).includes(m);
 const ctl = (controls: unknown) => ((controls && typeof controls === "object" ? (controls as Record<string, unknown>).literaryReviser : null) ?? {}) as Record<string, unknown>;
@@ -81,7 +83,8 @@ export function buildLiteraryPrompt(text: string, findings: NaturalnessFinding[]
       "Keep plot, events, facts, names, numbers, dates, character knowledge, chronology and point of view exactly as they are. Add no new facts, characters or events.",
       "Keep deliberate parallelism and motifs. Do not force metaphors. Preserve the writer's voice. Change at most about a fifth of the text.",
       o.writerVoice ? `Writer voice to preserve: ${o.writerVoice.slice(0, 600)}` : "",
-      'Return JSON only: {"edits":[{"find":"exact text copied from the draft","replace":"improved text"}]}. Each find must appear exactly once; replace may be empty to delete.',
+      'OUTPUT FORMAT (strict): return ONLY one JSON object, {"edits":[{"find":"...","replace":"..."}]}, nothing before or after it: no explanation, no commentary, no reasoning, no markdown fences, and never the rewritten section.',
+      "At most 12 edits, most important first. Each find is the SHORTEST exact span copied from the section that is unique there (one sentence or less; never a whole paragraph). replace is the new text, or empty to delete. Each find must appear exactly once.",
     ].filter(Boolean).join(" "),
     user: `ISSUES:\n${issues || "(general literary tightening)"}\n\nSECTION:\n---\n${text}\n---`,
   };

@@ -58,7 +58,7 @@ export class BudgetGuard {
 
 /** Provider call: must send exactly `model`, cap output at `maxOutputTokens`, no fallback, no retry. */
 export type ExpCaller = (req: { model: string; system: string; user: string; maxOutputTokens: number }) =>
-  Promise<{ text: string; inputTokens: number; outputTokens: number; cachedInputTokens?: number; modelUsed: string }>;
+  Promise<{ text: string; inputTokens: number; outputTokens: number; cachedInputTokens?: number; modelUsed: string; stopReason?: string | null }>;
 
 export function guardedCall(guard: BudgetGuard, caller: ExpCaller, role: ExpRole, maxOutOverride?: number) {
   return async (p: Prompt) => {
@@ -163,9 +163,11 @@ export async function runRewriteOnly(input: { flawed: string; validatorPrompt: (
 }
 
 // ---- Isolated Astra vs Fable literary benchmark (one attempt each, same Draft B, same prompt) ----
-export const LITERARY_BENCHMARK_CAP_USD = 0.21;
+// v2 (fair rerun): larger output ceiling for BOTH models, strict concise edit format, truncation reported.
+export const LITERARY_BENCHMARK_CAP_USD = 0.32;
+export const LITERARY_BENCHMARK_CONFIRM = "RUN_LITERARY_BENCHMARK_V2_0.32";
 export const LITERARY_BENCHMARK_MODELS = { astra: "openai/gpt-6-astra", fable: "anthropic/claude-fable-5-1", validator: "openai/gpt-6-luna" } as const;
-export const LITERARY_BENCHMARK_MAX_OUT = { reviser: 1500, validator: 1200 } as const;
+export const LITERARY_BENCHMARK_MAX_OUT = { reviser: 2500, validator: 1200 } as const;
 
 /** Exact-model guarded call (same reservation/settlement rules as guardedCall). */
 export function guardedModelCall(guard: BudgetGuard, caller: ExpCaller, label: string, model: string, maxOut: number) {
@@ -205,7 +207,7 @@ export async function runLiteraryBenchmark(input: { flawed: string; validatorPro
     const arm: LiteraryArm = { model, textC: input.flawed, changeRatio: 0, attempts: [], proposals: [], after: out.before, unresolved: [], validation: "" };
     try {
       const rw = await runNaturalnessRewrite(input.flawed, { mode: "analyze_and_rewrite", writerVoice: input.writerVoice, promptBuilder: buildLiteraryPrompt, maxAttempts: 1 },
-        async (p) => ({ text: (await guardedModelCall(guard, caller, key, model, LITERARY_BENCHMARK_MAX_OUT.reviser)(p)).text }));
+        async (p) => { const r = await guardedModelCall(guard, caller, key, model, LITERARY_BENCHMARK_MAX_OUT.reviser)(p); return { text: r.text, stopReason: r.stopReason ?? null }; });
       Object.assign(arm, { textC: rw.text, attempts: rw.attempts, proposals: rw.proposals ?? [], after: rw.after, unresolved: rw.unresolved, changeRatio: charChangeRatio(input.flawed, rw.text) });
       // Validate the model's proposal (even if deterministic gates rejected it) so the author sees both.
       const proposed = (rw.proposals?.[0] as { candidate?: string } | undefined)?.candidate ?? rw.text;
