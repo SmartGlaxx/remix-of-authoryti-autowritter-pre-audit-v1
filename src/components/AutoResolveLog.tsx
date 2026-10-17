@@ -12,9 +12,9 @@ export function AutoResolveLog({ bookId }: { bookId: string }) {
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("canon_reconciliation_logs")
-      .select("id, chapter_index, subsection_index, description, excerpt, canon_ref, decided_at, created_at")
+      .select("id, chapter_index, subsection_index, description, prose_excerpt, canon_reference, decided_at, created_at")
       .eq("book_id", bookId)
-      .eq("canon_ref->>source", "auto_resolver")
+      .eq("canon_reference->>source", "auto_resolver")
       .order("created_at", { ascending: false })
       .limit(20);
     setItems(data ?? []);
@@ -33,7 +33,7 @@ export function AutoResolveLog({ bookId }: { bookId: string }) {
       </p>
       <p className="text-xs text-muted-foreground">These conflicts were fixed automatically by conforming the new prose to your established story facts. The choice is logged and reused if the same conflict reappears.</p>
       {items.map((l) => {
-        const reasoning = typeof l.canon_ref?.reasoning === "string" ? l.canon_ref.reasoning : null;
+        const reasoning = typeof l.canon_reference?.reasoning === "string" ? l.canon_reference.reasoning : null;
         return (
           <div key={l.id} className="rounded-md border border-border bg-background/60 p-2 space-y-1">
             <button type="button" className="w-full flex items-start gap-2 text-left" onClick={() => setOpen(open === l.id ? null : l.id)}>
@@ -45,7 +45,7 @@ export function AutoResolveLog({ bookId }: { bookId: string }) {
             </button>
             {open === l.id && (
               <div className="space-y-1.5 pt-1 border-t border-border">
-                {l.excerpt && <p className="text-xs"><span className="text-muted-foreground">Conflicting text: </span><span className="italic">“{l.excerpt}”</span></p>}
+                {l.prose_excerpt && <p className="text-xs"><span className="text-muted-foreground">Conflicting text: </span><span className="italic">“{l.prose_excerpt}”</span></p>}
                 {reasoning && <p className="text-xs"><span className="text-muted-foreground">Agent's reasoning: </span>{reasoning}</p>}
                 <p className="text-[11px] text-muted-foreground">Resolved: kept the established fact and corrected the new prose to match it.</p>
               </div>
