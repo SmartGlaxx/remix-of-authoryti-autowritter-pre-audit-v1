@@ -75,7 +75,14 @@ export async function prepareConflict(db: Db, bookId: string, userId: string, lo
     p_text: text, p_hash: contentHash(text), p_status: "NEEDS_AUTHOR_REVIEW", p_findings: [], p_usage: {}, p_origin: "author_edit", p_parent: null, p_dedup_keys: [log.dedup_key].filter(Boolean) });
   if (error) throw new Error(error.message);
   const { data: saved } = await db.from("book_candidate_drafts").select("validation_status").eq("id", data?.candidate_id).maybeSingle();
-  if (!saved || !open(saved)) throw new Error("This version was already reviewed. Open the section's current draft instead.");
+  if (!saved) throw new Error("The section draft could not be prepared. Refresh and retry.");
+  if (!open(saved)) {
+    // Same text was reviewed before: reopen that copy so the correction can run on the current section text.
+    const { error: re } = await db.from("book_candidate_drafts").update({ validation_status: "NEEDS_AUTHOR_REVIEW", resolved_at: null }).eq("id", data.candidate_id);
+    if (re) throw new Error(re.message);
+  }
+  const { error: le } = await db.from("canon_reconciliation_logs").update({ candidate_id: data.candidate_id }).eq("id", log.id).eq("decision", "PENDING");
+  if (le) throw new Error(le.message);
   return { candidate_id: data.candidate_id, draft_text: text };
 }
 
