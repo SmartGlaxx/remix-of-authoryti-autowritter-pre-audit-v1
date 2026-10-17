@@ -91,7 +91,7 @@ describe("prompt and engine", () => {
 
 describe("Astra vs Fable benchmark (mocked, no paid calls)", () => {
   it("uses the real Draft B when available", () => { if (B) expect(B.length).toBeGreaterThan(5000); });
-  it("worst case for Draft B fits $0.21", () => {
+  it("worst case for Draft B fits the v2 cap ($0.32)", () => {
     const w = literaryBenchmarkWorstCase(draftB, vp);
     expect(w.total).toBeLessThanOrEqual(LITERARY_BENCHMARK_CAP_USD);
   });
