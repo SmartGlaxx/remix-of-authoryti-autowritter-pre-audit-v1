@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export async function callReview<T = any>(body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: T }> {
+  try {
   const { data: s } = await supabase.auth.getSession();
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/candidate-review`, {
     method: "POST",
@@ -9,7 +10,17 @@ export async function callReview<T = any>(body: Record<string, unknown>): Promis
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
+  if (data?.error === "Invalid action") {
+    return { ok: false, status: 409, data: { error: "Story review is temporarily out of date. Reload the page, then retry. Your manuscript has not changed." } as T };
+  }
+  if (data && typeof data.__status === "number") {
+    const status = data.__status; delete data.__status;
+    return { ok: status >= 200 && status < 300, status, data };
+  }
   return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 503, data: { error: "Story review could not connect. Retry when your connection is restored. Your manuscript is safe." } as T };
+  }
 }
 
 export async function callPlanBook<T = any>(body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: T }> {
