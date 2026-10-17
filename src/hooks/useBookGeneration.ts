@@ -1029,7 +1029,12 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         });
 
         // Narrative memory: record what this section established. Non-blocking on failure.
-        // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
+        if (isProgressiveBook(book) && isFastDraft(book)) {
+          // Fast draft: server-side pre-acceptance already validated this section; story
+          // memory updates in the background and the next section's preflight waits for it.
+          void runNarrativeExtraction(book.id, chapterIndex, subIdx);
+        } else {
+          // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
           // accepted final text ever reaches narrative state.
           const cont = await runContinuityCheck(book.id, chapterIndex, subIdx);
           outline = applyContinuityResult(outline, chapterIndex, subIdx, cont);
@@ -1043,7 +1048,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
           // Unresolved contradictions must not become story memory until the author decides.
-          if (cont.status !== "NEEDS_REVIEW" || (book.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+          if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book)) await runNarrativeExtraction(book.id, chapterIndex, subIdx);
+        }
 
         // In guided mode, pause after each section
         if (automationLevel === "guided") {
