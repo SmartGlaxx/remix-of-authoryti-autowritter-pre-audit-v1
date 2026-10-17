@@ -798,7 +798,7 @@ serve(async (req) => {
             try {
               const nr = await runNaturalnessRewrite(cleaned, { mode: "advise", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
               draftForValidation = nr.text;
-              runMetrics.naturalness_rewrite = { changed: nr.changed, attempts: nr.attempts };
+              console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
             } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
           }
           const r = await runPreAcceptance(draftForValidation, ctx, evaluate, repair, { warnRatio });
