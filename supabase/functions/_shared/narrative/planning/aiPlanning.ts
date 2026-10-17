@@ -83,7 +83,7 @@ function parseWith<T>(raw: string, fn: (o: any, issues: string[]) => T | null): 
 }
 
 // ── Service 1: complete story alternatives (fiction only) ───────────────────
-export interface StoryAlternative { id: string; title: string; logline: string; summary: string; twist: string; ending: string }
+export interface StoryAlternative { id: string; title: string; logline: string; summary: string; twist: string; ending: string; coreThesis?: string; approach?: string; pillars?: string[]; readerOutcome?: string }
 
 export function assertAlternativesEligible(bookType: string, count: number): void {
   adapterForBookType(bookType); // any app book type may brainstorm alternatives
@@ -248,7 +248,9 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
   const fields = a.masterFields.filter((f) => f !== "reveals");
   return {
     system: system(a, "You write the master plan for a whole book."),
-    user: `${briefText(b)}\n` + (alternative ? `\nChosen story direction (author-selected, build on it):\n${alternative.title}\n${alternative.summary}\nTwist: ${alternative.twist}\nEnding: ${alternative.ending}\n` : "") +
+    user: `${briefText(b)}\n` + (alternative ? (a.isFiction
+      ? `\nChosen story direction (author-selected, build on it):\n${alternative.title}\n${alternative.summary}\nTwist: ${alternative.twist}\nEnding: ${alternative.ending}\n`
+      : `\nChosen book approach (author-selected, develop this exact approach; do not replace it or propose new options):\n${alternative.title}\nCore thesis: ${alternative.logline}\n${alternative.summary}\nReader outcome: ${alternative.ending}\n`) : "") +
       `\nPlan the whole book. Chapter objective kinds must come from: ${a.chapterObjectives.join(", ")}. ` +
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +

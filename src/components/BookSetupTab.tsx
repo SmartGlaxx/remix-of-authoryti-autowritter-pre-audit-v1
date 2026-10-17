@@ -58,7 +58,7 @@ async function callPersona(body: Row) {
   return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onTitleChange }: { book: Row; isFiction: boolean; onSaved: () => void; onContinue?: (o: { chapterCount: number; targetWords: number }) => void; onTitleChange?: (title: string) => void }) {
+export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onTitleChange }: { book: Row; isFiction: boolean; onSaved: () => void | Promise<void>; onContinue?: (o: { chapterCount: number; targetWords: number }) => void; onTitleChange?: (title: string) => void }) {
   const [st, setSt] = useState<BookSetup | null>(null);
   const premiseRef = useRef<HTMLTextAreaElement>(null);
   const [premiseExpanded, setPremiseExpanded] = useState(false);
@@ -146,6 +146,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
       if (d?.st && !r.data?.hasProse) { s0 = { ...s0, ...d.st }; if (typeof d.screen === "number") setScreen(d.screen); }
     } catch { /* ignore broken draft */ }
     setSt(s0); setHasProse(!!r.data?.hasProse);
+    if (COUNTS.includes(s0.alternatives.length)) setCount(s0.alternatives.length);
     setIdentities(ids.data ?? []); setUniverses(us.data ?? []); setPens(ps.data ?? []);
   };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [book.id]);
@@ -227,7 +228,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
       await supabase.from("books").update({ title, book_type: exType, theme: (pick?.logline || st.premise).slice(0, 1000), ...(exGenre ? { genre: exGenre } : {}), ...(exAudience ? { audience: exAudience } : {}) }).eq("id", book.id);
     }
     if (!Array.isArray(book.controls?.bannedWords)) await saveBanned(banned);
-    setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); onSaved();
+    setSt(r.data.setup); toast.success(stage === "planning" ? "Setup saved — now build the plan" : "Setup saved — you can come back to it any time"); await onSaved();
     if (stage === "planning") onContinue?.({ chapterCount, targetWords: exLength });
   });
 

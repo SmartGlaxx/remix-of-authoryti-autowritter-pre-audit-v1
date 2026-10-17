@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  emptySetup, normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, parseTwists, recommendCast,
+  emptySetup, normalizeSetup, selectedSetupApproach, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type BookSetup,
 } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
-import { parseAlternatives, parseConcepts, runWithRepair, buildAlternativesPrompt, type BookBrief } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
+import { parseAlternatives, parseConcepts, runWithRepair, buildAlternativesPrompt, buildMasterPrompt, type BookBrief } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
 import { planKnowledgeWrites } from "../../supabase/functions/_shared/narrative/knowledge";
 import { isRole } from "../../supabase/functions/_shared/narrative/personaGeneration";
 
@@ -35,6 +35,21 @@ describe("Phase 4 — story alternatives (free engine, real parsers)", () => {
   it("nonfiction gets approaches, not plots", () => {
     const r = parseConcepts(mockConceptsOutput({ ...brief, bookType: "self-help" }, 3), 3);
     expect(r.ok).toBe(true);
+  });
+  for (const n of [3, 5, 7, 10] as const) it(`master planning develops only the selected approach from ${n} options`, () => {
+    const alternatives = Array.from({ length: n }, (_, i) => ({ id: `a${i}`, title: `Approach ${i + 1}`, logline: `Thesis ${i + 1}`, summary: `Detailed summary ${i + 1}`, twist: "", ending: `Outcome ${i + 1}`, coreThesis: `Thesis ${i + 1}`, approach: `Method ${i + 1}`, pillars: [`First support ${i + 1}`, `Second support ${i + 1}`], readerOutcome: `Outcome ${i + 1}` }));
+    const setup = normalizeSetup({ ...emptySetup(), alternatives, selectedIndex: n - 1 });
+    const picked = selectedSetupApproach(setup);
+    expect(picked).toEqual(alternatives[n - 1]);
+    const guidance = setupPlannerGuidance(setup);
+    expect(guidance.alternative).toEqual(picked);
+    const prompt = buildMasterPrompt({ ...brief, bookType: "self-help", guidance: guidance.guidance }, guidance.alternative).user;
+    expect(prompt).toContain(`Detailed summary ${n}`);
+    expect(prompt).toContain(`Method ${n}`);
+    expect(prompt).toContain(`First support ${n}`);
+    expect(prompt).toContain(`Outcome ${n}`);
+    expect(prompt).not.toMatch(/Detailed summary 1\b/);
+    expect(prompt).not.toMatch(/Method 1\b/);
   });
   it("skipping stories leaves no chosen alternative for the planner", () => {
     expect(setupPlannerGuidance({ ...emptySetup(), storyMode: "skip", alternatives: [{ id: "a", title: "t", logline: "", summary: "", twist: "", ending: "" }], selectedIndex: 0 }).alternative).toBeNull();
