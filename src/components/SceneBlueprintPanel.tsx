@@ -142,6 +142,14 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
   if (!held.length) return null;
   return (
     <div className="space-y-2 mb-4">
+      <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
+        <p className="text-sm font-medium">Writing is paused — a draft needs your review</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Nothing is lost and your accepted chapters are unchanged. To continue: open the held draft below,
+          read what the checks flagged, then either edit the text yourself or press <span className="font-medium text-foreground">Use suggested repair</span>,
+          and finally press <span className="font-medium text-foreground">Re-run checks &amp; accept</span>. Once it passes, writing resumes from where it stopped.
+        </p>
+      </div>
       {held.map(({ c, pending }) => {
         const reason = (c.findings as Row[] ?? []).find((f) => f.severity !== "info")?.message;
         const text = edits[c.id] ?? c.draft_text;
