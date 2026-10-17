@@ -413,6 +413,9 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error || `Error: ${response.status}`;
+      if (errorData?.code === "RECOVER_EXTRACTION") {
+        throw new Error("Story memory for the previous section is still updating. Wait a moment, then press the write button again — nothing has been lost.");
+      }
       if (response.status === 402) {
         throw new Error(msg.includes("Daily") ? "Daily word limit reached for your plan. It resets at midnight UTC, or upgrade to keep writing now" : `Credit limit reached: ${msg}. Please upgrade your plan.`);
       }
