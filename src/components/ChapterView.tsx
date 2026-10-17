@@ -829,6 +829,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
                     </div>
                   )}
                   {progressive && <HeldDraftAlert bookId={book.id} />}
+                  {progressive && <AutoResolveLog bookId={book.id} />}
                   {currentChapter.subsections.map((sub, subIdx) => renderSubsectionContent(sub, subIdx, selectedChapter))}
                 </motion.div>
               </AnimatePresence>
