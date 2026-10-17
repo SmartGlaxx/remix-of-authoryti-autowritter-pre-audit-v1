@@ -96,7 +96,7 @@ export function charChangeRatio(original: string, revised: string): number {
 export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, model: RewriteModel): Promise<RewriteResult> {
   const before = analyzeSection(draft, o);
   const res: RewriteResult = { text: draft, changed: false, attempts: [], before, after: before };
-  if (o.mode !== "advise") return res;
+  if (o.mode !== "analyze_and_rewrite") return res;
   const limit = o.changeLimit ?? DEFAULT_NATURALNESS_CHANGE_LIMIT;
   const det = (t: string) => deterministicValidation(t, { controls: o.controls, motifs: o.protectedMotifs }).length;
   const baseDet = det(draft);

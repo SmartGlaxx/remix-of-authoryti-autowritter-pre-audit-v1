@@ -11,6 +11,8 @@ import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { buildEvaluatorPrompt } from "../_shared/narrative/planning/evaluator.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
+import { authorNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
+import { buildLedger } from "../_shared/writers/rhetoric.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const cors = corsHeaders;
@@ -133,6 +135,31 @@ async function handleRequest(req: Request): Promise<Response> {
       const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id, p_text: edited, p_hash: contentHash(edited), p_status: c.validation_status, p_findings: c.findings ?? [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });
       return error ? json({ error: error.message }, 400) : json(data);
     }
+
+    // Author-requested targeted naturalness rewrite of a held draft. Saves a NEW candidate version
+    // (parent = current); never accepts. Acceptance still requires the full "accept" pipeline.
+    if (action === "naturalness_rewrite") {
+      if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
+      const { data: c } = await db.from("book_candidate_drafts").select("*").eq("id", body.candidateId).eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+      if (!c || !["BLOCKED_MATERIAL", "NEEDS_AUTHOR_REVIEW"].includes(c.validation_status)) return json({ error: "Candidate not open" }, 409);
+      const { data: bk } = await db.from("books").select("book_type, controls, outline").eq("id", bookId).maybeSingle();
+      if (!bk) return json({ error: "Book not found" }, 404);
+      const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
+      if (!testMode) {
+        const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "candidate-review", _max_per_hour: 60, _max_per_day: 300 });
+        if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
+      }
+      const cfg = await loadBookModelConfig(db, bookId, userId);
+      const live = modelCallers(cfg, userId, bookId, testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId));
+      const r = await authorNaturalnessRewrite(c.draft_text, {
+        ledger: buildLedger(bk.outline, { chapterIndex: c.chapter_index, subsectionIndex: c.subsection_index }),
+        bookType: bk.book_type, controls: bk.controls, changeLimit: Number((bk.controls as any)?.revisionWarnRatio) || undefined,
+      }, live.repair);
+      if (!r.changed) return json({ status: "unchanged", candidateId: c.id, attempts: r.attempts, findings: r.after });
+      const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id, p_text: r.text, p_hash: contentHash(r.text), p_status: c.validation_status, p_findings: c.findings ?? [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });
+      return error ? json({ error: error.message }, 400) : json({ status: "rewritten", result: data, attempts: r.attempts, findings: r.after });
+    }
+
 
     if (action === "accept") {
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);

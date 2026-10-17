@@ -791,12 +791,12 @@ serve(async (req) => {
           const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
           const { evaluate, repair } = modelCallers(cfg, auth.user.id, book.id, createAIDeps(adminSupabase, auth.user.id));
           const warnRatio = Number((book.controls as Record<string, unknown> | null)?.revisionWarnRatio) || undefined;
-          // Stage C: optional targeted naturalness rewrite of the UNACCEPTED draft ("advise" only).
+          // Stage C: optional targeted naturalness rewrite of the UNACCEPTED draft ("analyze_and_rewrite" only).
           // The result still goes through the full validation + fenced acceptance below.
           let draftForValidation = cleaned;
-          if (resolveNaturalnessMode(book.controls) === "advise") {
+          if (resolveNaturalnessMode(book.controls) === "analyze_and_rewrite") {
             try {
-              const nr = await runNaturalnessRewrite(cleaned, { mode: "advise", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
+              const nr = await runNaturalnessRewrite(cleaned, { mode: "analyze_and_rewrite", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
               draftForValidation = nr.text;
               console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
             } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
