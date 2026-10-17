@@ -233,8 +233,29 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
     try { const r = await repair(buildRepairPrompt(t, targets, ctx)); track(r.usage); return applyReplacements(t, r.text); } catch { return t; }
   };
   const loop = await runValidationLoop(draft, validate, revise, opts);
-  const all = loop.remaining as StagedFinding[];
+  let text = loop.text;
+  let all = loop.remaining as StagedFinding[];
+  let autoResolved: PreAcceptanceResult["autoResolved"];
+  // Autonomous resolution agent: before anything is held for the author, repairable material
+  // canon conflicts get one canon-locked round — established canon wins, prose is conformed.
+  const materialTargets = all.filter((f) => routeFinding(f) === "canon_reconciliation" && f.repairable);
+  if (materialTargets.length && !unavailable) {
+    try {
+      const r = await repair(buildAutoResolvePrompt(text, materialTargets, ctx)); track(r.usage);
+      const candidate = applyReplacements(text, r.text);
+      if (candidate !== text) {
+        const after = await validate(candidate);
+        const stillMaterial = after.some((f) => routeFinding(f) === "canon_reconciliation");
+        const before = new Set(all.map((f) => f.code));
+        const regressions = after.filter((f) => !before.has(f.code) && (f.severity === "material" || f.severity === "moderate"));
+        if (!stillMaterial && !regressions.length) {
+          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt }));
+          text = candidate; all = after;
+        }
+      }
+    } catch { /* auto-resolution is best-effort; failure falls through to the author */ }
+  }
   const material = all.some((f) => routeFinding(f) === "canon_reconciliation");
   const decision = material ? "blocked_material" : (unavailable || loop.heldForApproval) ? "needs_author_review" : "accept";
-  return { text: loop.text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, usage };
+  return { text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, autoResolved, usage };
 }
