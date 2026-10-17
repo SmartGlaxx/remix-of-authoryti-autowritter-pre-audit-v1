@@ -16,25 +16,26 @@ export interface BookModelConfig {
   profileTier?: Tier | null;
 }
 
-/** Exactly what the app used before Pass 3 — existing books keep this behaviour. */
+/** Default role map for books without a model config. Gemini removed by owner request (no credits) —
+ *  background jobs use OpenAI, prose stays on DeepSeek. */
 export const LEGACY_ROLE_MODELS: Record<Role, string> = {
-  planner: "google/gemini-2.5-flash",
+  planner: "openai/gpt-6-sol",
   writer: "deepseek/deepseek-reasoner",
-  narrative_extractor: "google/gemini-2.5-flash",
-  continuity_checker: "google/gemini-2.5-flash",
-  continuity_reviser: "google/gemini-2.5-pro",
-  editor: "google/gemini-2.5-pro",
+  narrative_extractor: "openai/gpt-6-luna",
+  continuity_checker: "openai/gpt-6-luna",
+  continuity_reviser: "openai/gpt-6-sol",
+  editor: "openai/gpt-6-sol",
   difficult_chapter: "deepseek/deepseek-reasoner",
-  manuscript_auditor: "google/gemini-2.5-pro",
-  character_generator: "google/gemini-2.5-flash",
-  summarizer: "google/gemini-2.5-flash-lite", // registry entry sends gemini-3.5-flash-lite on user Google keys
+  manuscript_auditor: "openai/gpt-6-astra",
+  character_generator: "openai/gpt-6-sol",
+  summarizer: "openai/gpt-6-luna",
   intro_writer: "deepseek/deepseek-chat",
 };
-/** Pre-Pass-3 behaviour: DeepSeek calls fell back to Gemini when DeepSeek was not configured. */
+/** DeepSeek failures fall back to OpenAI (never Gemini). */
 export const LEGACY_FALLBACKS: Partial<Record<Role, string>> = {
-  writer: "google/gemini-3.1-pro-preview",
-  difficult_chapter: "google/gemini-3.1-pro-preview",
-  intro_writer: "google/gemini-2.5-pro",
+  writer: "openai/gpt-6-sol",
+  difficult_chapter: "openai/gpt-6-sol",
+  intro_writer: "openai/gpt-6-sol",
 };
 
 /** "Optimized — Recommended" workflow configuration. */

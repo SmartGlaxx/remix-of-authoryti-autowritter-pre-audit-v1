@@ -89,24 +89,19 @@ describe("Pass 3 — existing providers", () => {
     expect(r.text).toBe("Hello.");
     expect(usage[0]).toMatchObject({ provider: "deepseek", model: "deepseek/deepseek-reasoner", inputTokens: 100, cachedInputTokens: 80, credentialSource: "platform", success: true });
   });
-  it("legacy writer falls back to Gemini when DeepSeek is not configured (pre-Pass-3 behaviour)", async () => {
-    const f = vi.fn(async (url: string) => { expect(url).toContain("ai.gateway.lovable.dev/v1/chat/completions"); return chatSSE("Hi"); });
+  it("legacy writer falls back to OpenAI (never Gemini) when DeepSeek is not configured", async () => {
+    const f = vi.fn(async () => chatSSE("Hi"));
     const { deps } = makeDeps(f as never, { env: { LOVABLE_API_KEY: "lov_key_123456789" } });
     const meta: any = {};
-    let t = ""; for await (const c of streamAI({ role: "writer", config: null, userId: "u", request: { user: "x" } }, deps, meta)) t += c;
-    expect(t).toBe("Hi");
-    expect(meta).toMatchObject({ model: "google/gemini-3.1-pro-preview", usedFallback: true });
+    for await (const _c of streamAI({ role: "writer", config: null, userId: "u", request: { user: "x" } }, deps, meta)) { /* drain */ }
+    expect(meta).toMatchObject({ model: "openai/gpt-6-sol", usedFallback: true });
   });
-  it("6. legacy extractor/planner use Gemini through built-in AI", async () => {
-    const f = vi.fn(async (url: string, init: RequestInit) => {
-      expect(url).toBe("https://ai.gateway.lovable.dev/v1/chat/completions");
-      expect(JSON.parse(init.body as string).model).toBe("google/gemini-2.5-flash");
-      return chatSSE("{}");
-    });
-    const { deps } = makeDeps(f as never);
-    await generateAIText({ role: "narrative_extractor", config: null, userId: "u", request: { user: "x", json: true } }, deps);
-    await generateAIText({ role: "planner", config: null, userId: "u", request: { user: "x" } }, deps);
-    expect(f).toHaveBeenCalledTimes(2);
+  it("6. default config never routes any role to Gemini", () => {
+    for (const role of Object.keys(LEGACY_ROLE_MODELS) as (keyof typeof LEGACY_ROLE_MODELS)[]) {
+      expect(resolveModelForRole(null, role).model.startsWith("google/")).toBe(false);
+      expect(resolveModelForRole(null, role).fallback?.startsWith("google/") ?? false).toBe(false);
+    }
+    expect(resolveModelForRole(null, "summarizer").model).toBe("openai/gpt-6-luna");
   });
   it("OpenAI models go through the Responses API with store=false", async () => {
     const f = vi.fn(async (url: string, init: RequestInit) => {
@@ -192,7 +187,7 @@ describe("Pass 3 — usage and cost", () => {
     let n = 0;
     const f = vi.fn(async () => (++n === 1 ? new Response("slow down", { status: 429 }) : chatSSE("ok")));
     const { deps } = makeDeps(f as never);
-    expect((await generateAIText({ role: "planner", config: null, userId: "u", request: { user: "x" } }, deps)).text).toBe("ok");
+    expect((await generateAIText({ role: "planner", config: { mode: "single", singleModel: "google/gemini-2.5-flash" }, userId: "u", request: { user: "x" } }, deps)).text).toBe("ok");
     expect(f).toHaveBeenCalledTimes(2);
   });
   it("toChatSSE keeps the existing client stream format", async () => {
