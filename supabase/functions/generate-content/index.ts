@@ -7,6 +7,8 @@ import { openingDirective } from "../_shared/writers/opening.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
 import { runNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
+import { recordSignals } from "../_shared/writers/learningRepo.ts";
+import { renderActiveOverlays } from "../_shared/writers/learning.ts";
 import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
@@ -688,6 +690,16 @@ serve(async (req) => {
       console.log(`[rhetoric] strategy=${strategy} prior=${ledger.length}`);
     } catch (e) { console.warn("[rhetoric] skipped:", e instanceof Error ? e.message : e); }
 
+    // ── Stage D: author-approved, pinned writer overlays — dynamic tail only, analyze_and_rewrite only ──
+    if (progressive && progressive.plan.usable && book.id && resolveNaturalnessMode(book.controls) === "analyze_and_rewrite") try {
+      const writerId = resolveWriter(book.controls, book.bookType).id;
+      const pins = Array.isArray(book.controls?.adaptationPins) ? (book.controls.adaptationPins as string[]) : null;
+      const { data: ov } = await adminSupabase.from("writer_style_adaptations").select("id, writer_id, dimension, adjustment, status, version, expires_at").eq("user_id", auth.user.id).eq("writer_id", writerId).eq("status", "active").limit(50);
+      const block = renderActiveOverlays(ov ?? [], writerId, pins);
+      if (block) userPrompt = `${userPrompt}\n\n${block}`;
+    } catch (e) { console.warn("[learning] overlays skipped:", e instanceof Error ? e.message : e); }
+
+
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.
@@ -781,6 +793,7 @@ serve(async (req) => {
         // recoverable candidate; the previously accepted manuscript stays exactly as it was.
         let finalText = cleaned;
         let decision: "accept" | "blocked_material" | "needs_author_review" = "accept";
+        let provenCategories: string[] = []; // Stage D: categories a rewrite demonstrably improved
         try {
           const { data: factRows } = await adminSupabase.from("canonical_facts").select("id, subject, predicate, value, is_canonical, conflict_status, canon_status, source_chapter_index, source_subsection_index").eq("book_id", book.id).eq("canon_status", "ESTABLISHED").limit(400);
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
@@ -798,6 +811,7 @@ serve(async (req) => {
             try {
               const nr = await runNaturalnessRewrite(cleaned, { mode: "analyze_and_rewrite", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
               draftForValidation = nr.text;
+              if (nr.changed) { const after = new Set(nr.after.map((f) => f.category)); provenCategories = [...new Set(nr.before.map((f) => f.category))].filter((c) => !after.has(c)); }
               console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
             } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
           }
@@ -839,6 +853,10 @@ serve(async (req) => {
               const fs = analyzeSection(finalText, { ledger: nl, bookType: book.bookType });
               await adminSupabase.from("naturalness_findings").delete().eq("book_id", book.id).eq("chapter_index", absChapter).eq("subsection_index", subsectionIndex).eq("status", "open");
               if (fs.length) await adminSupabase.from("naturalness_findings").insert(fs.map((f) => ({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, category: f.category, severity: f.severity, message: f.message, evidence: f.evidence, content_hash: hash })));
+              // Stage D: learning signals (best-effort; never blocks). Findings + proven rewrite improvements.
+              const sig = { userId: auth.user.id, bookId: book.id, controls: book.controls, bookType: book.bookType, chapter: absChapter, sub: subsectionIndex, hash };
+              await recordSignals(adminSupabase, { ...sig, categories: fs.map((f) => f.category), kind: "finding", sourceRef: `section:${book.id}:${absChapter}:${subsectionIndex}:${hash}` });
+              await recordSignals(adminSupabase, { ...sig, categories: provenCategories, kind: "proven", sourceRef: `rewrite:${book.id}:${absChapter}:${subsectionIndex}:${hash}` });
             } catch (e) { console.warn("[naturalness] skipped:", e instanceof Error ? e.message : e); }
           }
         }
