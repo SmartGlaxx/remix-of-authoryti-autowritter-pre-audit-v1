@@ -4,6 +4,8 @@ import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sli
 import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
+import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
+import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
 import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
@@ -819,6 +821,15 @@ serve(async (req) => {
           console.log("[phase-f] commit", JSON.stringify(c));
           // Replacing an accepted section flags derived/later memory inside commit_fenced_section itself.
           await adminSupabase.rpc("write_accepted_outline_text", { p_book_id: book.id, p_user_id: auth.user.id, p_chapter: absChapter, p_sub: subsectionIndex, p_text: finalText, p_hash: hash }).then(() => {}, () => {});
+          // Stage B: advisory-only naturalness analysis, off by default. Never blocks or rewrites.
+          if (resolveNaturalnessMode((book as any).controls) !== "off") {
+            try {
+              const nl = buildLedger(book.outline, { chapterIndex, subsectionIndex });
+              const fs = analyzeSection(finalText, { ledger: nl, bookType: book.bookType });
+              await adminSupabase.from("naturalness_findings").delete().eq("book_id", book.id).eq("chapter_index", absChapter).eq("subsection_index", subsectionIndex).eq("status", "open");
+              if (fs.length) await adminSupabase.from("naturalness_findings").insert(fs.map((f) => ({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, category: f.category, severity: f.severity, message: f.message, evidence: f.evidence, content_hash: hash })));
+            } catch (e) { console.warn("[naturalness] skipped:", e instanceof Error ? e.message : e); }
+          }
         }
         }
         }
