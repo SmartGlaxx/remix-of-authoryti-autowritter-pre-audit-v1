@@ -144,12 +144,12 @@ export const blocksAcceptance = (fs: Finding[]) => fs.some((f) => routeFinding(f
 // ── 6. Revision scope: configurable warning, author approval above it ───────
 export const DEFAULT_REVISION_WARN_RATIO = 0.2;
 
+import { changeRatio } from "../../writers/textDiff.ts";
 function paragraphs(t: string) { return t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean); }
-/** Share of original paragraphs not kept verbatim in the revision. */
+/** Share of the original actually modified (word-level diff; unchanged text between edits never counts). */
 export function revisionChangeRatio(original: string, revised: string): number {
-  const o = paragraphs(original); if (!o.length) return revised.trim() ? 1 : 0;
-  const r = new Set(paragraphs(revised));
-  return o.filter((p) => !r.has(p)).length / o.length;
+  if (!paragraphs(original).length) return revised.trim() ? 1 : 0;
+  return changeRatio(original, revised);
 }
 
 export interface RevisionDecision { apply: boolean; ratio: number; route: Route; reason: string }
