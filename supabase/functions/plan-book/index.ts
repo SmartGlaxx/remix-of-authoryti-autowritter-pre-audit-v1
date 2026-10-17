@@ -18,6 +18,7 @@ import {
   normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, buildTwistPrompt, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
+import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
 
@@ -27,7 +28,7 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ACTIONS = ["edit_plan", "alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
+const ACTIONS = ["edit_plan", "alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats", "blueprint", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
 // Story alternatives, concepts and twists use the real planner model for authors. Test mode (and STORY_AI_ENGINE=mock) always uses the free deterministic engine.
 const storyLive = () => Deno.env.get("STORY_AI_ENGINE") !== "mock";
 // Deployment handshake: test harnesses must read this BEFORE any AI-capable request and abort on mismatch,
@@ -407,6 +408,24 @@ async function handle(req: Request): Promise<Response> {
         if (error) throw new Error(error.message);
         return json({ saved: data, attempts: r.attempts });
       }
+      if (action === "blueprint") {
+        // Stage 2: detailed chapter blueprint. Saved as PLANNED; authoritative only after author approval.
+        const secRows = latest("SECTION", ch);
+        const details = chapter.sections.map((sec) => secRows.find((r) => r.subsection_index === sec.sectionIndex)?.content?.detail).filter(Boolean);
+        if (details.length !== chapter.sections.length) return json({ error: "Plan this chapter's sections first" }, 409);
+        const notes = chapter.sections.flatMap((sec) => latest("BEATS", ch).find((r) => r.subsection_index === sec.sectionIndex)?.content?.notes ?? []);
+        const chapRow = latest("CHAPTER", ch)[0];
+        const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
+        const cast: CastRef[] = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
+        const input: BlueprintInput = { m, chapter, details, notes, cast, expanded, stakes: chapRow?.content?.stakes, focus: chapRow?.content?.focus };
+        const caller = mockPlanner === null && testMode ? storyCall(mockBlueprintOutput(input)) : call;
+        const r = await runWithRepair(caller, buildBlueprintPrompt(input), (t) => parseBlueprint(t, input));
+        if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+        const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["blueprint", mp.id, ch, runId]),
+          p_items: [{ plan_level: "BLUEPRINT", chapter_index: ch, content: { blueprint: r.value }, dependencies: [] }] });
+        if (error) throw new Error(error.message);
+        return json({ saved: data, attempts: r.attempts });
+      }
       return json({ error: "Invalid action" }, 400);
     } catch (e) {
       if (e instanceof DryRunStop) return json({ dryRun: true, prompts });
@@ -422,7 +441,7 @@ async function handle(req: Request): Promise<Response> {
 // AI planning calls can think for minutes in silence; the platform drops a request after 150s with no bytes.
 // For those actions we send a space every 15s (valid leading JSON whitespace), then the real JSON body.
 // The real HTTP status travels in the body as `__status` because headers are already sent.
-const LONG_ACTIONS = new Set(["alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats"]);
+const LONG_ACTIONS = new Set(["alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats", "blueprint"]);
 Deno.serve(async (req) => {
   if (req.method !== "POST") return handle(req);
   let action = "";

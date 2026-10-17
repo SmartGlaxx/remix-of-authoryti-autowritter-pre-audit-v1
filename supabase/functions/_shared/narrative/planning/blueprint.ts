@@ -145,18 +145,17 @@ export function parseBlueprint(raw: string, i: BlueprintInput): ParseResult<Chap
     castProposals: arr(o.castProposals).map((p) => ({ id: str(p?.id), name: str(p?.name), role: str(p?.role), justification: str(p?.justification) })).filter((p) => p.id || p.name),
   };
   const issues = validateBlueprint(bp, i);
-  return issues.length ? { ok: false, issues, value: bp } as ParseResult<ChapterBlueprint> : { ok: true, value: bp, issues: [] } as ParseResult<ChapterBlueprint>;
+  return issues.length ? { ok: false, issues } : { ok: true, value: bp };
 }
 
 /** Free deterministic blueprint for test mode: built only from the approved plan, never invented. */
 export function mockBlueprintOutput(i: BlueprintInput): string {
-  const ch = i.chapter.chapterIndex;
   const people = i.cast.slice(0, 2);
   const est = expectedMicrobeats(i.chapter.targetWords);
   const per = Math.max(1, Math.ceil(est / Math.max(1, i.details.length)));
   const beats = i.details.flatMap((d, si) => Array.from({ length: per }, (_, k) => ({
     id: `m${si * per + k}`, sectionId: d.id, text: `${people[0]?.name ?? "The narrator"} ${k === 0 ? d.entry : k === per - 1 ? d.outcome : d.focus}`,
-    characterIds: people.length ? [people[(k % people.length)].id].concat(people[0] ? [] : []) : [], locationId: "l0", eventIds: [`e${si}`], purpose: d.focus || "advance the section", transition: "leads into the next moment",
+    characterIds: people.length ? [people[k % people.length].id] : [], locationId: "l0", eventIds: [`e${si}`], purpose: d.focus || "advance the section", transition: "leads into the next moment",
   })));
   if (people.length) for (const b of beats) b.text = `${people.find((p) => p.id === b.characterIds[0])?.name ?? people[0].name}: ${b.text.replace(/^\S+\s/, "")}`;
   return JSON.stringify({
@@ -168,5 +167,4 @@ export function mockBlueprintOutput(i: BlueprintInput): string {
     microbeats: beats, knowledge: { author: [], reader: i.details.map((d) => d.outcome), characters: people.map((p) => ({ characterId: p.id, knows: [], doesNotKnow: [] })) },
     castProposals: [],
   });
-  void ch;
 }
