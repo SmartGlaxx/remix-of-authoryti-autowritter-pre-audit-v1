@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { PersonaStudioView } from "@/pages/PersonaStudio";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Loader2, Lock, BookOpen, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
 type ScreenKey = "idea" | "twists" | "cast" | "narration" | "writer";
 const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name", writer: "Writer & voice" };
 import { supabase } from "@/integrations/supabase/client";
@@ -198,7 +198,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const useSavedIdea = (idea: Partial<CreateBookInput>) => run("saved-idea", async () => {
     if (hasProse) throw new Error("Writing has started — this book's story cannot be replaced.");
     if (st.premise.trim() && !window.confirm("Replace this starting idea and writer settings with the saved idea? Written text will not change.")) return;
-    const next: BookSetup = { ...st, premise: idea.theme ?? "", alternatives: [], selectedIndex: null, storyMode: "skip", stage: "idea" };
+    const next: BookSetup = { ...st, premise: idea.theme ?? "", alternatives: [], selectedIndex: null, storyMode: "skip", stage: "concept" };
     const result = await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: next });
     if (!result.ok) throw new Error(result.data.message ?? result.data.error ?? "Couldn't use this idea");
     const { error } = await supabase.from("books").update({
@@ -208,7 +208,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
     }).eq("id", book.id);
     if (error) throw error;
     setSt(result.data.setup); setExType(idea.bookType ?? exType); setExGenre(idea.genre ?? ""); setExAudience(idea.audience ?? "");
-    setWriterId(idea.controls?.writerId ?? ""); setSliders(readSliders(idea.toneProfile, idea.controls));
+    setWriterId(idea.controls?.writerId ?? ""); setSliders(readSliders({ ...idea.toneProfile }, { ...idea.controls }));
     onTitleChange?.(idea.title ?? book.title); setIdeasOpen(false); onSaved(); toast.success("Saved idea added to your setup");
   });
   const universeIds = identities.filter((i) => (i.universe_id ?? null) === st.universeId);
