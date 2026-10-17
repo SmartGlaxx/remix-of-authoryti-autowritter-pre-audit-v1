@@ -38,6 +38,12 @@ export const LEGACY_FALLBACKS: Partial<Record<Role, string>> = {
   intro_writer: "openai/gpt-6-sol",
 };
 
+/** Fast-draft prose: long-thinking models swap to their non-thinking counterparts. */
+export const FAST_PROSE_MAP: Record<string, string> = {
+  "deepseek/deepseek-reasoner": "deepseek/deepseek-chat",
+};
+const PROSE_ROLES: ReadonlySet<Role> = new Set(["writer", "difficult_chapter", "intro_writer"]);
+
 /** "Optimized — Recommended" workflow configuration. */
 export const OPTIMIZED_ROLE_MODELS: Record<Role, string> = {
   planner: "openai/gpt-6-sol",
@@ -93,9 +99,17 @@ export function normalizeConfig(raw: unknown): BookModelConfig {
   return { mode: finalMode, profileWriter, profileTier, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
 }
 
-export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role): ResolvedModel {
+export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role, opts: { fast?: boolean } = {}): ResolvedModel {
   const c = normalizeConfig(config ?? DEFAULT_CONFIG);
   const explicitFallback = c.fallbacks?.[role] ?? null;
+  const resolved = resolve(c, role, explicitFallback);
+  if (!opts.fast || !PROSE_ROLES.has(role)) return resolved;
+  const quicker = FAST_PROSE_MAP[resolved.model];
+  if (!quicker) return resolved;
+  return { ...resolved, model: quicker, reasoning: undefined, thinking: undefined };
+}
+
+function resolve(c: BookModelConfig, role: Role, explicitFallback: string | null): ResolvedModel {
   switch (c.mode) {
     case "profile": {
       const prof = getProfile(c.profileWriter, c.profileTier)!;

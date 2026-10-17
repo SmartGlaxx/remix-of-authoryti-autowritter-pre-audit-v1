@@ -107,7 +107,30 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
             <ModelConfigCard bookId={book.id} writerId={writerId ?? bestWriterFor(book.bookType).id} />
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Writer</CardTitle>
+                <CardTitle className="text-base">Writing speed</CardTitle>
+                <p className="text-xs text-muted-foreground">Fast draft writes each section with the quick model and lets story memory update in the background. Studio audit uses the deep-thinking writer and re-checks every section after it is written.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  {(["fast", "studio"] as const).map((m) => {
+                    const active = ((book.controls as { writingSpeed?: string }).writingSpeed ?? "fast") === m;
+                    return (
+                      <Button key={m} variant={active ? "default" : "outline"} size="sm" className="rounded-full"
+                        onClick={async () => {
+                          const next = { ...book.controls, writingSpeed: m };
+                          const { error } = await supabase.from("books").update({ controls: next as never }).eq("id", book.id);
+                          if (!error) (book.controls as { writingSpeed?: string }).writingSpeed = m;
+                        }}>
+                        {m === "fast" ? "Fast draft" : "Studio audit"}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                 <CardTitle className="text-base">Writer</CardTitle>
                 <p className="text-xs text-muted-foreground">The virtual author whose voice shapes this book. Applies to sections written from now on.</p>
               </CardHeader>
               <CardContent>
