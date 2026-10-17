@@ -20,6 +20,7 @@ import { ApprovalGate } from "@/components/ApprovalGate";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TestimonialModal } from "@/components/TestimonialModal";
 import { BookSearchPanel } from "@/components/BookSearchPanel";
+import { NaturalnessPanel } from "@/components/NaturalnessPanel";
 import { ManuscriptAuditPanel } from "@/components/ManuscriptAuditPanel";
 import { ContradictionReviewCard } from "@/components/ContradictionReviewCard";
 import { exportBookToPdf } from "@/lib/exportPdf";
@@ -528,6 +529,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
 
         {hasOutline && <ContradictionReviewCard bookId={book.id} />}
 
+        {hasOutline && <NaturalnessPanel bookId={book.id} controls={book.controls} />}
         {hasOutline && <ManuscriptAuditPanel bookId={book.id} onNavigateToChapter={(idx) => setSearchNavigateChapter(idx)} />}
 
         <div className="flex-1 min-h-0">
