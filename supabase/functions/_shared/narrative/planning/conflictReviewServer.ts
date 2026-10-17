@@ -35,7 +35,7 @@ export async function conflictStatus(db: Db, bookId: string) {
       if (fact && Number.isInteger(fact.source_chapter_index) && Number.isInteger(fact.source_subsection_index)) {
         const p = bestParagraph(outline?.chapters?.[fact.source_chapter_index]?.subsections?.[fact.source_subsection_index]?.content ?? "", priorText);
         priorLocation = locate(outline, fact.source_chapter_index, fact.source_subsection_index, p?.index ?? null);
-        priorParagraph = p?.paragraph ?? ""; source = "accepted_text";
+        priorParagraph = p?.paragraph ?? ""; source = p ? "accepted_text" : "unknown";
       } else {
         // Do not search later text or the conflicting section as evidence for earlier truth.
         outer: for (let c = 0; c <= ch; c++) for (let s = 0; s < (outline?.chapters?.[c]?.subsections?.length ?? 0); s++) {
