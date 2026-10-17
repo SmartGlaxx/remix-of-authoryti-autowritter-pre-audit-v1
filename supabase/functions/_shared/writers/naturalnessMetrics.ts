@@ -42,6 +42,25 @@ export function repeatedStarters(text: string): { starter: string; count: number
   return Object.entries(counts).filter(([, c]) => c >= 4 && c / Math.max(n, 1) >= 0.15).map(([starter, count]) => ({ starter, count })).sort((a, b) => b.count - a.count);
 }
 
+// Syntactic templates: content words collapse to X, function words stay. Catches a rewrite that
+// swaps "As the X, she waited" for "The X while she waited" — different words, same skeleton.
+const FUNCTION = new Set("a an the as while when then and but or so yet she he they i we you it her his their its my our your him them me us of in on at to from by with into over under through after before again still not no".split(" "));
+export function templateSignature(s: string): string {
+  const toks = s.toLowerCase().replace(/[^a-z', ]/g, " ").replace(/,/g, " , ").split(/\s+/).filter(Boolean);
+  const sig: string[] = [];
+  for (const t of toks) { const k = FUNCTION.has(t) || t === "," ? t : "X"; if (!(k === "X" && sig[sig.length - 1] === "X")) sig.push(k); }
+  return sig.join(" ");
+}
+export interface RepeatedTemplate { template: string; count: number; examples: string[] }
+/** Narrative (non-dialogue) sentences sharing one skeleton ≥4 times and ≥12% of narration.
+ *  Three-beat literary parallelism stays below the threshold; protected motifs are exempt. */
+export function repeatedTemplates(text: string, motifs: string[] = []): RepeatedTemplate[] {
+  const narr = sentences(text).filter((s) => !/["\u201C\u201D]/.test(s) && !motifs.some((m) => m && s.toLowerCase().includes(m.toLowerCase())));
+  const m = new Map<string, string[]>();
+  for (const s of narr) { const sig = templateSignature(s); if (sig.split(" ").length < 5 || (sig.match(/X/g) ?? []).length < 2) continue; m.set(sig, [...(m.get(sig) ?? []), s]); }
+  return [...m].filter(([, v]) => v.length >= 4 && v.length / Math.max(narr.length, 1) >= 0.12).map(([template, v]) => ({ template, count: v.length, examples: v.slice(0, 3) }));
+}
+
 export interface AnalyzeOptions {
   ledger?: LedgerEntry[];
   /** Writer creativity baseline 1–10 widens figurative tolerance. */
@@ -131,7 +150,9 @@ export function analyzeSection(text: string, opts: AnalyzeOptions = {}): Natural
   const stock = p.stockPhrases.filter((s) => !isMotif(s));
   const duplicates = verbatimDuplicates(text, opts);
   const duplicateNotes = (["sentences", "paragraphs"] as const).flatMap((kind) => duplicates[kind].slice(0, 5).map((d) => `Identical ${kind === "sentences" ? "sentence" : "paragraph"} ×${d.count}: “${d.text.slice(0, 160)}${d.text.length > 160 ? "…" : ""}”.`));
-  if (starters.length || stock.length || p.triads >= 4 || duplicateNotes.length) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : "", ...duplicateNotes].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads, ...(duplicateNotes.length ? { subtype: "verbatim_repetition", duplicates } : {}) } });
+  const templates = repeatedTemplates(text, opts.protectedMotifs);
+  if (templates.length) duplicateNotes.push(...templates.map((t) => `Same sentence shape ×${t.count}: “${t.examples[0].slice(0, 100)}”.`));
+  if (starters.length || stock.length || p.triads >= 4 || duplicateNotes.length) out.push({ category: "mechanical_pattern", severity: "advisory", message: [starters.length ? `Repeated sentence starts: ${starters.map((s) => `"${s.starter}" ×${s.count}`).join(", ")}.` : "", stock.length ? `Stock phrases: ${stock.map((s) => `"${s}"`).join(", ")}.` : "", p.triads >= 4 ? `${p.triads} three-item lists.` : "", ...duplicateNotes].filter(Boolean).join(" "), evidence: { starters, stockPhrases: stock, triads: p.triads, templates, ...(duplicateNotes.length ? { subtype: "verbatim_repetition", duplicates } : {}) } });
 
   return out;
 }
