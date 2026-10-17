@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
+import { HeldDraftStyle } from "@/components/HeldDraftStyle";
 import { sceneKnowledge } from "../../supabase/functions/_shared/narrative/sceneKnowledge";
 
 type Row = Record<string, any>;
@@ -175,6 +176,7 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
                   {(c.findings as Row[] ?? []).filter((f) => f.severity !== "info").map((f, i) => (
                     <p key={i} className="text-xs border-l-2 border-primary pl-2">{f.message}{f.excerpt && <span className="italic text-muted-foreground"> “{f.excerpt}”</span>}</p>
                   ))}
+                  <HeldDraftStyle bookId={bookId} c={c} onRewritten={load} />
                   <Textarea rows={8} value={text} onChange={(e) => setEdits({ ...edits, [c.id]: e.target.value })} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" disabled={!!busy || text === c.draft_text} onClick={async () => {

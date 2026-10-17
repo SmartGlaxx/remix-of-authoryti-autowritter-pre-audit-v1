@@ -137,3 +137,9 @@
 - [ ] Stage C: full regression, live checks, deployment check
 
 - [x] Autonomous conflict-resolution agent: canon-locked auto-resolve round before holding drafts; choices logged + decided automatically; writer canon rule + evaluator desensitized to benign detail — 558 tests
+
+# Naturalness Stage E
+- [x] Style-check setting (3 modes), chapter + whole-book style notes, intentional motifs, held-draft check + targeted rewrite with compare, Writer Improvement Studio (approve/undo) — 601 tests
+- [ ] Per-book "pin improvement versions" screen (backend ready)
+- [ ] Optional AI detectors (off; needs your keys + approval)
+- [ ] Real paid writing session to judge quality

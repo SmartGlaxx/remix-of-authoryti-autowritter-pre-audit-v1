@@ -1,3 +1,4 @@
+import { NaturalnessSettingsCard } from "@/components/NaturalnessSettingsCard";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -128,6 +129,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
                 </div>
               </CardContent>
             </Card>
+            <NaturalnessSettingsCard bookId={book.id} controls={book.controls as unknown as Record<string, unknown>} />
             <Card>
               <CardHeader className="pb-3">
                  <CardTitle className="text-base">Writer</CardTitle>

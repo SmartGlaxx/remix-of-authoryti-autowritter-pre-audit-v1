@@ -13,7 +13,7 @@ import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narra
 import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
 import { authorNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
 import { buildLedger } from "../_shared/writers/rhetoric.ts";
-import { recordSignals, sectionFindingCategories } from "../_shared/writers/learningRepo.ts";
+import { recordSignals, sectionFindingCategories, loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const cors = corsHeaders;
@@ -164,7 +164,7 @@ async function handleRequest(req: Request): Promise<Response> {
       const live = modelCallers(cfg, userId, bookId, testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId));
       const r = await authorNaturalnessRewrite(c.draft_text, {
         ledger: buildLedger(bk.outline, { chapterIndex: c.chapter_index, subsectionIndex: c.subsection_index }),
-        bookType: bk.book_type, controls: bk.controls, changeLimit: Number((bk.controls as any)?.revisionWarnRatio) || undefined,
+        bookType: bk.book_type, controls: bk.controls, protectedMotifs: await loadProtectedMotifs(db, bookId), changeLimit: Number((bk.controls as any)?.revisionWarnRatio) || undefined,
       }, live.repair);
       if (!r.changed) return json({ status: "unchanged", candidateId: c.id, attempts: r.attempts, findings: r.after });
       const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id, p_text: r.text, p_hash: contentHash(r.text), p_status: c.validation_status, p_findings: c.findings ?? [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });

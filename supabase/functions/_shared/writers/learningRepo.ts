@@ -1,4 +1,5 @@
 // Stage D I/O: best-effort signal recording. Never throws, never blocks acceptance or writing.
+import { protectedMotifLabels } from "./naturalness.ts";
 import { resolveWriter } from "./personas.ts";
 import type { SignalKind } from "./learning.ts";
 import { SIGNAL_WEIGHT } from "./learning.ts";
@@ -21,5 +22,13 @@ export async function sectionFindingCategories(db: any, bookId: string, chapter:
   try {
     const { data } = await db.from("naturalness_findings").select("category").eq("book_id", bookId).eq("chapter_index", chapter).eq("subsection_index", sub).limit(50);
     return [...new Set((data ?? []).map((r: any) => r.category as string))];
+  } catch { return []; }
+}
+
+/** Book's intentional motifs (owner-marked). Never throws; empty on any error. */
+export async function loadProtectedMotifs(db: any, bookId: string): Promise<string[]> {
+  try {
+    const { data } = await db.from("book_literary_artifacts").select("artifact_type, label, status").eq("book_id", bookId).eq("status", "active").limit(200);
+    return protectedMotifLabels(data);
   } catch { return []; }
 }
