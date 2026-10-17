@@ -13,12 +13,12 @@ describe("Stage E naturalness UI contracts", () => {
   });
 
   it("an opening marked as intentional motif is no longer flagged", () => {
-    const text = "She remembered Ceres again. " + "The corridor was quiet and long. ".repeat(20);
-    const ledger = [{ family: "memory_recall" }, { family: "memory_recall" }] as never;
+    const text = "There is a particular silence before a storm. " + "The corridor was quiet and long. ".repeat(20);
+    const ledger = [{ family: "general_observation" }, { family: "general_observation" }] as never;
     const flagged = analyzeSection(text, { ledger }).some((f) => f.category === "opening_recurrence");
-    const withMotif = analyzeSection(text, { ledger, protectedMotifs: ["remembered Ceres"] }).some((f) => f.category === "opening_recurrence");
+    const withMotif = analyzeSection(text, { ledger, protectedMotifs: ["particular silence"] }).some((f) => f.category === "opening_recurrence");
+    expect(flagged).toBe(true);
     expect(withMotif).toBe(false);
-    if (flagged) expect(withMotif).not.toBe(flagged);
   });
 
   it("settings offer exactly the three modes and legacy advise stays analyze-only", () => {
