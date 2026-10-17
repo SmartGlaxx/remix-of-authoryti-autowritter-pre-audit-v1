@@ -124,6 +124,7 @@
 - [x] Approving the whole-book summary goes straight on to chapter/section summaries
 
 # Phase 5
+- [ ] Fix summary requests ignoring saved book models; verify 402 recovery with unpaid tests.
 - [x] Clear dismissed warnings, reconcile exact continuity findings, and stop paused writing spinners. Signed-in browser verified dismissed Chapter 2 conflict shows reviewed, no stale spinner, separate Section 2 held-draft card; 22 tests passed, no paid AI or manuscript changes.
 - [x] Paired conflict evidence, detailed review, AI/manual repair, checked acceptance and follow-up conflicts. Browser verified real evidence cards and temporary manual correction reaching fenced acceptance/memory update with deterministic stand-ins; temporary book removed. Paid AI correction quality not tested.
 - [x] AI portrait choices (up to five), uploads, richer promotion cards and reversible demotion. Browser: five mocked choices, full view, real portrait storage, demotion preserving profile/picture, same-profile restoration; deployed test-mode block verified. 532/532 free tests pass. Real image quality remains untested (paid approval required).

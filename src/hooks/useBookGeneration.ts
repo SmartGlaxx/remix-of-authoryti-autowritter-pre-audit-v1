@@ -511,17 +511,20 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     try {
       const { data, error } = await supabase.functions.invoke("summarize-content", {
-        body: { content, type },
+        body: { bookId: book.id, content, type },
       });
       if (error) throw error;
-      return data.summary || "";
+      return data?.summary || "";
     } catch (err) {
       // Summaries are optional context; a failure (e.g. AI limit reached) must not break the page.
       detectAiBlock((err as any)?.context ? await (err as any).context.text?.().catch(() => "") : String(err));
       console.warn("Summarization skipped:", err instanceof Error ? err.message : err);
       return "";
+    } finally {
+      // Restore writing progress without overriding an explicit pause/stop/error.
+      setState(s => s.phase === "summarizing" ? { ...s, phase: "writing" } : s);
     }
-  }, []);
+  }, [book.id]);
 
   const startGeneration = useCallback(async () => {
     abortRef.current = false;
