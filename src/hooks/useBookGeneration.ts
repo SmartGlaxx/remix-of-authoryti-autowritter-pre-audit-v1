@@ -750,7 +750,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
             // Fast draft: the server's pre-acceptance gate already validated this section
             // before it was saved, so the client re-check is redundant. Story memory updates
             // in the background — the next section's preflight waits for it if needed.
-            void runNarrativeExtraction(book.id, chIdx, subIdx);
+            void runNarrativeExtraction(book.id, chIdx, subIdx, { timeoutMs: 180_000, attempts: 5 });
           } else {
             // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
             // accepted final text ever reaches narrative state.
@@ -1048,7 +1048,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         if (isProgressiveBook(book.controls) && isFastDraft(book.controls)) {
           // Fast draft: server-side pre-acceptance already validated this section; story
           // memory updates in the background and the next section's preflight waits for it.
-          void runNarrativeExtraction(book.id, chapterIndex, subIdx);
+          void runNarrativeExtraction(book.id, chapterIndex, subIdx, { timeoutMs: 180_000, attempts: 5 });
         } else {
           // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
           // accepted final text ever reaches narrative state.
