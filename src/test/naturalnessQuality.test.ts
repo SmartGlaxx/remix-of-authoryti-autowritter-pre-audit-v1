@@ -29,7 +29,7 @@ describe("Naturalness quality corrections", () => {
   });
 
   it("genuine structural variation is accepted", async () => {
-    const edits = things.slice(0, 6).map((t, i) => ({ find: `As the ${t}, she waited. `, replace: ["", "She gave up on the clock. ", "", "Rain ticked at the glass behind her. ", "", "Her hands kept moving. "][i] }));
+    const edits = things.slice(0, 8).map((t, i) => ({ find: `As the ${t}, she waited. `, replace: ["", "She gave up on the clock. ", "", "Rain ticked at the glass behind her. ", "", "Her hands kept moving. ", "", "Theo's car was still nowhere. "][i] }));
     const r = await runNaturalnessRewrite(asOpen, { mode: "analyze_and_rewrite", changeLimit: 0.5 }, reply(edits));
     expect(r.attempts[0].reason).toBe("improved");
     expect(naturalnessScore(r.after)).toBeLessThan(naturalnessScore(r.before));
