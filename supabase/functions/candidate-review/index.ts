@@ -10,7 +10,7 @@ import { LEASE_TTL_SECONDS } from "../_shared/narrative/planning/pipeline.ts";
 import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { buildEvaluatorPrompt } from "../_shared/narrative/planning/evaluator.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
-import { conflictStatus, prepareConflict, rewriteConflict } from "../_shared/narrative/planning/conflictReviewServer.ts";
+import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const cors = corsHeaders;
@@ -59,6 +59,13 @@ async function handleRequest(req: Request): Promise<Response> {
       if (action === "prepare_conflict") return json(await prepareConflict(db, bookId, userId, body.logId));
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
       return json(await rewriteConflict(db, bookId, userId, body.logId, body.candidateId, body.testMode === true || req.headers.get("x-ai-test-mode") === "1"));
+    }
+    if (action === "discuss_conflict" || action === "apply_conflict_edits") {
+      if (!UUID.test(String(body.logId))) return json({ error: "Invalid logId" }, 400);
+      if (action === "discuss_conflict") return json(await discussConflict(db, bookId, userId, body.logId, body.messages, body.testMode === true || req.headers.get("x-ai-test-mode") === "1"));
+      const edits = Array.isArray(body.edits) ? body.edits.slice(0, 4).map((e: any) => ({ find: String(e?.find ?? "").slice(0, 2000), replace: String(e?.replace ?? "").slice(0, 2000) })) : [];
+      if (!edits.length) return json({ error: "No edits to apply" }, 400);
+      return json(await applyConflictEdits(db, bookId, userId, body.logId, edits));
     }
 
     if (action === "blast_radius" || action === "confirm_memory") {
