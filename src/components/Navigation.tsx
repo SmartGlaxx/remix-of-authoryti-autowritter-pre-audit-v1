@@ -1,4 +1,4 @@
-import { BookOpen, Sparkles, Plus, Flame, Zap, PenTool, Users } from "lucide-react";
+import { BookOpen, Bookmark, Sparkles, Plus, Flame, Zap, PenTool, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -7,9 +7,10 @@ import { AppSidebar } from "@/components/AppSidebar";
 
 interface NavigationProps {
   onCreateBook: () => void;
+  onBookIdeas: () => void;
 }
 
-const Navigation = ({ onCreateBook }: NavigationProps) => {
+const Navigation = ({ onCreateBook, onBookIdeas }: NavigationProps) => {
   const turbo = useTurbo();
   const navigate = useNavigate();
 
@@ -87,6 +88,10 @@ const Navigation = ({ onCreateBook }: NavigationProps) => {
               )}
             </TooltipProvider>
 
+            <Button variant="outline" size="sm" onClick={onBookIdeas} className="gap-1" aria-label="Book Ideas" title="Book Ideas">
+              <Bookmark className="w-4 h-4" />
+              <span className="hidden sm:inline">Book Ideas</span>
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/personas")} className="gap-1" title="Persona Studio">
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Persona Studio</span>
