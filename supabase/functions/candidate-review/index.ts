@@ -134,6 +134,11 @@ Deno.serve(async (req) => {
       }
       const { data: linked } = await db.from("canon_reconciliation_logs").select("id, decision, canon_reference").in("candidate_id", lineage);
       if ((linked ?? []).some((l) => l.decision === "PENDING")) return json({ error: "RECONCILIATION_REQUIRED", message: "Decide every contradiction before accepting." }, 409);
+      // Ask before replacing accepted text, and do it before any paid check runs.
+      if (body.replaceAccepted !== true) {
+        const { data: acc } = await db.from("book_section_acceptances").select("id").eq("book_id", bookId).eq("chapter_index", c.chapter_index).eq("subsection_index", c.subsection_index).in("manuscript_status", ["ACCEPTED", "ESTABLISHED"]).limit(1);
+        if ((acc ?? []).length) return json({ status: "needs_replace_confirmation", candidateId: c.id });
+      }
       const edited = null;
       const text = c.draft_text;
       const { data: bk } = await db.from("books").select("book_type, controls, outline").eq("id", bookId).maybeSingle();
@@ -158,7 +163,7 @@ Deno.serve(async (req) => {
       const hash = contentHash(r.text);
       if (r.decision !== "accept") {
         const saved = await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: edited ? "author_edit" : "retry", parentId: c.id });
-        return json({ status: "held", decision: r.decision, candidateId: saved.candidateId, findings: r.findings, usage: r.usage }, 409);
+        return json({ status: "held", decision: r.decision, candidateId: saved.candidateId, findings: r.findings, usage: r.usage });
       }
       const worker = `cr_${crypto.randomUUID()}`;
       const { data: lease } = await db.rpc("acquire_generation_lease", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_worker: worker, p_ttl_seconds: LEASE_TTL_SECONDS });
@@ -166,6 +171,7 @@ Deno.serve(async (req) => {
       const { data: done, error } = await db.rpc("commit_candidate_draft", { p_candidate_id: c.id, p_user_id: userId, p_worker: worker, p_token: Number(lease.fencing_token), p_text: r.text, p_hash: hash, p_replace: body.replaceAccepted === true });
       if (error) {
         await db.rpc("release_generation_lease", { p_lease_id: lease.lease_id, p_worker: worker, p_token: Number(lease.fencing_token) }).then(() => {}, () => {});
+        if (error.message?.includes("ACCEPTED_SECTION_PROTECTED")) return json({ status: "needs_replace_confirmation", candidateId: c.id });
         return json({ error: error.message }, 409);
       }
       await db.rpc("write_accepted_outline_text", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_text: r.text, p_hash: hash }).then(() => {}, () => {});

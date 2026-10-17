@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { callPlanBook, callReview, saveThenAccept } from "@/lib/candidateReview";
+import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
 import IdentityReviewPanel from "@/components/IdentityReviewPanel";
@@ -333,6 +333,7 @@ const DECISIONS: { value: string; label: string; help: string }[] = [
 function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; review: { candidates: Row[]; logs: Row[]; findings: Row[] }; busy: string | null; run: RunFn; refresh: () => Promise<void> }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [why, setWhy] = useState<Record<string, string>>({});
+  const [replaceAsk, setReplaceAsk] = useState<Record<string, string>>({});
   const decide = (logId: string, decision: string) => run(`d-${logId}`, async () => {
     const r = await callReview({ action: "decide", logId, decision, rationale: why[logId] || DECISIONS.find((d) => d.value === decision)!.label });
     if (!r.ok) throw new Error(r.data.error); await refresh();
@@ -374,13 +375,8 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
               <Textarea rows={10} value={text} onChange={(e) => setEdits({ ...edits, [c.id]: e.target.value })} />
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!!busy || pending} onClick={() => run(`a-${c.id}`, async () => {
-                  let r = await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
-                  if (r.data?.error === "ACCEPTED_SECTION_PROTECTED") {
-                    if (!window.confirm("This section already has accepted text in your book. Replace it with this draft? (Cancel keeps the current text and removes this draft.)")) {
-                      await callReview({ action: "discard", candidateId: r.candidateId }); toast.success("Kept the accepted text; removed the old draft"); await refresh(); return;
-                    }
-                    r = await saveThenAccept(bookId, r.candidateId, c.draft_text, undefined, true);
-                  }
+                  const r = await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
+                  if (needsReplaceConfirmation(r.data)) { setReplaceAsk((m) => ({ ...m, [c.id]: r.candidateId })); return; }
                   if (r.data.status === "accepted") {
                     toast.success("Accepted — updating story memory");
                     await runNarrativeExtraction(bookId, c.chapter_index, c.subsection_index);
@@ -391,6 +387,25 @@ function ReviewTab({ bookId, review, busy, run, refresh }: { bookId: string; rev
                 <Button variant="outline" disabled={!!busy} onClick={() => run(`x-${c.id}`, async () => { const r = await callReview({ action: "discard", candidateId: c.id }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}>Discard draft</Button>
               </div>
               {pending && <p className="text-xs text-muted-foreground">Decide every conflict above before accepting.</p>}
+              {replaceAsk[c.id] && (
+                <div className="rounded-md border border-primary/50 p-3 space-y-2">
+                  <p className="text-sm">This section already has accepted text in your book. Replace it with this draft? The full checks still run first.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" disabled={!!busy} onClick={() => run(`a-${c.id}`, async () => {
+                      const r = await saveThenAccept(bookId, replaceAsk[c.id], c.draft_text, undefined, true);
+                      setReplaceAsk((m) => { const n = { ...m }; delete n[c.id]; return n; });
+                      if (r.data.status === "accepted") { toast.success("Accepted — updating story memory"); await runNarrativeExtraction(bookId, c.chapter_index, c.subsection_index); }
+                      else if (r.data.status === "held") toast.warning("Still not passing checks — see the new findings");
+                      else throw new Error(r.data.message ?? r.data.error ?? "Could not accept");
+                      await refresh();
+                    })}>Replace with this draft</Button>
+                    <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run(`k-${c.id}`, async () => {
+                      for (const id of new Set([c.id, replaceAsk[c.id]])) await callReview({ action: "discard", candidateId: id });
+                      setReplaceAsk({}); toast.success("Kept the accepted text; removed the old draft"); await refresh();
+                    })}>Keep current text</Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

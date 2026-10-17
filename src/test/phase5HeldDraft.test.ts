@@ -26,3 +26,12 @@ describe("held draft acceptance", () => {
     expect(calls[0].candidateId).toBe("old-id");
   });
 });
+
+import { needsReplaceConfirmation } from "@/lib/candidateReview";
+describe("accepted section protection", () => {
+  it("asks keep-or-replace for both the new status and the old error", () => {
+    expect(needsReplaceConfirmation({ status: "needs_replace_confirmation" })).toBe(true);
+    expect(needsReplaceConfirmation({ error: "ACCEPTED_SECTION_PROTECTED" })).toBe(true);
+    expect(needsReplaceConfirmation({ status: "held" })).toBe(false);
+  });
+});

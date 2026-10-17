@@ -53,6 +53,9 @@ export async function priorSectionOutcome(bookId: string, chapter: number, subse
 
 export const isProgressiveBook = (controls: unknown) => (controls as Record<string, unknown> | null)?.planning_pipeline === "progressive";
 
+/** The section already has accepted text: the author must choose keep or replace. */
+export const needsReplaceConfirmation = (data: any) => data?.status === "needs_replace_confirmation" || data?.error === "ACCEPTED_SECTION_PROTECTED";
+
 /**
  * Accept a held draft. Unsaved edits are persisted first as a new candidate version, then the
  * full server pre-acceptance + fenced pipeline runs on that latest saved version only.
