@@ -101,3 +101,34 @@ export async function rewriteConflict(db: Db, bookId: string, userId: string, lo
   if (error) throw new Error(error.message);
   return { candidate_id: data.candidate_id, draft_text: patched.text, status: "saved" };
 }
+
+/** Chat with the continuity editor about one conflict. Returns a reply plus optional targeted edits; nothing is saved. */
+export async function discussConflict(db: Db, bookId: string, userId: string, logId: string, history: ChatMsg[], testMode: boolean) {
+  const status = await conflictStatus(db, bookId);
+  const log = status.logs.find((l: Row) => l.id === logId);
+  if (!log) throw new Error("This conflict could not be found. Refresh the review list.");
+  const clean: ChatMsg[] = (Array.isArray(history) ? history : []).slice(-12)
+    .filter((m) => m && (m.role === "author" || m.role === "assistant") && typeof m.content === "string")
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+  if (!clean.length || clean[clean.length - 1].role !== "author") throw new Error("Send your thought or question first.");
+  const { data: allowed, error: rateError } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "conflict-discuss", _max_per_hour: 60, _max_per_day: 200 });
+  if (rateError || allowed !== true) throw new Error("Discussion limit reached. Try again later.");
+  const config = await loadBookModelConfig(db, bookId, userId);
+  const deps = createAIDeps(db, userId);
+  const r = await generateAIText({ role: "continuity_reviser", config, userId, bookId, maxRetries: 0,
+    request: { ...discussionPrompt({ truth: log.prior.summary, conflicting: log.newer.paragraph || log.newer.summary, description: log.description, recommendation: log.recommendation.reason, history: clean }), json: true } }, testMode ? failClosedDeps(deps) : deps);
+  const parsed = parseDiscussion(r.text);
+  return { reply: parsed.reply, edits: parsed.edits.slice(0, 4) };
+}
+
+/** Apply chat-proposed targeted edits to the open candidate (preparing one if needed) and save a new version. */
+export async function applyConflictEdits(db: Db, bookId: string, userId: string, logId: string, edits: { find: string; replace: string }[]) {
+  const prepared = await prepareConflict(db, bookId, userId, logId);
+  const patched = applyTargetedEdits(prepared.draft_text, Array.isArray(edits) ? edits.slice(0, 4) : []);
+  if (!patched.applied) throw new Error("The suggested edits no longer match the draft. Ask the editor again or edit manually.");
+  const { data: c } = await db.from("book_candidate_drafts").select("*").eq("id", prepared.candidate_id).maybeSingle();
+  const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id,
+    p_text: patched.text, p_hash: contentHash(patched.text), p_status: "NEEDS_AUTHOR_REVIEW", p_findings: [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });
+  if (error) throw new Error(error.message);
+  return { candidate_id: data.candidate_id, draft_text: patched.text, status: "saved" };
+}
