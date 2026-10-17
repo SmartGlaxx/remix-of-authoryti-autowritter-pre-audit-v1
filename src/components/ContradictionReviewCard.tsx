@@ -188,6 +188,23 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
             {!selected.candidate && selected.memorySynced && <p className="text-sm text-primary flex gap-2 items-center"><CheckCircle2 className="w-4 h-4" />Resolved — accepted text and story memory are up to date.</p>}
             {!selected.candidate && selected.accepted && !selected.memorySynced && selected.decision !== "DISMISS" && <Button variant="outline" disabled={!!busy} onClick={async () => { setBusy(selected.id); setPhase("Updating story memory…"); try { await runNarrativeExtraction(bookId, selected.chapter_index, selected.subsection_index); await load(); notify(); } catch (e) { updateWork(selected.id, { outcome: e instanceof Error ? e.message : "Memory update failed. Your accepted text is safe; try again." }); } finally { setBusy(""); setPhase(""); } }}>Retry story memory update</Button>}
           </>}
+          <div className="border border-border rounded-lg p-3 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2"><MessageSquare className="w-4 h-4 text-primary" />Discuss with the editor</p>
+            {(chat[selected.id] ?? []).length > 0 && <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {(chat[selected.id] ?? []).map((t, i) => <div key={i} className={`rounded-lg p-2.5 text-sm leading-relaxed ${t.role === "author" ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`}>
+                <p className="whitespace-pre-wrap break-words">{t.content}</p>
+                {t.edits && <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{t.applied ? "Suggestion applied" : `${t.edits.length} suggested edit${t.edits.length > 1 ? "s" : ""}`}</Badge>
+                  {!t.applied && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => void applyChatEdits(selected, i)}><Sparkles className="w-3.5 h-3.5 mr-1" />Apply suggestion</Button>}
+                </div>}
+              </div>)}
+            </div>}
+            <div className="flex gap-2 items-end">
+              <Textarea aria-label="Your thought or question" placeholder="Share your take — e.g. “she pauses only when stressed; merge both” — and the editor will suggest a fix." value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={2} disabled={!!busy} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(selected); } }} />
+              <Button size="icon" aria-label="Send" disabled={!!busy || !draft.trim()} onClick={() => void sendChat(selected)}><Send className="w-4 h-4" /></Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Suggestions only change text after you apply them and run checks.</p>
+          </div>
           {busy && <div role="status" aria-live="polite" className="flex gap-2 items-center text-sm text-primary"><Loader2 className="w-4 h-4 animate-spin" />{phase}</div>}
           {w?.outcome && <p role="status" className="text-sm leading-relaxed border-l-2 border-primary pl-3">{w.outcome}</p>}
           {pending.filter((l) => l.id !== selected.id).length > 0 && <div className="border-t border-border pt-3 space-y-2"><p className="text-sm font-medium">Other conflicts to review</p>{pending.filter((l) => l.id !== selected.id).map((l) => <Button key={l.id} variant="outline" className="w-full whitespace-normal h-auto py-2 text-left justify-start" onClick={() => open(l)}>{summary(l.description)}<ArrowRight className="w-4 h-4 shrink-0 ml-auto" /></Button>)}</div>}
