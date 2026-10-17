@@ -168,3 +168,45 @@ export function mockBlueprintOutput(i: BlueprintInput): string {
     castProposals: [],
   });
 }
+
+// ---------- Stage 2 completion: authority rules (pure) ----------
+/**
+ * Detailed-blueprint workflow is explicit per book: `controls.blueprint_mode = "required"`.
+ * Books that turn Progressive Planning on get it; older Progressive books keep their current
+ * behaviour until the author opts in (non-destructive compatibility). Standard books never see it.
+ */
+export type BlueprintMode = "required" | "off";
+export const resolveBlueprintMode = (controls: unknown): BlueprintMode => {
+  const c = (controls ?? {}) as Record<string, unknown>;
+  return c.planning_pipeline === "progressive" && c.blueprint_mode === "required" ? "required" : "off";
+};
+
+/** Proposed new people not yet registered in the book's master cast. Listing someone never authorizes them. */
+export function pendingCastProposals(bp: Pick<ChapterBlueprint, "castProposals"> | null | undefined, cast: readonly CastRef[]): CastProposal[] {
+  const names = new Set(cast.flatMap((c) => [c.name, ...(c.aliases ?? [])]).map(norm));
+  return (bp?.castProposals ?? []).filter((p) => !names.has(norm(p.name)));
+}
+
+/** Plan rows a bulk "approve all" may approve: never blueprints (each needs its own review). */
+export const bulkApprovableIds = (rows: readonly { id: string; plan_status: string; plan_level: string }[]) =>
+  rows.filter((r) => r.plan_status === "PLANNED" && r.plan_level !== "BLUEPRINT").map((r) => r.id);
+
+/** Why a blueprint may not be approved yet (empty = approvable). */
+export function blueprintApprovalIssues(bp: ChapterBlueprint | null | undefined, cast: readonly CastRef[]): string[] {
+  if (!bp) return ["blueprint content is missing"];
+  return pendingCastProposals(bp, cast).map((p) => `"${p.name}" must be approved and added to the book's cast first`);
+}
+
+export type BlueprintGate = { ok: true; blueprint: ChapterBlueprint | null; planId: string | null; version: number | null }
+  | { ok: false; code: "BLUEPRINT_REQUIRED" | "CAST_APPROVAL_REQUIRED"; reason: string };
+
+/** Writing gate for required-blueprint books: the chapter needs an approved blueprint whose people are all registered. */
+export function blueprintGate(mode: BlueprintMode, rows: readonly { id: string; plan_status: string; version?: number; content?: any }[], ch: number, cast: readonly CastRef[]): BlueprintGate {
+  if (mode !== "required") return { ok: true, blueprint: null, planId: null, version: null };
+  const ready = rows.filter((r) => r.plan_status === "READY").sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0];
+  const bp = ready?.content?.blueprint as ChapterBlueprint | undefined;
+  if (!ready || !bp) return { ok: false, code: "BLUEPRINT_REQUIRED", reason: `Chapter ${ch + 1} needs an approved detailed blueprint before it can be written.` };
+  const pending = pendingCastProposals(bp, cast);
+  if (pending.length) return { ok: false, code: "CAST_APPROVAL_REQUIRED", reason: `Approve and add to the cast first: ${pending.map((p) => p.name).join(", ")}.` };
+  return { ok: true, blueprint: bp, planId: ready.id, version: Number(ready.version ?? 1) };
+}

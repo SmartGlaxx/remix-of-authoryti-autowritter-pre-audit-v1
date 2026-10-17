@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { bulkApprovableIds } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
@@ -101,7 +102,7 @@ export default function PlanningStudio() {
             Plan your book before writing: start with the big idea, then shape the chapters and scenes. As you write, the app checks for mixed-up details and keeps twists for the right moment. You review drafts that need attention. Turn this off to write one section at a time without this planning flow.
           </TooltipContent></Tooltip></TooltipProvider>
           <Switch checked={progressive} disabled={!!busy} onCheckedChange={(on) => run("toggle", async () => {
-            const controls = { ...(book.controls ?? {}), planning_pipeline: on ? "progressive" : "standard" };
+            const controls = { ...(book.controls ?? {}), planning_pipeline: on ? "progressive" : "standard", ...(on && !(book.controls as Row)?.planning_pipeline ? { blueprint_mode: "required" } : {}) };
             const { error } = await supabase.from("books").update({ controls }).eq("id", bookId);
             if (error) throw error; toast.success(on ? "Progressive Planning is on for this book" : "Back to standard writing"); await refresh();
           })} />
@@ -149,13 +150,17 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const has = (level: string, ch: number) => mine.some((p) => p.plan_level === level && p.chapter_index === ch);
   const chapters = [...new Set(mine.filter((p) => p.plan_level === "CHAPTER").map((p) => p.chapter_index))].sort((a, b) => a - b);
   const brief = { premise, targetWords, chapterCount };
+  // Detailed-blueprint workflow: new Progressive books require it; older Progressive books opt in explicitly.
+  const blueprintsRequired = (book.controls as Row)?.blueprint_mode === "required" || !(book.controls as Row)?.planning_pipeline;
+  const legacyProgressive = (book.controls as Row)?.planning_pipeline === "progressive" && (book.controls as Row)?.blueprint_mode !== "required";
   // Every chapter of the approved master has chapter, section and beat plans.
   const planningComplete = master?.status === "APPROVED" && chapters.length > 0
     && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION", "BEATS"].every((lv) => has(lv, c)));
   const allReady = master?.status === "APPROVED" && chapters.length > 0 && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
-    && mine.every((p) => p.plan_status === "READY");
+    && mine.every((p) => p.plan_status === "READY")
+    && (!blueprintsRequired || chapters.every((c) => mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === c && p.plan_status === "READY")));
 
   const createMaster = () => run("master", async () => {
     const extra = {}; // the story chosen in Setup reaches the planner server-side
@@ -240,10 +245,11 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             <div className="flex flex-wrap gap-2">
               <Button onClick={planAll} disabled={!!busy || planningComplete}>{busy === "auto" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{planningComplete ? "Whole book planned" : "Plan the whole book"}</Button>
               {progress && <Button variant="outline" onClick={() => { pauseRef.current = !pauseRef.current; setProgress({ ...progress, paused: pauseRef.current }); }}>{progress.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}</Button>}
-              <Button variant="outline" disabled={!!busy || !planningComplete || !mine.some((p) => p.plan_status === "PLANNED")} onClick={() => run("approveAll", async () => {
-                const r = await callPlanBook({ action: "approve_plans", ids: mine.filter((p) => p.plan_status === "PLANNED" && p.plan_level !== "BLUEPRINT").map((p) => p.id) }); if (!r.ok) throw new Error(r.data.error); toast.success(`${r.data.approved} plans approved`); await refresh();
+              <Button variant="outline" disabled={!!busy || !planningComplete || !bulkApprovableIds(mine as never).length} onClick={() => run("approveAll", async () => {
+                const r = await callPlanBook({ action: "approve_plans", ids: bulkApprovableIds(mine as never) }); if (!r.ok) throw new Error(r.data.error); toast.success(`${r.data.approved} plans approved${blueprintsRequired ? " — approve each chapter blueprint separately" : ""}`); await refresh();
               })}>4. Approve all planned</Button>
             </div>
+            {legacyProgressive && <div className="rounded-md border border-border p-3 text-xs flex flex-wrap items-center gap-2"><span className="flex-1">This book started before detailed blueprints. Writing still follows your approved summaries. Turning blueprints on makes every chapter not yet written need an approved blueprint first; written text is not changed.</span><Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("bpOn", async () => { const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), blueprint_mode: "required" } }).eq("id", book.id); if (error) throw error; toast.success("Detailed blueprints now required for this book"); await refresh(); })}>Require blueprints</Button></div>}
             {progress && <Progress value={(progress.done / progress.total) * 100} />}
             <div className="space-y-2">
               {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground border border-border rounded-md">No chapter summaries yet. Press "Plan the whole book" to explode the summary into chapters and sections.</p>}
@@ -257,7 +263,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             {allReady && <div className="rounded-lg border border-primary p-4 flex flex-wrap items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-primary" /><span className="text-sm flex-1">The whole book is planned and approved. Writing will follow these exact summaries, section by section.</span>
               <Button disabled={!!busy} onClick={() => run("write", async () => {
-                const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive" };
+                const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive", ...(!(book.controls as Row)?.planning_pipeline ? { blueprint_mode: "required" } : {}) };
                 const outline = buildOutlineFromPlans(master, mine, book.outline);
                 const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
                 const { error } = await supabase.from("books").update({ controls, outline: outline as any, ...(hasProse ? {} : { status: "ready_to_write", current_chapter_index: 0, current_subsection_index: 0 }) }).eq("id", book.id); if (error) throw error;
@@ -328,6 +334,7 @@ function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats, onBlue
 
 function BlueprintBlock({ rows, busy, run, refresh, onBuild }: { rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onBuild: () => void }) {
   const row = rows.find((r) => r.plan_status === "READY") && !rows.some((r) => r.plan_status === "PLANNED") ? rows.find((r) => r.plan_status === "READY") : rows.find((r) => r.plan_status === "PLANNED") ?? rows[0];
+  const { bookId = "" } = useParams();
   const bp = row?.content?.blueprint as Row | undefined;
   const name = (id: string) => (bp?.cast as Row[] | undefined)?.find((c) => c.id === id)?.name ?? (bp?.castProposals as Row[] | undefined)?.find((c) => c.id === id)?.name ?? id;
   const place = (id: string) => (bp?.locations as Row[] | undefined)?.find((l) => l.id === id)?.name ?? id;
@@ -349,7 +356,7 @@ function BlueprintBlock({ rows, busy, run, refresh, onBuild }: { rows: Row[]; bu
           <div><p className="font-medium">Places</p>{(bp.locations as Row[]).map((l) => <p key={l.id}>{l.name} — {l.significance}</p>)}</div>
           <div><p className="font-medium">Events</p>{(bp.events as Row[]).map((e) => <p key={e.id}>{e.name}</p>)}</div>
         </div>
-        {(bp.castProposals as Row[]).length > 0 && <div className="text-xs rounded bg-muted/40 p-2"><p className="font-medium">New people the plan needs (approving the blueprint approves them)</p>{(bp.castProposals as Row[]).map((p) => <p key={p.id}>{p.name} — {p.justification}</p>)}</div>}
+        {(bp.castProposals as Row[]).length > 0 && <div className="text-xs rounded bg-muted/40 p-2"><p className="font-medium">New people the plan proposes — each must be approved and added to your cast before this blueprint can be approved</p>{(bp.castProposals as Row[]).map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 py-1"><span className="flex-1">{p.name} — {p.justification}</span>{row?.plan_status === "PLANNED" && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run(`cp-${p.id}`, async () => { const r = await callPlanBook({ action: "approve_cast_proposal", bookId, planId: row.id, proposalId: p.id }); if (!r.ok) throw new Error(r.data.error); toast.success(r.data.already ? `${p.name} is already in your cast` : `${p.name} added to your cast`); await refresh(); })}>Add to cast</Button>}</div>)}</div>}
         <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Step-by-step beats ({(bp.microbeats as Row[]).length})</summary>
           <ol className="list-decimal ml-5 mt-1 space-y-1">{(bp.microbeats as Row[]).map((b) => <li key={b.id}>{b.text} <span className="text-muted-foreground">· {(b.characterIds as string[]).map(name).join(", ") || "no one"} · {place(b.locationId)} · why: {b.purpose}</span></li>)}</ol></details>
         <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Who knows what</summary>
