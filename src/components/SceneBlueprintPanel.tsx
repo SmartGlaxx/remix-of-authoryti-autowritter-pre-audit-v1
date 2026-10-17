@@ -86,7 +86,7 @@ export function SceneBlueprintPanel({ bookId, chapterIndex, subsectionIndex }: {
 }
 
 /** Inline card for drafts the checks held back. Edits are saved first; checks run on the saved version. */
-export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: string; chapterIndex: number; onAccepted?: () => void }) {
+export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: string; chapterIndex?: number; onAccepted?: () => void }) {
   const [held, setHeld] = useState<{ c: Row; pending: number }[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -94,7 +94,7 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
   const load = useCallback(async () => {
     const r = await callReview<{ candidates: Row[]; logs: Row[] }>({ action: "status", bookId });
     if (!r.ok) return;
-    setHeld(r.data.candidates.filter((c) => c.chapter_index === chapterIndex).map((c) => {
+    setHeld(r.data.candidates.filter((c) => chapterIndex === undefined || c.chapter_index === chapterIndex).map((c) => {
       const lineage: string[] = c.lineage ?? [c.id];
       return { c, pending: r.data.logs.filter((l) => lineage.includes(l.candidate_id) && l.decision === "PENDING").length };
     }));
@@ -142,6 +142,14 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
   if (!held.length) return null;
   return (
     <div className="space-y-2 mb-4">
+      <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
+        <p className="text-sm font-medium">Writing is paused — a draft needs your review</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Nothing is lost and your accepted chapters are unchanged. To continue: open the held draft below,
+          read what the checks flagged, then either edit the text yourself or press <span className="font-medium text-foreground">Use suggested repair</span>,
+          and finally press <span className="font-medium text-foreground">Re-run checks &amp; accept</span>. Once it passes, writing resumes from where it stopped.
+        </p>
+      </div>
       {held.map(({ c, pending }) => {
         const reason = (c.findings as Row[] ?? []).find((f) => f.severity !== "info")?.message;
         const text = edits[c.id] ?? c.draft_text;
@@ -151,7 +159,7 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
             <CardContent className="p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-destructive" />
-                <span className="text-sm font-medium flex-1 min-w-0">Section {c.subsection_index + 1} draft is held{reason ? `: ${reason}` : ""}</span>
+                <span className="text-sm font-medium flex-1 min-w-0">Chapter {c.chapter_index + 1}, Section {c.subsection_index + 1} draft is held{reason ? `: ${reason}` : ""}</span>
                 {repair && (
                   <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => {
                     setEdits({ ...edits, [c.id]: repair }); setOpen(c.id);

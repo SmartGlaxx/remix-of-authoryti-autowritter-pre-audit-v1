@@ -389,16 +389,14 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     let response = await send();
 
-    // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
-    if (response.status === 409) {
+    // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry.
+    // Extraction can still be finishing when the first retry lands, so allow a few rounds.
+    for (let round = 0; round < 3 && response.status === 409; round++) {
       const errBody = await response.clone().json().catch(() => ({}));
-      if (errBody?.code === "RECOVER_EXTRACTION" && bookData.id) {
-        const prev = prevPos;
-        if (prev) {
-          const r = await runNarrativeExtraction(bookData.id, prev.c, prev.s, { timeoutMs: 120_000 });
-          if (r.status === "completed" || r.status === "skipped") response = await send();
-        }
-      }
+      if (errBody?.code !== "RECOVER_EXTRACTION" || !bookData.id || !prevPos) break;
+      const r = await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 4 });
+      if (r.status !== "completed" && r.status !== "skipped") continue;
+      response = await send();
     }
 
     // The same section is still being written by an earlier request (e.g. after a dropped connection).
@@ -415,6 +413,9 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error || `Error: ${response.status}`;
+      if (errorData?.code === "RECOVER_EXTRACTION") {
+        throw new Error("Story memory for the previous section is still updating. Wait a moment, then press the write button again — nothing has been lost.");
+      }
       if (response.status === 402) {
         throw new Error(msg.includes("Daily") ? "Daily word limit reached for your plan. It resets at midnight UTC, or upgrade to keep writing now" : `Credit limit reached: ${msg}. Please upgrade your plan.`);
       }
@@ -605,7 +606,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           const startedAt = new Date(Date.now() - 5000).toISOString();
           // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
           const prior = isProgressiveBook(book.controls) && !subsection.content ? await priorSectionOutcome(book.id, chIdx, subIdx) : { state: "pending" as const };
-          if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          if (prior.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
           let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
             () => streamContent(
               { ...currentBook, outline, tonalAnchors },
@@ -623,7 +624,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (isProgressiveBook(book.controls)) {
             const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chIdx, subIdx, startedAt);
             if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — open Planning Studio to see its status before continuing");
-            if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+            if (outcome.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
             if (outcome.state === "pending") throw new Error("checks on this section did not finish; open Planning Studio to review");
             if (outcome.text) content = outcome.text;
           }
@@ -920,7 +921,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         const progressiveBook = isProgressiveBook(book.controls);
         // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
         const prior = progressiveBook && !subsection.content ? await priorSectionOutcome(book.id, chapterIndex, subIdx) : { state: "pending" as const };
-        if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+        if (prior.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
         let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
           () => streamContent(
             { ...currentBook, outline, tonalAnchors },
@@ -936,7 +937,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         if (progressiveBook) {
           const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chapterIndex, subIdx, startedAt);
           if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — try again in a minute");
-          if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          if (outcome.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
           if (outcome.state === "pending") throw new Error("checks on this section did not finish; try again shortly");
           if (outcome.text) content = outcome.text;
         }
