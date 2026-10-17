@@ -12,7 +12,7 @@ describe("independent verbatim duplicate detection", () => {
   });
   it("detects identical paragraphs with normalized whitespace and HTML layout", () => {
     const p = "Rain covered the yard. The door stayed shut.";
-    expect(verbatimDuplicates(`${p}\n\nShe waited.\n\n${p.replaceAll(" ", "  ")}`).paragraphs).toEqual([{ text: p, count: 2 }]);
+    expect(verbatimDuplicates(`${p}\n\nShe waited.\n\n${p.replace(/ /g, "  ")}`).paragraphs).toEqual([{ text: p, count: 2 }]);
     expect(verbatimDuplicates(`<p>${p}</p><p>She waited.</p><p>${p}</p>`).paragraphs).toEqual([{ text: p, count: 2 }]);
   });
   it("does not treat similar wording or different case as verbatim", () => {
