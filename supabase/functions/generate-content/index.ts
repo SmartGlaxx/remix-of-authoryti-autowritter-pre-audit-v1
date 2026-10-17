@@ -8,6 +8,8 @@ import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
 import { runNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
+import { resolveLiteraryReviser, LiteraryBudget, buildLiteraryPrompt } from "../_shared/writers/literaryReviser.ts";
+import { literaryCaller } from "../_shared/writers/literaryReviserServer.ts";
 import { recordSignals } from "../_shared/writers/learningRepo.ts";
 import { renderActiveOverlays } from "../_shared/writers/learning.ts";
 import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
@@ -815,6 +817,19 @@ serve(async (req) => {
               if (nr.changed) { const after = new Set(nr.after.map((f) => f.category)); provenCategories = [...new Set(nr.before.map((f) => f.category))].filter((c) => !after.has(c)); }
               console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
             } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
+          }
+          // Tier 2 literary reviser: only when the author opted into "automatic". Exact model, own key,
+          // per-section cost ceiling; the 20% limit is measured against the ORIGINAL draft. The result is
+          // never accepted here — it goes through the same full validation + fenced acceptance below.
+          const lit = resolveLiteraryReviser(book.controls, cfg);
+          if (lit.mode === "automatic") {
+            try {
+              const budget = new LiteraryBudget(lit.capUsd);
+              const lr = await runNaturalnessRewrite(draftForValidation, { mode: "analyze_and_rewrite", protectedMotifs: await loadProtectedMotifs(adminSupabase, book.id), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio, promptBuilder: buildLiteraryPrompt, maxAttempts: lit.maxAttempts }, literaryCaller(lit, { userId: auth.user.id, bookId: book.id, deps: createAIDeps(adminSupabase, auth.user.id), budget }));
+              const { changeRatio } = await import("../_shared/writers/textDiff.ts");
+              if (lr.changed && changeRatio(cleaned, lr.text) <= (warnRatio ?? 0.2)) draftForValidation = lr.text;
+              console.log("[literary] rewrite", JSON.stringify({ model: lit.model, changed: lr.changed, attempts: lr.attempts, spentCeiling: budget.spent }));
+            } catch (e) { console.warn("[literary] rewrite skipped:", e instanceof Error ? e.message : e); }
           }
           const r = await runPreAcceptance(draftForValidation, ctx, evaluate, repair, { warnRatio });
           finalText = r.text; decision = r.decision;

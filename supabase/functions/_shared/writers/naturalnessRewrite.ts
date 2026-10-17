@@ -24,6 +24,10 @@ export interface RewriteOptions extends AnalyzeOptions {
   changeLimit?: number;
   /** Established character/place names from canon; protected in addition to mid-sentence capitals. */
   knownNames?: string[];
+  /** Custom prompt (e.g. the literary reviser); all deterministic gates still apply. */
+  promptBuilder?: (text: string, findings: NaturalnessFinding[], o: { writerVoice?: string }) => Prompt;
+  /** Fewer attempts than the 2-attempt maximum (never more). */
+  maxAttempts?: number;
 }
 export interface RewriteAttempt { attempt: number; edits: number; accepted: boolean; reason: string; scoreBefore: number; scoreAfter?: number }
 export interface RewriteProposal { attempt: number; rawEdits: Edit[]; rejectedEdits: string[]; candidate: string; changeRatio: number }
@@ -120,12 +124,13 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
   const det = (t: string) => deterministicValidation(t, { controls: o.controls, motifs: o.protectedMotifs }).length;
   const baseDet = det(draft);
   let best = draft, bestFindings = before;
-  for (let i = 1; i <= MAX_NATURALNESS_ATTEMPTS; i++) {
+  const maxA = Math.max(1, Math.min(MAX_NATURALNESS_ATTEMPTS, o.maxAttempts ?? MAX_NATURALNESS_ATTEMPTS));
+  for (let i = 1; i <= maxA; i++) {
     const targets = bestFindings.filter((f) => REWRITABLE.has(f.category));
     if (!targets.length) break;
     const scoreBefore = naturalnessScore(bestFindings);
     let edits: Edit[] = [];
-    try { edits = parseEdits((await model(buildRewritePrompt(best, targets, o))).text); }
+    try { edits = parseEdits((await model((o.promptBuilder ?? buildRewritePrompt)(best, targets, o))).text); }
     catch { res.attempts.push({ attempt: i, edits: 0, accepted: false, reason: "model_unavailable", scoreBefore }); break; }
     const { text: cand, applied, rejected } = applyEdits(best, edits, o.knownNames);
     res.proposals!.push({ attempt: i, rawEdits: edits, rejectedEdits: rejected, candidate: cand, changeRatio: charChangeRatio(draft, cand) });

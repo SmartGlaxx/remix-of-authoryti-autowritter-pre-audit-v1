@@ -30,12 +30,14 @@ export const LEGACY_ROLE_MODELS: Record<Role, string> = {
   character_generator: "openai/gpt-6-sol",
   summarizer: "openai/gpt-6-luna",
   intro_writer: "deepseek/deepseek-chat",
+  literary_reviser: "openai/gpt-6-sol",
 };
 /** DeepSeek failures fall back to OpenAI (never Gemini). */
 export const LEGACY_FALLBACKS: Partial<Record<Role, string>> = {
   writer: "openai/gpt-6-sol",
   difficult_chapter: "openai/gpt-6-sol",
   intro_writer: "openai/gpt-6-sol",
+  literary_reviser: "openai/gpt-6-sol",
 };
 
 /** Fast-draft prose: long-thinking models swap to their non-thinking counterparts. */
@@ -57,6 +59,7 @@ export const OPTIMIZED_ROLE_MODELS: Record<Role, string> = {
   character_generator: "openai/gpt-6-sol",
   summarizer: "openai/gpt-6-luna",
   intro_writer: "openai/gpt-6-sol",
+  literary_reviser: "openai/gpt-6-sol",
 };
 export const OPTIMIZED_LABEL = "Optimized — Recommended";
 

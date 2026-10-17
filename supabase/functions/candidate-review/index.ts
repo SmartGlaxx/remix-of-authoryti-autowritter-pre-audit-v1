@@ -12,6 +12,8 @@ import { buildEvaluatorPrompt } from "../_shared/narrative/planning/evaluator.ts
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
 import { authorNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
+import { resolveLiteraryReviser, LiteraryBudget, buildLiteraryPrompt } from "../_shared/writers/literaryReviser.ts";
+import { literaryCaller } from "../_shared/writers/literaryReviserServer.ts";
 import { buildLedger } from "../_shared/writers/rhetoric.ts";
 import { recordSignals, sectionFindingCategories, loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
@@ -171,6 +173,31 @@ async function handleRequest(req: Request): Promise<Response> {
       return error ? json({ error: error.message }, 400) : json({ status: "rewritten", result: data, attempts: r.attempts, findings: r.after });
     }
 
+
+    // Author-requested literary rewrite of a held draft. Requires the book's literary mode to be on
+    // ("on_request" or "automatic"). Saves a NEW candidate version; never accepts.
+    if (action === "literary_rewrite") {
+      if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
+      const { data: c } = await db.from("book_candidate_drafts").select("*").eq("id", body.candidateId).eq("book_id", bookId).eq("user_id", userId).maybeSingle();
+      if (!c || !["BLOCKED_MATERIAL", "NEEDS_AUTHOR_REVIEW"].includes(c.validation_status)) return json({ error: "Candidate not open" }, 409);
+      const { data: bk } = await db.from("books").select("book_type, controls").eq("id", bookId).maybeSingle();
+      if (!bk) return json({ error: "Book not found" }, 404);
+      const cfg = await loadBookModelConfig(db, bookId, userId);
+      const lit = resolveLiteraryReviser(bk.controls, cfg);
+      if (lit.mode === "off") return json({ error: "LITERARY_OFF", message: "Turn on the literary reviser for this book first." }, 409);
+      const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
+      if (!testMode) {
+        const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "candidate-review", _max_per_hour: 60, _max_per_day: 300 });
+        if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
+      }
+      const deps = testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId);
+      const budget = new LiteraryBudget(lit.capUsd);
+      const r = await authorNaturalnessRewrite(c.draft_text, { bookType: bk.book_type, controls: bk.controls, protectedMotifs: await loadProtectedMotifs(db, bookId), changeLimit: Number((bk.controls as any)?.revisionWarnRatio) || undefined, promptBuilder: buildLiteraryPrompt, maxAttempts: lit.maxAttempts },
+        literaryCaller(lit, { userId, bookId, deps, budget }));
+      if (!r.changed) return json({ status: "unchanged", candidateId: c.id, model: lit.model, attempts: r.attempts, unresolved: r.unresolved });
+      const { data, error } = await db.rpc("save_candidate_draft", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_master_plan_id: c.master_plan_id, p_text: r.text, p_hash: contentHash(r.text), p_status: c.validation_status, p_findings: c.findings ?? [], p_usage: {}, p_origin: "author_edit", p_parent: c.id, p_dedup_keys: [] });
+      return error ? json({ error: error.message }, 400) : json({ status: "rewritten", result: data, model: lit.model, attempts: r.attempts, unresolved: r.unresolved });
+    }
 
     if (action === "accept") {
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
