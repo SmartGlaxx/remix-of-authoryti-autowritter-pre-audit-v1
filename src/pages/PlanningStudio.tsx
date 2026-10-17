@@ -258,7 +258,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             {allReady && <div className="rounded-lg border border-primary p-4 flex flex-wrap items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-primary" /><span className="text-sm flex-1">The whole book is planned and approved. Writing will follow these exact summaries, section by section.</span>
               <Button disabled={!!busy} onClick={() => run("write", async () => {
-                const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive" };
+                const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive", ...(!(book.controls as Row)?.planning_pipeline ? { blueprint_mode: "required" } : {}) };
                 const outline = buildOutlineFromPlans(master, mine, book.outline);
                 const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
                 const { error } = await supabase.from("books").update({ controls, outline: outline as any, ...(hasProse ? {} : { status: "ready_to_write", current_chapter_index: 0, current_subsection_index: 0 }) }).eq("id", book.id); if (error) throw error;
@@ -321,14 +321,15 @@ function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats, onBlue
             </div>; })}
           {secs.length > 0 && beats.length === 0 && <Button size="sm" variant="outline" disabled={!!busy} onClick={onBeats}>Add scene beats</Button>}
         </div>
-        {secs.length > 0 && <BlueprintBlock bookId={bookId} rows={rows.filter((p) => p.plan_level === "BLUEPRINT")} busy={busy} run={run} refresh={refresh} onBuild={onBlueprint} />}
+        {secs.length > 0 && <BlueprintBlock rows={rows.filter((p) => p.plan_level === "BLUEPRINT")} busy={busy} run={run} refresh={refresh} onBuild={onBlueprint} />}
       </div>}
     </div>
   );
 }
 
-function BlueprintBlock({ bookId, rows, busy, run, refresh, onBuild }: { bookId: string; rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onBuild: () => void }) {
+function BlueprintBlock({ rows, busy, run, refresh, onBuild }: { rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onBuild: () => void }) {
   const row = rows.find((r) => r.plan_status === "READY") && !rows.some((r) => r.plan_status === "PLANNED") ? rows.find((r) => r.plan_status === "READY") : rows.find((r) => r.plan_status === "PLANNED") ?? rows[0];
+  const { bookId = "" } = useParams();
   const bp = row?.content?.blueprint as Row | undefined;
   const name = (id: string) => (bp?.cast as Row[] | undefined)?.find((c) => c.id === id)?.name ?? (bp?.castProposals as Row[] | undefined)?.find((c) => c.id === id)?.name ?? id;
   const place = (id: string) => (bp?.locations as Row[] | undefined)?.find((l) => l.id === id)?.name ?? id;
