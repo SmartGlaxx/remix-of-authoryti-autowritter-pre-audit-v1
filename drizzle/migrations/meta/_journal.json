@@ -127,6 +127,13 @@
       "when": 1791769005231,
       "tag": "0017_persona_portraits_universe_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792200328071,
+      "tag": "0018_conflict_candidate_lineage",
+      "breakpoints": true
     }
   ]
 }
