@@ -94,7 +94,7 @@ export function editViolation(text: string, e: Edit, knownNames: string[] = []):
   const replaceWords = new Set(capsWords(e.replace));
   for (const n of inFind) if (!replaceWords.has(n)) return `name_removed:${n}`;
   // A new name is a word the replacement capitalises mid-sentence (or a known name) that the draft never had.
-  const added = new Set([...midSentenceCaps(e.replace), ...capsWords(e.replace).filter((w) => names.has(w))]);
+  const added = new Set([...midSentenceCaps(e.replace), ...capsWords(e.replace).filter((w) => names.has(w) || !new RegExp(`\\b${w.toLowerCase()}\\b`).test(text))]);
   for (const n of added) if (!text.includes(n)) return `name_added:${n}`;
   return null;
 }

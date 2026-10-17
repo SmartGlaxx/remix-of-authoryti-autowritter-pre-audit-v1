@@ -29,7 +29,7 @@ describe("Naturalness quality corrections", () => {
   });
 
   it("genuine structural variation is accepted", async () => {
-    const edits = things.slice(0, 8).map((t, i) => ({ find: `As the ${t}, she waited. `, replace: ["", "She gave up on the clock. ", "", "Rain ticked at the glass behind her. ", "", "Her hands kept moving. ", "", "Theo's car was still nowhere. "][i] }));
+    const edits = things.slice(0, 8).map((t, i) => ({ find: `As the ${t}, she waited. `, replace: ["", "She gave up on the clock. ", "", "Rain ticked at the glass behind her. ", "", "Her hands kept moving. ", "", "No car came up the drive. "][i] }));
     const r = await runNaturalnessRewrite(asOpen, { mode: "analyze_and_rewrite", changeLimit: 0.5 }, reply(edits));
     expect(r.attempts[0].reason).toBe("improved");
     expect(naturalnessScore(r.after)).toBeLessThan(naturalnessScore(r.before));
@@ -46,6 +46,7 @@ describe("Naturalness quality corrections", () => {
     expect(editViolation(text, { find: "Theo came in late.", replace: "He came in late." })).toMatch(/^name_removed:Theo/);
     expect(editViolation(text, { find: "Wren sat by the door.", replace: "Someone sat by the door." }, ["Wren Holloway"])).toMatch(/^name_removed:Wren/);
     expect(editViolation(text, { find: "Theo came in late.", replace: "Theo came in late with Ivo." })).toMatch(/^name_added:Ivo/);
+    expect(editViolation(text, { find: "Wren sat by the door.", replace: "Ivo sat by the door. Wren stood." })).toMatch(/^name_added:Ivo/);
   });
 
   it("duplicate sentences hundreds of words apart are found and reported", async () => {
