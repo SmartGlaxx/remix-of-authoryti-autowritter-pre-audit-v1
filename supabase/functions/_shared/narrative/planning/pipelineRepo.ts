@@ -1,6 +1,7 @@
 // Phase F I/O for the opt-in progressive pipeline (server only). Pure decisions live in pipeline.ts.
 import { previousPosition, priorFromAcceptances, progressiveGate, requiredAnchorKeys, scopedAnchors, type AnchorRow, type GateResult } from "./pipeline.ts";
 import { resolvePlanForSection, type PlanResolution } from "./planningContext.ts";
+import { blueprintGate, resolveBlueprintMode, type BlueprintGate } from "./blueprint.ts";
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -39,4 +40,16 @@ export async function loadProgressiveState(db: Db, bookId: string, userId: strin
   const plan = resolvePlanForSection(master, { chapterIndex: ch, subsectionIndex: sub }, bookType, readyPlans);
   const required = requiredAnchorKeys(plan.usable ? plan.section : null, anchors);
   return { gate, master, readyPlans, anchors, anchorRows, plan, required };
+}
+
+/** Stage 2 completion: approved-blueprint gate for books in the required-blueprint workflow. */
+export async function loadBlueprintGate(db: Db, bookId: string, userId: string, controls: unknown, ch: number): Promise<BlueprintGate> {
+  const mode = resolveBlueprintMode(controls);
+  if (mode !== "required") return blueprintGate(mode, [], ch, []);
+  const [b, c] = await Promise.all([
+    db.from("book_progressive_plans").select("id, plan_status, version, content").eq("book_id", bookId).eq("plan_level", "BLUEPRINT").eq("chapter_index", ch).eq("plan_status", "READY"),
+    db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true),
+  ]);
+  for (const r of [b, c]) if (r?.error) throw new Error(r.error.message);
+  return blueprintGate(mode, b.data ?? [], ch, (c.data ?? []).map((x: Row) => ({ id: x.id, name: x.name, aliases: x.aliases ?? [] })));
 }
