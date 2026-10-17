@@ -196,6 +196,7 @@ export function renderPlanBlock(plan: ResolvedPlan, ch: number, anchors: AnchorR
   for (const f of foreshadowFor(plan.master, ch)) lines.push(f.text);
   const req = new Set(required);
   for (const a of anchors) lines.push(`EXACT${req.has(a.anchor_key) ? " (REQUIRED in this section)" : " (if mentioned)"}: ${a.anchor_key} = "${a.exact_text}"`);
+  lines.push("CANON RULE: use established facts and EXACT details verbatim — never invent variations of named rules, numbers, terms, objects or places. If a detail you want is not in your context, keep it general instead of inventing a specific.");
   return lines.join("\n");
 }
 

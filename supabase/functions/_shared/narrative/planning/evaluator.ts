@@ -78,6 +78,7 @@ export function buildEvaluatorPrompt(draft: string, ctx: EvalContext): Prompt {
       "(5) writing quality: only unintended narration repetition, broken logic, or incoherence. Style preferences are 'info'.",
       `Writing quality is judged for this genre on: ${qualityRubric(ctx.adapter).join("; ")}. These are advisory: report them as minor or info, never material.`,
       "Setup-only and deferred beats are CORRECT when planted but unresolved. Explaining a deferred mystery early is a violation.",
+      "Benign descriptive detail (weather, clothing, atmosphere, sensory texture, ordinary in-scene behaviour) that does not contradict canon is NOT a finding. Report 'material' only for a direct contradiction of an established fact, identity, timeline or exact anchor — never for style or richness of detail.",
       "Every finding must quote a short exact excerpt from the draft and cite the canon id/anchor key it conflicts with when relevant.",
       ctx.secrets.length ? "Disclosure check: a twist is DISCLOSED only when the passage lets the reader understand the twist itself. Mentioning a name, object or place involved, hints and foreshadowing are NOT disclosure. Use certainty 'definite' only when the twist is plainly given away." : "",
       n ? "Epistemic check: flag 'premature_knowledge' when the narrator states as known something they do not know yet, and 'pov_violation' when a first-person/limited narrator states another character's private thoughts or secret actions as fact. Speculation, guesses, lies, mistakes, unreliable narration and (in retrospective narration) clearly framed hindsight are literary devices: set device=true and do not mark them definite." : "",
@@ -187,7 +188,27 @@ export function applyReplacements(draft: string, raw: string): string {
 export interface PreAcceptanceResult {
   text: string; findings: StagedFinding[]; rounds: number; outcome: LoopResult["outcome"] | "evaluator_unavailable";
   decision: "accept" | "blocked_material" | "needs_author_review"; heldForApproval?: { text: string; ratio: number };
+  /** Material canon conflicts the agent resolved itself by conforming the prose to established canon. */
+  autoResolved?: { code: string; message: string; excerpt?: string }[];
   usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number };
+}
+
+/**
+ * Canon-locked auto-resolution prompt: established canon is always the truth; the conflicting
+ * sentences are rewritten to match it exactly. Used for one final autonomous round before a
+ * draft is ever held for the author.
+ */
+export function buildAutoResolvePrompt(draft: string, material: StagedFinding[], ctx: EvalContext): Prompt {
+  const list = material.slice(0, 8).map((f, i) => `${i + 1}. [${f.code}] ${f.message}${f.excerpt ? ` — conflicting excerpt: "${f.excerpt}"` : ""}${f.sourceRef ? ` (canon: ${f.sourceRef})` : ""}`).join("\n");
+  const truths = [
+    ...ctx.anchors.slice(0, 40).map((a) => `- ${a.key}: "${clip(a.text, 200)}"`),
+    ...ctx.facts.slice(0, 80).map((f) => `- ${f.id}: ${clip(f.text, 200)}`),
+  ].join("\n") || "- (none)";
+  return {
+    system: "You conform prose to established canon with minimal, surgical edits. Established canon is always true; rewrite only the conflicting sentences so they match it exactly. Keep voice, length and everything else identical. Never use markdown. Return JSON only.",
+    user: [`ESTABLISHED CANON (always true):\n${truths}`, `CONFLICTS TO RESOLVE:\n${list}`, `DRAFT:\n---\n${draft}\n---`,
+      `Respond with {"replacements":[{"find":"exact sentence copied from the draft","replace":"corrected sentence that matches canon"}]}`].join("\n\n"),
+  };
 }
 
 /**
@@ -212,8 +233,29 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
     try { const r = await repair(buildRepairPrompt(t, targets, ctx)); track(r.usage); return applyReplacements(t, r.text); } catch { return t; }
   };
   const loop = await runValidationLoop(draft, validate, revise, opts);
-  const all = loop.remaining as StagedFinding[];
+  let text = loop.text;
+  let all = loop.remaining as StagedFinding[];
+  let autoResolved: PreAcceptanceResult["autoResolved"];
+  // Autonomous resolution agent: before anything is held for the author, repairable material
+  // canon conflicts get one canon-locked round — established canon wins, prose is conformed.
+  const materialTargets = all.filter((f) => routeFinding(f) === "canon_reconciliation" && f.repairable);
+  if (materialTargets.length && !unavailable) {
+    try {
+      const r = await repair(buildAutoResolvePrompt(text, materialTargets, ctx)); track(r.usage);
+      const candidate = applyReplacements(text, r.text);
+      if (candidate !== text) {
+        const after = await validate(candidate);
+        const stillMaterial = after.some((f) => routeFinding(f) === "canon_reconciliation");
+        const before = new Set(all.map((f) => f.code));
+        const regressions = after.filter((f) => !before.has(f.code) && (f.severity === "material" || f.severity === "moderate"));
+        if (!stillMaterial && !regressions.length) {
+          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt }));
+          text = candidate; all = after;
+        }
+      }
+    } catch { /* auto-resolution is best-effort; failure falls through to the author */ }
+  }
   const material = all.some((f) => routeFinding(f) === "canon_reconciliation");
   const decision = material ? "blocked_material" : (unavailable || loop.heldForApproval) ? "needs_author_review" : "accept";
-  return { text: loop.text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, usage };
+  return { text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, autoResolved, usage };
 }

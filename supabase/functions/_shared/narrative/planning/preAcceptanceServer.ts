@@ -44,6 +44,19 @@ export async function persistOutcome(r: PreAcceptanceResult, a: PersistArgs): Pr
         details: { stage: f.stage, source_ref: f.sourceRef ?? null }, dedup_key: dk }, { onConflict: "dedup_key", ignoreDuplicates: true });
     }
   }
+  // Autonomous resolutions are logged and immediately decided: established canon won, the prose
+  // was conformed. The recorded choice dedups re-detection of the same contradiction later.
+  for (const [i, f] of (r.autoResolved ?? []).entries()) {
+    try {
+      const dk = `auto_${a.bookId}_${a.chapter}_${a.sub}_${a.hash.slice(0, 16)}_${i}`.slice(0, 400);
+      const { data: rec } = await a.db.rpc("record_canon_discrepancy", { p_book_id: a.bookId, p_user_id: a.userId, p_chapter: a.chapter, p_sub: a.sub, p_severity: "MAJOR",
+        p_type: f.code, p_description: `Auto-resolved: ${f.message}`, p_excerpt: f.excerpt ?? "", p_canon_ref: { source: "auto_resolver", finding_key: findingKey({ code: f.code, excerpt: f.excerpt } as never) },
+        p_content_hash: a.hash, p_dedup_key: dk });
+      const logId = rec?.log_id ?? rec?.id;
+      if (logId) await a.db.rpc("decide_canon_reconciliation", { p_log_id: logId, p_decision: "KEEP_CANON_REVISE_PROSE",
+        p_rationale: "Resolved automatically: the draft was conformed to the established canon before acceptance.", p_resulting_changes: [], p_replan: false });
+    } catch { /* logging is best-effort; the accepted text is already conformed */ }
+  }
   if (r.decision === "accept") return { candidateId: null };
   const { data, error } = await a.db.rpc("save_candidate_draft", {
     p_book_id: a.bookId, p_user_id: a.userId, p_chapter: a.chapter, p_sub: a.sub, p_master_plan_id: a.masterPlanId, p_text: r.text,
