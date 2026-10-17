@@ -249,7 +249,9 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
         const before = new Set(all.map((f) => f.code));
         const regressions = after.filter((f) => !before.has(f.code) && (f.severity === "material" || f.severity === "moderate"));
         if (!stillMaterial && !regressions.length) {
-          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt }));
+          let reasoning: string | undefined;
+          try { const o = extractJson(r.text); if (typeof o?.reasoning === "string") reasoning = o.reasoning.trim().slice(0, 600) || undefined; } catch { /* optional */ }
+          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt, reasoning }));
           text = candidate; all = after;
         }
       }
