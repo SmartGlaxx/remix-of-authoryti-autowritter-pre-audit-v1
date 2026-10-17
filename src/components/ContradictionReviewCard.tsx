@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Location, Recommendation } from "../../supabase/functions/_shared/narrative/planning/conflictReview";
 
 export const RECONCILIATION_EVENT = "canon-reconciliation-changed";
@@ -25,6 +26,7 @@ function Source({ evidence }: { evidence: Evidence }) {
 }
 
 export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string; onAccepted?: () => void }) {
+  const queryClient = useQueryClient();
   const [logs, setLogs] = useState<Log[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -69,6 +71,7 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
         const fix = await callReview<{ candidate_id: string; draft_text: string; error?: string }>({ action: "rewrite_conflict", bookId, logId: log.id, candidateId: draft.candidate_id });
         if (!fix.ok) throw new Error(fix.data.error ?? "Could not create a correction");
         updateWork(log.id, { id: fix.data.candidate_id, original: fix.data.draft_text, text: fix.data.draft_text, outcome: "Correction saved. Run checks before accepting it." });
+        await check(log, false, { id: fix.data.candidate_id, original: fix.data.draft_text, text: fix.data.draft_text, replace: false, outcome: "" });
       } else if (mode === "manual") updateWork(log.id, { outcome: "Choice saved — edit this section, then run checks." });
       else if (mode === "new") updateWork(log.id, { outcome: "New text selected. It still needs full checks and memory update." });
       else { updateWork(log.id, { outcome: "Dismissed by you — no manuscript or story facts were changed." }); toast.success("Marked as not a conflict"); }
@@ -76,8 +79,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Could not complete review" }); toast.error(e instanceof Error ? e.message : "Could not complete review"); await load(); }
     finally { setBusy(""); setPhase(""); }
   };
-  const check = async (log: Log, replacement = false) => {
-    const draft = work[log.id] ?? (log.candidate ? { id: log.candidate.id, original: log.candidate.draft_text, text: log.candidate.draft_text, replace: false, outcome: "" } : null);
+  const check = async (log: Log, replacement = false, saved?: Work) => {
+    const draft = saved ?? work[log.id] ?? (log.candidate ? { id: log.candidate.id, original: log.candidate.draft_text, text: log.candidate.draft_text, replace: false, outcome: "" } : null);
     if (!draft) return;
     setBusy(log.id); setPhase("Checking the full section…");
     try {
@@ -89,7 +92,9 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
         setPhase("Updating story memory…");
         await runNarrativeExtraction(bookId, log.chapter_index, log.subsection_index);
         onAccepted?.();
-        updateWork(log.id, { replace: false, outcome: "Section passed and was accepted. Checking memory status…" });
+        void queryClient.invalidateQueries({ queryKey: ["books"] });
+        void queryClient.invalidateQueries({ queryKey: ["book", bookId] });
+        updateWork(log.id, { id: "", replace: false, outcome: "Section passed and was accepted. See the story memory status below." });
       } else if (r.data.status === "held") {
         updateWork(log.id, { id: r.data.candidateId ?? draft.id, outcome: "Further issues were found. The section is held; review the new conflict cards or draft findings." });
       } else throw new Error(r.data.error ?? "Review still pending");

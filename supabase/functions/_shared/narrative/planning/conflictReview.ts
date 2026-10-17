@@ -19,7 +19,7 @@ export function bestParagraph(text: string, query: string): { paragraph: string;
   const qw = new Set(words(query).filter((w) => !STOP.has(w)));
   let best = -1, score = 0;
   ps.forEach((p, i) => { const s = new Set(words(p)); let n = 0; qw.forEach((w) => { if (s.has(w)) n++; }); if (n > score) { score = n; best = i; } });
-  return best >= 0 && score >= Math.min(2, qw.size) ? { paragraph: ps[best], index: best } : null;
+  return best >= 0 && qw.size > 0 && score >= Math.max(2, Math.ceil(qw.size * 0.65)) ? { paragraph: ps[best], index: best } : null;
 }
 
 export interface Location { chapter: number; section: number; chapterTitle: string; sectionTitle: string; page: number | null; paragraphNumber: number | null }
@@ -51,7 +51,7 @@ export function recommend(o: { severity: string; authority?: string | null; prio
   const a = new Set(words(o.priorText).filter((w) => !STOP.has(w))), b = new Set(words(o.newText).filter((w) => !STOP.has(w)));
   let shared = 0; a.forEach((w) => { if (b.has(w)) shared++; });
   const overlap = a.size ? shared / a.size : 0;
-  if (o.priorSource === "accepted_text" && overlap >= 0.6 && o.severity !== "CRITICAL") return { choice: "dismiss", reason: "Both passages describe nearly the same thing; this looks like a wording difference rather than a real change." };
+  if (o.priorSource === "accepted_text" && overlap === 1 && a.size === b.size && o.severity !== "CRITICAL") return { choice: "dismiss", reason: "Both passages use the same detail. Consider dismissing this flag after reviewing the context." };
   return { choice: "prior", reason: "Earlier chapters already rely on the established detail. Keeping it avoids having to change other parts of the book." };
 }
 

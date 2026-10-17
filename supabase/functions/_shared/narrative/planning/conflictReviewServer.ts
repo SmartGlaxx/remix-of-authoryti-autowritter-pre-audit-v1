@@ -50,7 +50,7 @@ export async function conflictStatus(db: Db, bookId: string) {
     return { ...l, candidate: active ?? null,
       prior: { summary: priorText || "The earlier detail was not recorded with this flag.", paragraph: priorParagraph, location: priorLocation, source },
       newer: { summary: l.prose_excerpt || "The check did not record a specific quotation.", paragraph: newer?.paragraph ?? "", location: locate(outline, ch, sub, newer?.index ?? null), source: active ? "held_draft" : "manuscript" },
-      recommendation: recommend({ severity: l.severity, authority: ref.authority, priorSource: source, priorText, newText: l.prose_excerpt ?? "" }),
+      recommendation: source === "unknown" ? { choice: "prior", reason: "The earlier claim has no verified quotation here. Review the recorded fact before choosing; AI correction is unavailable until its source is clear." } : recommend({ severity: l.severity, authority: ref.authority, priorSource: source, priorText, newText: l.prose_excerpt ?? "" }),
       memorySynced: acc?.extraction_status === "EXTRACTED", accepted: Boolean(acc),
     };
   });
