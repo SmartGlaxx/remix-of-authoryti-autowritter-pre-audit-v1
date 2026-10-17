@@ -10,16 +10,15 @@ import { LEASE_TTL_SECONDS } from "../_shared/narrative/planning/pipeline.ts";
 import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { buildEvaluatorPrompt } from "../_shared/narrative/planning/evaluator.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
+import { conflictStatus, prepareConflict, rewriteConflict } from "../_shared/narrative/planning/conflictReviewServer.ts";
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const cors = corsHeaders;
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const int = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 10000 ? (v as number) : null);
 
-Deno.serve(async (req) => {
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
@@ -33,6 +32,7 @@ Deno.serve(async (req) => {
     if (raw.length > 150_000) return json({ error: "Payload too large" }, 413);
     let body: Record<string, any>; try { body = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
     const action = String(body.action ?? "");
+    if (action === "version") return json({ version: "conflict-review-2026-10-17", testModeBlocksPaidAI: true });
 
     // Owner decisions run as the signed-in user so database ownership checks use auth.uid().
     if (action === "decide") {
@@ -52,6 +52,14 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const owned = await verifyBookOwnership(db, bookId, userId);
     if (!owned) return json({ error: "Book not found" }, 404);
+
+    if (action === "conflicts") return json(await conflictStatus(db, bookId));
+    if (action === "prepare_conflict" || action === "rewrite_conflict") {
+      if (!UUID.test(String(body.logId))) return json({ error: "Invalid logId" }, 400);
+      if (action === "prepare_conflict") return json(await prepareConflict(db, bookId, userId, body.logId));
+      if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
+      return json(await rewriteConflict(db, bookId, userId, body.logId, body.candidateId, body.testMode === true || req.headers.get("x-ai-test-mode") === "1"));
+    }
 
     if (action === "blast_radius" || action === "confirm_memory") {
       const ch = int(body.chapter), sub = int(body.subsection);
@@ -142,10 +150,15 @@ Deno.serve(async (req) => {
       const edited = null;
       const text = c.draft_text;
       const { data: bk } = await db.from("books").select("book_type, controls, outline").eq("id", bookId).maybeSingle();
-      const ps = await loadProgressiveState(db, bookId, userId, bk!.book_type, bk!.outline, c.chapter_index, c.subsection_index);
+      if (!bk) return json({ error: "Book not found" }, 404);
+      const ps = await loadProgressiveState(db, bookId, userId, bk.book_type, bk.outline, c.chapter_index, c.subsection_index);
       if (!ps.plan.usable) return json({ error: "PLAN_REQUIRED" }, 409);
       const { data: factRows } = await db.from("canonical_facts").select("id, subject, predicate, value, is_canonical, conflict_status, canon_status, source_chapter_index, source_subsection_index").eq("book_id", bookId).eq("canon_status", "ESTABLISHED").limit(400);
-      const ctx = buildEvalContext({ bookType: bk!.book_type, plan: ps.plan, chapterIndex: c.chapter_index, anchors: ps.anchors as never, facts: factRows ?? [], controls: bk!.controls, approvedLogs: linked ?? [] });
+      const ctx = buildEvalContext({ bookType: bk.book_type, plan: ps.plan, chapterIndex: c.chapter_index, anchors: ps.anchors as never, facts: factRows ?? [], controls: bk.controls, approvedLogs: linked ?? [] });
+      // Author choices are evaluator context, never a bypass or character knowledge.
+      for (const l of linked ?? []) {
+        ctx.facts.push({ id: `author-review-${l.id}`, text: `AUTHOR REVIEW: ${l.decision}. ${JSON.stringify(l.canon_reference)}. Recheck the whole candidate; flag any other unresolved conflicts.` });
+      }
       // Reconciliation never bypasses validation: the (edited) candidate is fully re-checked.
       if (body.dryRun === true) return json({ dryRun: true, prompt: buildEvaluatorPrompt(text, ctx), approvedCanonKeys: ctx.approvedCanonKeys });
       const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "candidate-review", _max_per_hour: 60, _max_per_day: 300 });
@@ -159,7 +172,7 @@ Deno.serve(async (req) => {
         ? async () => ({ text: JSON.stringify({ beats: ctx.beats.map((b) => ({ id: b.id, planted: true, resolved: true, explanationRevealed: false })), continuity: [], disclosures: [], epistemic: [], claims: [] }), usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 } })
         : live.evaluate;
       const repair = live.repair;
-      const r = await runPreAcceptance(text, ctx, evaluate, repair, { warnRatio: Number((bk!.controls as any)?.revisionWarnRatio) || undefined });
+      const r = await runPreAcceptance(text, ctx, evaluate, repair, { warnRatio: Number((bk.controls as any)?.revisionWarnRatio) || undefined });
       const hash = contentHash(r.text);
       if (r.decision !== "accept") {
         const saved = await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: edited ? "author_edit" : "retry", parentId: c.id });
@@ -183,4 +196,24 @@ Deno.serve(async (req) => {
     console.error("candidate-review error:", e instanceof Error ? e.message : e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
+}
+
+// Keep corrections and full acceptance checks alive; final HTTP status travels in JSON.
+Deno.serve((req) => {
+  if (req.method !== "POST") return handleRequest(req);
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enc = new TextEncoder();
+      let closed = false;
+      const ping = setInterval(() => { if (!closed) { try { controller.enqueue(enc.encode(" \n")); } catch { closed = true; } } }, 15_000);
+      try {
+        const response = await handleRequest(req);
+        const body = await response.json();
+        if (!closed) controller.enqueue(enc.encode(JSON.stringify({ ...body, __status: response.status })));
+      } catch {
+        if (!closed) controller.enqueue(enc.encode(JSON.stringify({ error: "Could not complete review. Your accepted text is safe.", __status: 500 })));
+      } finally { clearInterval(ping); if (!closed) { closed = true; controller.close(); } }
+    },
+  });
+  return new Response(stream, { headers: { ...cors, "Content-Type": "application/json" } });
 });

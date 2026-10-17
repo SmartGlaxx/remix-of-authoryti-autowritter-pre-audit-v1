@@ -9,6 +9,10 @@ export async function callReview<T = any>(body: Record<string, unknown>): Promis
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
+  if (data && typeof data.__status === "number") {
+    const status = data.__status; delete data.__status;
+    return { ok: status >= 200 && status < 300, status, data };
+  }
   return { ok: res.ok, status: res.status, data };
 }
 
