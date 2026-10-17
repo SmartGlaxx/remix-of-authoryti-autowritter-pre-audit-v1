@@ -532,6 +532,7 @@ serve(async (req) => {
     let engine: ContextEngine = "legacy";
     let pipeline: Pipeline = "current";
     let serverOutline: any = null;
+    let bookControls: unknown = null;
     if (book.id) {
       try {
         const { data: eb } = await adminSupabase.from("books").select("controls, user_id, outline").eq("id", book.id).maybeSingle();
@@ -543,7 +544,6 @@ serve(async (req) => {
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
-    // bookControls set from the server-side book row above.
     let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
     let heartbeat: Heartbeat | null = null;
     if (pipeline === "progressive" && book.id) {
