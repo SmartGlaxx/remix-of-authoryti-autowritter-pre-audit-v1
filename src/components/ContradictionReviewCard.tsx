@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
+import { hasUnfinishedRepair } from "@/lib/reviewDisplay";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,7 +50,7 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
   }, [bookId]);
   useEffect(() => { void load(); const h = () => void load(); window.addEventListener(RECONCILIATION_EVENT, h); return () => window.removeEventListener(RECONCILIATION_EVENT, h); }, [load]);
   const pending = logs.filter((l) => l.decision === "PENDING");
-  const unfinished = logs.filter((l) => l.decision !== "PENDING" && (l.candidate || ["PENDING_APPLICATION", "AWAITING_SYNC"].includes(l.application_status)));
+  const unfinished = logs.filter(hasUnfinishedRepair);
   const done = logs.filter((l) => l.decision !== "PENDING" && !unfinished.includes(l));
   const active = [...pending, ...unfinished];
   const w = selected ? work[selected.id] : undefined;
@@ -126,7 +127,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     try {
       const r = await callReview<{ reply?: string; edits?: { find: string; replace: string }[]; error?: string }>({ action: "discuss_conflict", bookId, logId: log.id, messages: turns.map((t) => ({ role: t.role, content: t.content })) });
       if (!r.ok || !r.data.reply) throw new Error(r.data.error ?? "The editor could not respond. Try again.");
-      setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: r.data.reply!, edits: r.data.edits?.length ? r.data.edits : undefined }] }));
+      const reply = r.data.reply;
+      setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: reply, edits: r.data.edits?.length ? r.data.edits : undefined }] }));
     } catch (e) { setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: e instanceof Error ? e.message : "The editor could not respond. Try again." }] })); }
     finally { setBusy(""); setPhase(""); }
   };
@@ -165,10 +167,10 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
   };
   if (!logs.length && !error) return null;
   return <section className="mb-4 px-4 md:px-0 space-y-3" aria-label="Story conflict review">
-    <div className="flex items-center flex-wrap gap-2"><AlertTriangle className="w-5 h-5 text-destructive" /><h2 className="font-semibold">Story review</h2>{pending.length > 0 && <Badge variant="destructive">{pending.length} awaiting your choice</Badge>}{unfinished.length > 0 && <Badge variant="outline">{unfinished.length} awaiting checks</Badge>}<Button size="sm" variant="ghost" onClick={() => void load()} aria-label="Refresh conflicts"><RefreshCw className="w-4 h-4" /></Button>{done.length > 0 && <Button size="sm" variant="ghost" onClick={() => setHistory(!history)}>{history ? "Hide" : "Show"} reviewed ({done.length})</Button>}</div>
+    <div className="flex items-center flex-wrap gap-2">{active.length > 0 ? <AlertTriangle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-success" />}<h2 className="font-semibold">{active.length > 0 ? "Story review" : "Conflicts reviewed"}</h2>{pending.length > 0 && <Badge variant="destructive">{pending.length} awaiting your choice</Badge>}{unfinished.length > 0 && <Badge variant="outline">{unfinished.length} awaiting checks</Badge>}<Button size="sm" variant="ghost" onClick={() => void load()} aria-label="Refresh conflicts"><RefreshCw className="w-4 h-4" /></Button>{done.length > 0 && <Button size="sm" variant="ghost" onClick={() => setHistory(!history)}>{history ? "Hide" : "Show"} reviewed ({done.length})</Button>}</div>
     {error && <p role="alert" className="text-sm text-destructive">{error} <Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button></p>}
     {(history ? [...active, ...done] : active).slice(0, 20).map((log) => <div key={log.id} className="space-y-3 border-b border-border pb-4">
-      <div className="flex justify-between items-center gap-2"><p className="text-sm font-medium">Chapter {log.chapter_index + 1}, Section {log.subsection_index + 1}</p>{log.decision !== "PENDING" && <Badge variant="outline">{log.candidate ? "Needs checks" : log.decision === "DISMISS" ? "Dismissed by you" : log.memorySynced ? "Resolved · memory updated" : "Choice recorded"}</Badge>}</div>
+      <div className="flex justify-between items-center gap-2"><p className="text-sm font-medium">Chapter {log.chapter_index + 1}, Section {log.subsection_index + 1}</p>{log.decision !== "PENDING" && <Badge variant="outline">{log.decision === "DISMISS" ? "Dismissed by you" : log.candidate ? "Needs checks" : log.memorySynced ? "Resolved · memory updated" : "Choice recorded"}</Badge>}</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{evidenceCard(log, "prior")}{evidenceCard(log, "new")}</div>
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground flex-1 min-w-0"><ShieldCheck className="w-3.5 h-3.5 inline mr-1 text-primary" />{log.recommendation.reason}</p><Button size="sm" variant="outline" onClick={() => open(log)}>Review conflict<ArrowRight className="w-3.5 h-3.5 ml-1" /></Button></div>
     </div>)}
