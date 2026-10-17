@@ -532,7 +532,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
 
         <div className="flex-1 min-h-0">
           <ChapterView
-            book={book}
+            book={phase === "error" || phase === "paused" ? { ...book, status: "paused" } : book}
             onGenerateChapter={canGenerateChapter && !isAwaitingApproval ? generateChapter : undefined}
             onUpdateBook={updateBook}
             automationLevel={automationLevel}
