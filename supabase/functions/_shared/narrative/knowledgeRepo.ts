@@ -2,6 +2,32 @@
 // Rollback: rows from an older text of the same section are removed first. Retries are idempotent
 // through deterministic dedup keys. Ambiguous holders go to knowledge_identity_reviews, never guessed.
 import { planKnowledgeWrites, type ExtractedKnowledge } from "./knowledge.ts";
+import { planCastIdentities } from "./castIdentities.ts";
+
+/** Gives every planned cast member of this book a knowledge identity (book-scoped matches only),
+ *  so planned characters are never queued as "Characters to confirm". Best-effort, idempotent. */
+// deno-lint-ignore no-explicit-any
+export async function ensureCastIdentities(db: any, userId: string, bookId: string, universeId: string | null): Promise<{ created: number; linked: number }> {
+  const { data: cast } = await db.from("story_characters").select("id, name, aliases, narrative_identity_id").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
+  if (!cast?.length || !cast.some((c: any) => !c.narrative_identity_id)) return { created: 0, linked: 0 };
+  let q = db.from("narrative_identities").select("id, display_name, aliases, universe_id").eq("user_id", userId).eq("origin_book_id", bookId).is("merged_into_id", null);
+  q = universeId ? q.eq("universe_id", universeId) : q.is("universe_id", null);
+  const { data: own } = await q;
+  const plan = planCastIdentities(cast, (own ?? []).map((r: any) => ({ id: r.id, displayName: r.display_name, aliases: r.aliases ?? [], universeId: r.universe_id })));
+  const ids = new Map<string, string>();
+  for (const c of plan.create) {
+    const { data, error } = await db.from("narrative_identities").insert({ user_id: userId, universe_id: universeId, display_name: c.displayName, aliases: c.aliases, level: "story_character", kind: "person", origin_book_id: bookId, seed_details: {} }).select("id").single();
+    if (error) throw new Error(`cast identity failed: ${error.message}`);
+    ids.set(c.key, data.id);
+  }
+  let linked = 0;
+  for (const l of plan.links) {
+    const id = ids.get(l.target) ?? l.target;
+    const { error } = await db.from("story_characters").update({ narrative_identity_id: id }).eq("id", l.castId).is("narrative_identity_id", null);
+    if (!error) linked++;
+  }
+  return { created: plan.create.length, linked };
+}
 import type { KnownIdentity } from "./identityResolution.ts";
 import type { StoryPosition } from "./rules.ts";
 
@@ -30,6 +56,7 @@ export async function syncKnowledgeForSection(db: Db, o: {
   await db.from("knowledge_acquisitions").delete().eq("book_id", o.bookId).eq("source_section_key", sectionKey).neq("content_hash", o.contentHash);
   await db.from("knowledge_identity_reviews").delete().eq("book_id", o.bookId).eq("source_section_key", sectionKey).eq("status", "PENDING").neq("content_hash", o.contentHash);
 
+  await ensureCastIdentities(db, o.userId, o.bookId, o.universeId);
   const identities = await loadIdentitiesFor(db, o.userId, o.universeId);
   const plan = planKnowledgeWrites(o.items, { identities, universeId: o.universeId, bookId: o.bookId, chapterIndex: o.pos.chapterIndex, subsectionIndex: o.pos.subsectionIndex, contentHash: o.contentHash, sectionDate: o.sectionDate, nonLinear: o.nonLinear });
 

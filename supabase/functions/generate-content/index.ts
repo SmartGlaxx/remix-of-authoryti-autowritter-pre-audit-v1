@@ -170,7 +170,7 @@ function getLanguageGuidelines(band: number): string {
 }
 
 // ── Pacing rules ──
-function getPacingRules(hookFreq: number, vel: number, isNarr: boolean, hookInt: number, sceneWords: number, controls: any): string {
+function getPacingRules(hookFreq: number, vel: number, isNarr: boolean, hookInt: number, sceneWords: number, controls: any, closedWorld = false): string {
   let rules = `WRITING CONTROLS:
 - Velocity: ${vel}/10 (${vel > 6 ? "fast-paced, action-driven" : vel > 3 ? "balanced pacing" : "slow, descriptive"})
 - Creativity: ${controls.creativity}/10
@@ -182,7 +182,7 @@ function getPacingRules(hookFreq: number, vel: number, isNarr: boolean, hookInt:
   rules += `
 
 PACING & MOMENTUM RULES (STRICTLY ENFORCED):
-1. HOOK INJECTION: Every ${hookInt} paragraph(s), inject a hook — a compelling question, revelation, action beat, scene change, new character entrance, or dialogue shift.
+1. HOOK INJECTION: Every ${hookInt} paragraph(s), inject a hook — a compelling question, revelation, action beat, scene change, ${closedWorld ? "planned character entrance" : "new character entrance"}, or dialogue shift.
 2. NO RUMINATION: Never spend more than ${hookFreq >= 7 ? "1-2" : "2-3"} sentences on internal feelings before moving forward.
 3. SCENE MOMENTUM: Every ${sceneWords} words maximum, something MUST change.
 4. DYNAMIC PACING: Treat each paragraph like a cut in a film.
@@ -203,7 +203,7 @@ function buildStaticSystemPrompt(book: any, band: number, isScreenplay: boolean,
   const velocity = controls?.velocity ?? 5;
   const hookInterval = Math.max(1, Math.round(9 - (hookFrequency - 1) * (8 / 9)));
   const sceneChangeWords = Math.max(150, Math.round(600 - ((velocity + hookFrequency) / 2 - 1) * 50));
-  const pacingRules = getPacingRules(hookFrequency, velocity, isNarrative, hookInterval, sceneChangeWords, controls);
+  const pacingRules = getPacingRules(hookFrequency, velocity, isNarrative, hookInterval, sceneChangeWords, controls, configuredBansOnly);
 
   const screenplayRules = isScreenplay ? `
 SCREENPLAY FORMAT (MANDATORY — you are writing a screenplay, NOT prose):
@@ -333,7 +333,13 @@ ${openingDirective(book.bookType)}
 ANTI-REPETITION RULE (STRICTLY ENFORCED):
 - NEVER rewrite, paraphrase, or revisit scenes, dialogue, descriptions, or events that already appeared in the previous section.
 - If the previous section ended mid-scene, continue from exactly that point — do not restart the scene.
-- Each subsection must introduce NEW events, NEW dialogue, or NEW developments. Zero overlap with previous content.
+- Each subsection must introduce NEW events, NEW dialogue, or NEW developments. Zero overlap with previous content.${configuredBansOnly ? `
+
+CLOSED-WORLD RULE (PLANNED BOOK — STRICTLY ENFORCED):
+- Expand the approved plan; do not create new story facts. "New developments" means the planned events of this section, never invented ones.
+- Use only characters already in the cast or named in the plan. Never invent a new named person, relationship, backstory, consequential location, discovery or plot complication.
+- Unnamed background figures (a guard, a passer-by) may appear only if they stay unnamed and change nothing.
+- Gestures, sensory detail, atmosphere and dialogue wording remain fully yours.` : ""}
 
 ${isNarrative && !isChildren ? `CHARACTER DESCRIPTION (MANDATORY for every narrative book — novel, serial, short story, biography, memoir, drama, comic):
 - When a character first appears in a scene, render them in the tradition of James Hadley Chase: lean, sensory, and instantly cinematic.

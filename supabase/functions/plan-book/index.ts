@@ -19,7 +19,7 @@ import {
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
-import { loadIdentitiesFor } from "../_shared/narrative/knowledgeRepo.ts";
+import { loadIdentitiesFor, ensureCastIdentities } from "../_shared/narrative/knowledgeRepo.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,6 +150,24 @@ async function handle(req: Request): Promise<Response> {
       return json({ recommendations: recommendCast(text, ids, st.universeId, st.cast) });
     }
     if (action === "identity_reviews") {
+      // Planned cast members are never "new": link them, then auto-resolve pending entries that now match exactly one person.
+      const uni = book.universe_id ?? null;
+      await ensureCastIdentities(db, userId, bookId, uni).catch(() => null);
+      const { data: pend } = await db.from("knowledge_identity_reviews").select("*").eq("book_id", bookId).eq("user_id", userId).eq("status", "PENDING").eq("reason", "no_identity");
+      if (pend?.length) {
+        const known = await loadIdentitiesFor(db, userId, uni);
+        for (const rv of pend) {
+          const [chS, subS] = String(rv.source_section_key).split(":").map(Number);
+          const plan = planKnowledgeWrites([rv.payload as ExtractedKnowledge], { identities: known, universeId: uni, bookId, chapterIndex: chS, subsectionIndex: subS, contentHash: rv.content_hash });
+          if (!plan.rows.length) continue;
+          const r = plan.rows[0];
+          const { error } = await db.from("knowledge_acquisitions").upsert([{ user_id: userId, book_id: bookId, universe_id: uni, identity_id: r.identity_id, claim: r.claim, source: r.source,
+            source_identity_id: r.source_identity_id, certainty: r.certainty, learned_date: r.learned_date, learned_chapter_index: r.learned_chapter_index, learned_subsection_index: r.learned_subsection_index,
+            knowledge_kind: r.knowledge_kind, truth_status: r.truth_status, evidence: r.evidence, scene_point: r.scene_point, extraction_id: `cast:${rv.id}`, source_section_key: rv.source_section_key,
+            content_hash: rv.content_hash, dedup_key: r.dedup_key }], { onConflict: "dedup_key", ignoreDuplicates: true });
+          if (!error) await db.from("knowledge_identity_reviews").update({ status: "RESOLVED", resolved_identity_id: r.identity_id, resolution_note: "Planned cast member — matched automatically" }).eq("id", rv.id).eq("status", "PENDING");
+        }
+      }
       const { data } = await db.from("knowledge_identity_reviews").select("*").eq("book_id", bookId).eq("user_id", userId).eq("status", "PENDING").order("created_at");
       const candIds = [...new Set((data ?? []).flatMap((r: any) => r.candidate_identity_ids ?? []))];
       const { data: cands } = candIds.length ? await db.from("narrative_identities").select("id, display_name, aliases, level").in("id", candIds).eq("user_id", userId) : { data: [] };
