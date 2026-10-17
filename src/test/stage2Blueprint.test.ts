@@ -13,6 +13,14 @@ const input: BlueprintInput = {
 const good = () => JSON.parse(mockBlueprintOutput(input));
 
 describe("Stage 2 chapter blueprints", () => {
+  it("self-help example roles can be plan-local without proposals", () => {
+    const i = { ...input, cast: [], m: { ...input.m, skeleton: { ...input.m.skeleton, adapter: "self_help", reveals: [] } } } as BlueprintInput;
+    const o = good();
+    o.cast = [{ id: "k", name: "Bill payer", role: "example" }, { id: "j", name: "Reader", role: "exercise participant" }];
+    expect(parseBlueprint(JSON.stringify(o), i).ok).toBe(true);
+    o.cast[0].name = "Omar Reyes";
+    expect(parseBlueprint(JSON.stringify(o), i).ok).toBe(false);
+  });
   it("a complete, plan-grounded blueprint passes", () => expect(parseBlueprint(JSON.stringify(good()), input).ok).toBe(true));
   it("microbeat target is one per ~120 words", () => expect(expectedMicrobeats(1200)).toBe(10));
   it("a person outside the cast is rejected unless proposed", () => {
