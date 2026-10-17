@@ -690,6 +690,16 @@ serve(async (req) => {
       console.log(`[rhetoric] strategy=${strategy} prior=${ledger.length}`);
     } catch (e) { console.warn("[rhetoric] skipped:", e instanceof Error ? e.message : e); }
 
+    // ── Stage D: author-approved, pinned writer overlays — dynamic tail only, analyze_and_rewrite only ──
+    if (progressive && progressive.plan.usable && book.id && resolveNaturalnessMode(book.controls) === "analyze_and_rewrite") try {
+      const writerId = resolveWriter(book.controls, book.bookType).id;
+      const pins = Array.isArray(book.controls?.adaptationPins) ? (book.controls.adaptationPins as string[]) : null;
+      const { data: ov } = await adminSupabase.from("writer_style_adaptations").select("id, writer_id, dimension, adjustment, status, version, expires_at").eq("user_id", auth.user.id).eq("writer_id", writerId).eq("status", "active").limit(50);
+      const block = renderActiveOverlays(ov ?? [], writerId, pins);
+      if (block) userPrompt = `${userPrompt}\n\n${block}`;
+    } catch (e) { console.warn("[learning] overlays skipped:", e instanceof Error ? e.message : e); }
+
+
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.
