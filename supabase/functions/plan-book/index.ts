@@ -83,6 +83,19 @@ async function handle(req: Request): Promise<Response> {
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     if (!(await verifyBookOwnership(db, bookId, userId))) return json({ error: "Book not found" }, 404);
     const { data: book } = await db.from("books").select("title, book_type, genre, audience, theme, word_count, story_setup, universe_id, controls").eq("id", bookId).maybeSingle();
+    if (action === "approve_cast_proposal") {
+      // Author explicitly approves one proposed person: registered in the book's master cast (and identity) first.
+      const { data: row } = await db.from("book_progressive_plans").select("id, plan_level, plan_status, content").eq("id", String(body.planId ?? "")).eq("book_id", bookId).maybeSingle();
+      const prop = (row?.content?.blueprint?.castProposals ?? []).find((p: any) => p.id === body.proposalId);
+      if (!row || row.plan_level !== "BLUEPRINT" || !prop) return json({ error: "Proposal not found" }, 404);
+      const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
+      const cast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
+      if (!pendingCastProposals({ castProposals: [prop] }, cast).length) return json({ ok: true, already: true });
+      const { data: ins, error } = await db.from("story_characters").insert({ book_id: bookId, user_id: userId, name: String(prop.name).slice(0, 200), role: String(prop.role ?? "").slice(0, 500) || null, source_key: `proposal:${row.id}:${prop.id}` }).select("id").single();
+      if (error) throw new Error(error.message);
+      await ensureCastIdentities(db, userId, bookId, book?.universe_id ?? null).catch(() => {});
+      return json({ ok: true, characterId: ins.id });
+    }
     if (!book) return json({ error: "Book not found" }, 404);
     try { adapterForBookType(book.book_type); } catch { return json({ error: "Unsupported book type" }, 400); }
 
@@ -417,19 +430,6 @@ async function handle(req: Request): Promise<Response> {
         const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["beats", mp.id, ch, runId]), p_items: items });
         if (error) throw new Error(error.message);
         return json({ saved: data, attempts: r.attempts });
-      }
-      if (action === "approve_cast_proposal") {
-        // Author explicitly approves one proposed person: registered in the book's master cast (and identity) first.
-        const { data: row } = await db.from("book_progressive_plans").select("id, plan_level, plan_status, content").eq("id", String(body.planId ?? "")).eq("book_id", bookId).maybeSingle();
-        const prop = (row?.content?.blueprint?.castProposals ?? []).find((p: any) => p.id === body.proposalId);
-        if (!row || row.plan_level !== "BLUEPRINT" || !prop) return json({ error: "Proposal not found" }, 404);
-        const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
-        const cast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
-        if (!pendingCastProposals({ castProposals: [prop] }, cast).length) return json({ ok: true, already: true });
-        const { data: ins, error } = await db.from("story_characters").insert({ book_id: bookId, user_id: userId, name: String(prop.name).slice(0, 200), role: String(prop.role ?? "").slice(0, 500) || null, source_key: `proposal:${row.id}:${prop.id}` }).select("id").single();
-        if (error) throw new Error(error.message);
-        await ensureCastIdentities(db, userId, bookId, book?.universe_id ?? null).catch(() => {});
-        return json({ ok: true, characterId: ins.id });
       }
       if (action === "blueprint") {
         // Stage 2: detailed chapter blueprint. Saved as PLANNED; authoritative only after author approval.
