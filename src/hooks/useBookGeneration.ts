@@ -605,7 +605,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           const startedAt = new Date(Date.now() - 5000).toISOString();
           // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
           const prior = isProgressiveBook(book.controls) && !subsection.content ? await priorSectionOutcome(book.id, chIdx, subIdx) : { state: "pending" as const };
-          if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          if (prior.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
           let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
             () => streamContent(
               { ...currentBook, outline, tonalAnchors },
@@ -623,7 +623,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           if (isProgressiveBook(book.controls)) {
             const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chIdx, subIdx, startedAt);
             if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — open Planning Studio to see its status before continuing");
-            if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+            if (outcome.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
             if (outcome.state === "pending") throw new Error("checks on this section did not finish; open Planning Studio to review");
             if (outcome.text) content = outcome.text;
           }
@@ -920,7 +920,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         const progressiveBook = isProgressiveBook(book.controls);
         // Progressive: never write a section twice. A held draft waits for review; an accepted one is reused.
         const prior = progressiveBook && !subsection.content ? await priorSectionOutcome(book.id, chapterIndex, subIdx) : { state: "pending" as const };
-        if (prior.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+        if (prior.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
         let content = prior.state === "accepted" && prior.text ? prior.text : await retryWithBackoff(
           () => streamContent(
             { ...currentBook, outline, tonalAnchors },
@@ -936,7 +936,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         if (progressiveBook) {
           const outcome = prior.state === "accepted" && prior.text ? prior : await awaitSectionOutcome(book.id, chapterIndex, subIdx, startedAt);
           if (outcome.state === "timeout") throw new Error("checks on this section are still running; your draft is saved — try again in a minute");
-          if (outcome.state === "held") throw new Error("this section's draft is held for your review in Planning Studio");
+          if (outcome.state === "held") throw new Error("a draft is held for your review — see the note at the top of this page to resolve it, then writing will resume");
           if (outcome.state === "pending") throw new Error("checks on this section did not finish; try again shortly");
           if (outcome.text) content = outcome.text;
         }
