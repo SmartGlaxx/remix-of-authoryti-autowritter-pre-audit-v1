@@ -22,7 +22,7 @@ import { streamAI, toChatSSE, statusForAIError } from "../_shared/ai/client.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { LEGACY_PICKER_MAP, resolveModelForRole } from "../_shared/ai/roles.ts";
 import { createLeaseHeartbeat, LEASE_TTL_SECONDS, renderPlanBlock, requireApprovedPlan, resolvePipeline, type Heartbeat, type Pipeline } from "../_shared/narrative/planning/pipeline.ts";
-import { loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
+import { loadBlueprintGate, loadProgressiveState, type ProgressiveState } from "../_shared/narrative/planning/pipelineRepo.ts";
 import { buildPlanningAwareContext, futureSecrets } from "../_shared/narrative/planning/planningContext.ts";
 import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/knowledgeRepo.ts";
@@ -535,7 +535,7 @@ serve(async (req) => {
     if (book.id) {
       try {
         const { data: eb } = await adminSupabase.from("books").select("controls, user_id, outline").eq("id", book.id).maybeSingle();
-        if (eb && eb.user_id === auth.user.id) { engine = resolveContextEngine(eb.controls); pipeline = resolvePipeline(eb.controls); serverOutline = eb.outline; }
+        if (eb && eb.user_id === auth.user.id) { engine = resolveContextEngine(eb.controls); pipeline = resolvePipeline(eb.controls); bookControls = eb.controls; serverOutline = eb.outline; }
       } catch (e) { console.warn("[context-engine] lookup failed, using legacy:", e instanceof Error ? e.message : e); }
     }
 
@@ -543,6 +543,7 @@ serve(async (req) => {
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
+    // bookControls set from the server-side book row above.
     let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
     let heartbeat: Heartbeat | null = null;
     if (pipeline === "progressive" && book.id) {
@@ -554,6 +555,11 @@ serve(async (req) => {
       const planReq = requireApprovedPlan(progressive.plan);
       if (!planReq.ok && !dryRun) {
         return new Response(JSON.stringify({ error: planReq.reason, code: planReq.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      // Stage 2 completion: required-blueprint books need an approved chapter blueprint with every person registered.
+      const bpGate = await loadBlueprintGate(adminSupabase, book.id, auth.user.id, bookControls, absChapter);
+      if (!bpGate.ok && !dryRun) {
+        return new Response(JSON.stringify({ error: bpGate.reason, code: bpGate.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (!dryRun) {
         const worker = `gc_${crypto.randomUUID()}`;
