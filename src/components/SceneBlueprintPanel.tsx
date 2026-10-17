@@ -86,7 +86,7 @@ export function SceneBlueprintPanel({ bookId, chapterIndex, subsectionIndex }: {
 }
 
 /** Inline card for drafts the checks held back. Edits are saved first; checks run on the saved version. */
-export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: string; chapterIndex: number; onAccepted?: () => void }) {
+export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: string; chapterIndex?: number; onAccepted?: () => void }) {
   const [held, setHeld] = useState<{ c: Row; pending: number }[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -94,7 +94,7 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
   const load = useCallback(async () => {
     const r = await callReview<{ candidates: Row[]; logs: Row[] }>({ action: "status", bookId });
     if (!r.ok) return;
-    setHeld(r.data.candidates.filter((c) => c.chapter_index === chapterIndex).map((c) => {
+    setHeld(r.data.candidates.filter((c) => chapterIndex === undefined || c.chapter_index === chapterIndex).map((c) => {
       const lineage: string[] = c.lineage ?? [c.id];
       return { c, pending: r.data.logs.filter((l) => lineage.includes(l.candidate_id) && l.decision === "PENDING").length };
     }));
