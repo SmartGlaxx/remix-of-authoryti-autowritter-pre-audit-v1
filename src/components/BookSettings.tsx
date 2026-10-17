@@ -78,7 +78,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
     : null;
   const automationOption = AUTOMATION_OPTIONS.find((a) => a.value === book.controls.automationLevel);
   const depthOption = DEPTH_OPTIONS.find((d) => d.value === book.controls.depthLevel);
-  const eraOption = TEMPORAL_ERA_OPTIONS.find((e) => e.value === book.controls.temporalContext.era);
+  const eraOption = TEMPORAL_ERA_OPTIONS.find((e) => e.value === book.controls.temporalContext?.era);
   const timelineOption = TIMELINE_OPTIONS.find((t) => t.value === book.controls.temporalContext.timelineStructure);
   const spatialOption = SPATIAL_SCOPE_OPTIONS.find((s) => s.value === book.controls.spatialScope);
   const audienceOption = AUDIENCE_OPTIONS.find((a) => a.value === book.audience);
@@ -306,7 +306,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                  <InfoRow label="Era" value={eraOption?.label || book.controls.temporalContext.era} />
+                  <InfoRow label="Era" value={eraOption?.label || book.controls.temporalContext?.era} />
                   <InfoRow label="Timeline Structure" value={timelineOption?.label || book.controls.temporalContext.timelineStructure} />
                   {book.controls.temporalContext.specificPeriod && (
                     <InfoRow label="Specific Period" value={book.controls.temporalContext.specificPeriod} />
