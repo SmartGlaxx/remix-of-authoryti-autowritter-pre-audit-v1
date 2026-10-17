@@ -211,7 +211,7 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
               <Textarea aria-label="Your thought or question" placeholder="Share your take — e.g. “she pauses only when stressed; merge both” — and the editor will suggest a fix." value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={2} disabled={!!busy} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(selected); } }} />
               <Button size="icon" aria-label="Send" disabled={!!busy || !draft.trim()} onClick={() => void sendChat(selected)}><Send className="w-4 h-4" /></Button>
             </div>
-            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Suggestions only change text after you apply them and run checks.</p>
+            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Applying a suggestion fixes the section, runs all checks and closes this box when resolved.</p>
           </div>
           {busy && <div role="status" aria-live="polite" className="flex gap-2 items-center text-sm text-primary"><Loader2 className="w-4 h-4 animate-spin" />{phase}</div>}
           {w?.outcome && <p role="status" className="text-sm leading-relaxed border-l-2 border-primary pl-3">{w.outcome}</p>}
