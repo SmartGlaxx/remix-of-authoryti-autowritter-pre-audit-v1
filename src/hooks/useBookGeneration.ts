@@ -3,6 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
+
+const isProgressiveBook = (b: { controls?: unknown }) =>
+  (b.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive";
+/** Fast draft is the default; "studio" keeps the full deep-check path after every section. */
+const isFastDraft = (b: { controls?: unknown }) =>
+  (b.controls as { writingSpeed?: string } | undefined)?.writingSpeed !== "studio";
 import { awaitSectionOutcome, isProgressiveBook, priorSectionOutcome } from "@/lib/candidateReview";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
@@ -724,21 +730,28 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           );
 
           // Narrative memory: record what this section established. Non-blocking on failure.
-          // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
-          // accepted final text ever reaches narrative state.
-          const cont = await runContinuityCheck(book.id, chIdx, subIdx);
-          outline = applyContinuityResult(outline, chIdx, subIdx, cont);
-          updatedSubsections[subIdx] = outline.chapters[chIdx].subsections[subIdx];
-          currentBook = { ...currentBook, outline };
-          if (cont.revised && cont.finalText) {
-            const w = cont.finalText.split(/\s+/);
-            previousRawContent = w.slice(-Math.min(1000, w.length)).join(" ");
-          }
-          onUpdateBook(book.id, { outline });
-          if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
+          if (isProgressiveBook(book) && isFastDraft(book)) {
+            // Fast draft: the server's pre-acceptance gate already validated this section
+            // before it was saved, so the client re-check is redundant. Story memory updates
+            // in the background — the next section's preflight waits for it if needed.
+            void runNarrativeExtraction(book.id, chIdx, subIdx);
+          } else {
+            // Pass 4: continuity check (+ bounded revision) BEFORE extraction, so only the
+            // accepted final text ever reaches narrative state.
+            const cont = await runContinuityCheck(book.id, chIdx, subIdx);
+            outline = applyContinuityResult(outline, chIdx, subIdx, cont);
+            updatedSubsections[subIdx] = outline.chapters[chIdx].subsections[subIdx];
+            currentBook = { ...currentBook, outline };
+            if (cont.revised && cont.finalText) {
+              const w = cont.finalText.split(/\s+/);
+              previousRawContent = w.slice(-Math.min(1000, w.length)).join(" ");
+            }
+            onUpdateBook(book.id, { outline });
+            if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
-          // Unresolved contradictions must not become story memory until the author decides.
-          if (cont.status !== "NEEDS_REVIEW" || (book.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive") await runNarrativeExtraction(book.id, chIdx, subIdx);
+            // Unresolved contradictions must not become story memory until the author decides.
+            if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book)) await runNarrativeExtraction(book.id, chIdx, subIdx);
+          }
 
           // APPROVAL GATES based on automation level
           if (automationLevel === "guided") {
