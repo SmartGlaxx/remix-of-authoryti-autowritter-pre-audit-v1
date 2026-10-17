@@ -118,14 +118,14 @@ export interface ExperimentReport {
   textA_original: string; textB_flawed: string; textC_revised: string;
   detection: { A: NaturalnessFinding[]; B: NaturalnessFinding[]; C: NaturalnessFinding[] };
   scores: { A: number; B: number; C: number };
-  changeRatioBtoC: number; rewriteAttempts: unknown[];
+  changeRatioBtoC: number; rewriteAttempts: unknown[]; proposals: unknown[];
   validation: { before: string; after: string };
   usage: UsageRecord[]; totalUSD: number; capUSD: number; aborted?: string;
 }
 
 /** One generation reused for both conditions; B is an isolated in-memory copy. Returns all three texts. */
 export async function runExperiment(input: { writerPrompt: Prompt; reuseOriginal?: string; validatorPrompt: (text: string) => Prompt; writerVoice?: string }, caller: ExpCaller, guard = new BudgetGuard()): Promise<ExperimentReport> {
-  const rep: ExperimentReport = { textA_original: "", textB_flawed: "", textC_revised: "", detection: { A: [], B: [], C: [] }, scores: { A: 0, B: 0, C: 0 }, changeRatioBtoC: 0, rewriteAttempts: [], validation: { before: "", after: "" }, usage: guard.log, totalUSD: 0, capUSD: guard.cap };
+  const rep: ExperimentReport = { textA_original: "", textB_flawed: "", textC_revised: "", detection: { A: [], B: [], C: [] }, scores: { A: 0, B: 0, C: 0 }, changeRatioBtoC: 0, rewriteAttempts: [], proposals: [], validation: { before: "", after: "" }, usage: guard.log, totalUSD: 0, capUSD: guard.cap };
   const fin = (aborted?: string) => {
     rep.scores = { A: naturalnessScore(rep.detection.A), B: naturalnessScore(rep.detection.B), C: naturalnessScore(rep.detection.C) };
     rep.changeRatioBtoC = rep.textC_revised ? charChangeRatio(rep.textB_flawed, rep.textC_revised) : 0;
@@ -139,7 +139,7 @@ export async function runExperiment(input: { writerPrompt: Prompt; reuseOriginal
     if (!pre.ok) return fin(`PREFLIGHT_FAILED: ${JSON.stringify(pre.checks)}`); // no rewrite money spent
     rep.validation.before = (await guardedCall(guard, caller, "validator")(input.validatorPrompt(rep.textB_flawed))).text;
     const rw = await runNaturalnessRewrite(rep.textB_flawed, { mode: "analyze_and_rewrite", writerVoice: input.writerVoice }, async (p) => ({ text: (await guardedCall(guard, caller, "rewriter")(p)).text }));
-    rep.textC_revised = rw.text; rep.rewriteAttempts = rw.attempts; rep.detection.C = rw.after;
+    rep.textC_revised = rw.text; rep.rewriteAttempts = rw.attempts; rep.proposals = rw.proposals ?? []; rep.detection.C = rw.after;
     rep.validation.after = (await guardedCall(guard, caller, "validator")(input.validatorPrompt(rep.textC_revised))).text;
   } catch (e) { return fin((e as Error).message); }
   return fin();

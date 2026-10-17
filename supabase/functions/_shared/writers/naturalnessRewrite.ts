@@ -6,6 +6,7 @@
 import type { NaturalnessFinding, NaturalnessMode } from "./naturalness.ts";
 import { analyzeSection, type AnalyzeOptions } from "./naturalnessMetrics.ts";
 import { deterministicValidation } from "../narrative/planning/validation.ts";
+import { changeRatio } from "./textDiff.ts";
 
 export const MAX_NATURALNESS_ATTEMPTS = 2;
 export const DEFAULT_NATURALNESS_CHANGE_LIMIT = 0.2;
@@ -23,7 +24,8 @@ export interface RewriteOptions extends AnalyzeOptions {
   changeLimit?: number;
 }
 export interface RewriteAttempt { attempt: number; edits: number; accepted: boolean; reason: string; scoreBefore: number; scoreAfter?: number }
-export interface RewriteResult { text: string; changed: boolean; attempts: RewriteAttempt[]; before: NaturalnessFinding[]; after: NaturalnessFinding[] }
+export interface RewriteProposal { attempt: number; rawEdits: Edit[]; rejectedEdits: string[]; candidate: string; changeRatio: number }
+export interface RewriteResult { text: string; changed: boolean; attempts: RewriteAttempt[]; proposals?: RewriteProposal[]; before: NaturalnessFinding[]; after: NaturalnessFinding[] }
 
 /** Lower is better. Counts each flagged item, so fixing one stock phrase inside a finding still counts. */
 export const naturalnessScore = (fs: NaturalnessFinding[]) => fs.reduce((s, f) => {
@@ -85,17 +87,12 @@ export function applyEdits(text: string, edits: Edit[]): { text: string; applied
   return { text: out, applied, rejected };
 }
 
-/** Share of the original's characters touched by edits (approximation via common prefix/suffix per edit). */
-export function charChangeRatio(original: string, revised: string): number {
-  if (original === revised) return 0;
-  let p = 0; while (p < original.length && original[p] === revised[p]) p++;
-  let s = 0; while (s < original.length - p && original[original.length - 1 - s] === revised[revised.length - 1 - s]) s++;
-  return (original.length - p - s) / Math.max(original.length, 1);
-}
+/** Share of the original actually modified (word-level diff vs the original baseline). */
+export function charChangeRatio(original: string, revised: string): number { return changeRatio(original, revised); }
 
 export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, model: RewriteModel): Promise<RewriteResult> {
   const before = analyzeSection(draft, o);
-  const res: RewriteResult = { text: draft, changed: false, attempts: [], before, after: before };
+  const res: RewriteResult = { text: draft, changed: false, attempts: [], proposals: [], before, after: before };
   if (o.mode !== "analyze_and_rewrite") return res;
   const limit = o.changeLimit ?? DEFAULT_NATURALNESS_CHANGE_LIMIT;
   const det = (t: string) => deterministicValidation(t, { controls: o.controls, motifs: o.protectedMotifs }).length;
@@ -108,7 +105,8 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
     let edits: Edit[] = [];
     try { edits = parseEdits((await model(buildRewritePrompt(best, targets, o))).text); }
     catch { res.attempts.push({ attempt: i, edits: 0, accepted: false, reason: "model_unavailable", scoreBefore }); break; }
-    const { text: cand, applied } = applyEdits(best, edits);
+    const { text: cand, applied, rejected } = applyEdits(best, edits);
+    res.proposals!.push({ attempt: i, rawEdits: edits, rejectedEdits: rejected, candidate: cand, changeRatio: charChangeRatio(draft, cand) });
     const push = (accepted: boolean, reason: string, scoreAfter?: number) => res.attempts.push({ attempt: i, edits: applied, accepted, reason, scoreBefore, scoreAfter });
     if (!applied) { push(false, "no_safe_edits"); continue; }
     if (charChangeRatio(draft, cand) > limit) { push(false, "change_too_broad"); continue; }
