@@ -705,7 +705,13 @@ serve(async (req) => {
       const { data: vb } = await adminSupabase.from("books").select("book_type, tone_profile, controls, voice_manifest").eq("id", book.id).eq("user_id", auth.user.id).maybeSingle();
       if (vb && !vb.voice_manifest) await adminSupabase.from("books").update({ voice_manifest: buildVoiceManifest(vb, bookModelConfig) }).eq("id", book.id).eq("user_id", auth.user.id).is("voice_manifest", null);
     } catch (e) { console.warn("[voice-manifest]", e instanceof Error ? e.message : e); }
-    const modelOverride = bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null;
+    // Writing speed: "fast" (default) swaps long-thinking prose models for their quick
+    // counterparts and lowers reasoning effort; "studio" keeps the full deep-writing path.
+    const writingSpeed = (book.controls as Record<string, unknown> | null)?.writingSpeed === "studio" ? "studio" : "fast";
+    const normalWriter = resolveModelForRole(bookModelConfig, "writer");
+    const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast" });
+    const modelOverride = (bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null)
+      ?? (fastWriter.model !== normalWriter.model ? fastWriter.model : null);
     const aiMeta: Record<string, unknown> = {};
     const chunks = streamAI({
       role: "writer",
@@ -713,7 +719,7 @@ serve(async (req) => {
       userId: auth.user.id,
       bookId: book.id ?? null,
       modelOverride,
-      request: { system: systemPrompt, user: userPrompt, reasoning: "medium" },
+      request: { system: systemPrompt, user: userPrompt, reasoning: writingSpeed === "fast" ? "low" : "medium" },
     }, createAIDeps(adminSupabase, auth.user.id), aiMeta);
 
     // The first chunk can take minutes on reasoning models; the response opens immediately and
