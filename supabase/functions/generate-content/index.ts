@@ -781,6 +781,7 @@ serve(async (req) => {
         // recoverable candidate; the previously accepted manuscript stays exactly as it was.
         let finalText = cleaned;
         let decision: "accept" | "blocked_material" | "needs_author_review" = "accept";
+        let provenCategories: string[] = []; // Stage D: categories a rewrite demonstrably improved
         try {
           const { data: factRows } = await adminSupabase.from("canonical_facts").select("id, subject, predicate, value, is_canonical, conflict_status, canon_status, source_chapter_index, source_subsection_index").eq("book_id", book.id).eq("canon_status", "ESTABLISHED").limit(400);
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
@@ -798,6 +799,7 @@ serve(async (req) => {
             try {
               const nr = await runNaturalnessRewrite(cleaned, { mode: "analyze_and_rewrite", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
               draftForValidation = nr.text;
+              if (nr.changed) { const after = new Set(nr.after.map((f) => f.category)); provenCategories = [...new Set(nr.before.map((f) => f.category))].filter((c) => !after.has(c)); }
               console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
             } catch (e) { console.warn("[naturalness] rewrite skipped:", e instanceof Error ? e.message : e); }
           }
