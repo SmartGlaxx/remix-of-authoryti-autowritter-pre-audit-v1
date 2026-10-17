@@ -389,16 +389,14 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     let response = await send();
 
-    // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry once.
-    if (response.status === 409) {
+    // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry.
+    // Extraction can still be finishing when the first retry lands, so allow a few rounds.
+    for (let round = 0; round < 3 && response.status === 409; round++) {
       const errBody = await response.clone().json().catch(() => ({}));
-      if (errBody?.code === "RECOVER_EXTRACTION" && bookData.id) {
-        const prev = prevPos;
-        if (prev) {
-          const r = await runNarrativeExtraction(bookData.id, prev.c, prev.s, { timeoutMs: 120_000 });
-          if (r.status === "completed" || r.status === "skipped") response = await send();
-        }
-      }
+      if (errBody?.code !== "RECOVER_EXTRACTION" || !bookData.id || !prevPos) break;
+      const r = await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 4 });
+      if (r.status !== "completed" && r.status !== "skipped") continue;
+      response = await send();
     }
 
     // The same section is still being written by an earlier request (e.g. after a dropped connection).
