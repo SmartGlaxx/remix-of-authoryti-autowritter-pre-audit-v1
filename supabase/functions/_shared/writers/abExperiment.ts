@@ -7,6 +7,7 @@ import { getModel } from "../ai/registry.ts";
 import { analyzeSection, sentences } from "./naturalnessMetrics.ts";
 import { runNaturalnessRewrite, charChangeRatio, naturalnessScore, MAX_NATURALNESS_ATTEMPTS, type Prompt } from "./naturalnessRewrite.ts";
 import type { NaturalnessFinding } from "./naturalness.ts";
+import { buildLiteraryPrompt } from "./literaryReviser.ts";
 
 export const EXPERIMENT_CAP_USD = 0.10;
 export const EXPERIMENT_MODELS = {
@@ -25,7 +26,7 @@ export class BudgetExceededError extends Error {
 /** Conservative token count when the provider tokenizer isn't available: ~3 chars per token (over-counts English). */
 export const countTokens = (s: string) => Math.ceil((s ?? "").length / 3);
 
-export interface UsageRecord { role: ExpRole; model: string; reserved: number; inputTokens: number; outputTokens: number; cachedInputTokens: number; actual: number }
+export interface UsageRecord { role: string; model: string; reserved: number; inputTokens: number; outputTokens: number; cachedInputTokens: number; actual: number }
 
 export class BudgetGuard {
   spent = 0; reservedOpen = 0; readonly log: UsageRecord[] = [];
@@ -45,7 +46,7 @@ export class BudgetGuard {
     this.reservedOpen += need; return need;
   }
   /** Settle with provider-reported usage; output beyond the reserved max is treated as a breach. */
-  settle(role: ExpRole, model: string, reserved: number, u: { inputTokens: number; outputTokens: number; cachedInputTokens?: number }) {
+  settle(role: string, model: string, reserved: number, u: { inputTokens: number; outputTokens: number; cachedInputTokens?: number }) {
     const p = getModel(model)!.pricing;
     const cached = Math.min(u.cachedInputTokens ?? 0, u.inputTokens);
     const actual = (((u.inputTokens - cached) * p.inputPerM! + cached * (p.cachedInputPerM ?? p.inputPerM!) + u.outputTokens * p.outputPerM!) / 1e6) * this.markup;
@@ -158,5 +159,59 @@ export async function runRewriteOnly(input: { flawed: string; validatorPrompt: (
     out.validationAfter = (await guardedCall(guard, caller, "validator", REWRITE_ONLY_MAX_OUT.validator)(input.validatorPrompt(out.textC))).text;
   } catch (e) { out.aborted = (e as Error).message; }
   out.changeRatio = charChangeRatio(input.flawed, out.textC);
+  return { ...out, totalUSD: +guard.spent.toFixed(6) };
+}
+
+// ---- Isolated Astra vs Fable literary benchmark (one attempt each, same Draft B, same prompt) ----
+export const LITERARY_BENCHMARK_CAP_USD = 0.21;
+export const LITERARY_BENCHMARK_MODELS = { astra: "openai/gpt-6-astra", fable: "anthropic/claude-fable-5-1", validator: "openai/gpt-6-luna" } as const;
+export const LITERARY_BENCHMARK_MAX_OUT = { reviser: 1500, validator: 1200 } as const;
+
+/** Exact-model guarded call (same reservation/settlement rules as guardedCall). */
+export function guardedModelCall(guard: BudgetGuard, caller: ExpCaller, label: string, model: string, maxOut: number) {
+  return async (p: Prompt) => {
+    const inTok = countTokens(p.system) + countTokens(p.user);
+    const reserved = guard.reserve(model, inTok, maxOut);
+    let r;
+    try { r = await caller({ model, system: p.system, user: p.user, maxOutputTokens: maxOut }); }
+    catch (e) { guard.settle(label, model, reserved, { inputTokens: inTok, outputTokens: maxOut }); throw e; }
+    if (r.modelUsed !== model) { guard.settle(label, model, reserved, r); throw new Error(`FALLBACK_FORBIDDEN: got ${r.modelUsed}`); }
+    guard.settle(label, model, reserved, r);
+    return r;
+  };
+}
+
+/** Free: the full worst-case plan must fit the cap before anything is sent. */
+export function literaryBenchmarkWorstCase(flawed: string, validatorPrompt: (t: string) => Prompt, writerVoice?: string) {
+  const p = buildLiteraryPrompt(flawed, analyzeSection(flawed).filter((f) => f.category !== "dialogue_naturalness"), { writerVoice });
+  const inTok = countTokens(p.system) + countTokens(p.user);
+  const v = validatorPrompt(flawed); const vTok = countTokens(v.system) + countTokens(v.user) + 200;
+  const g = new BudgetGuard(1000);
+  const astra = g.worstCase(LITERARY_BENCHMARK_MODELS.astra, inTok, LITERARY_BENCHMARK_MAX_OUT.reviser);
+  const fable = g.worstCase(LITERARY_BENCHMARK_MODELS.fable, inTok, LITERARY_BENCHMARK_MAX_OUT.reviser);
+  const val = g.worstCase(LITERARY_BENCHMARK_MODELS.validator, vTok, LITERARY_BENCHMARK_MAX_OUT.validator);
+  return { inputTokens: inTok, astra, fable, validatorEach: val, total: astra + fable + 2 * val };
+}
+
+export interface LiteraryArm { model: string; textC: string; changeRatio: number; attempts: unknown[]; proposals: unknown[]; after: NaturalnessFinding[]; unresolved: string[]; validation: string; aborted?: string }
+
+/** Runs Astra then Fable on the SAME draft with the SAME instructions; writes nothing. */
+export async function runLiteraryBenchmark(input: { flawed: string; validatorPrompt: (t: string) => Prompt; writerVoice?: string }, caller: ExpCaller, guard = new BudgetGuard(LITERARY_BENCHMARK_CAP_USD)) {
+  const plan = literaryBenchmarkWorstCase(input.flawed, input.validatorPrompt, input.writerVoice);
+  const out = { textB: input.flawed, before: analyzeSection(input.flawed), worstCase: plan, arms: {} as Record<string, LiteraryArm>, usage: guard.log, totalUSD: 0, capUSD: guard.cap, aborted: undefined as string | undefined };
+  if (plan.total > guard.cap) return { ...out, aborted: `WORST_CASE_EXCEEDS_CAP: $${plan.total.toFixed(4)} > $${guard.cap}` };
+  for (const key of ["astra", "fable"] as const) {
+    const model = LITERARY_BENCHMARK_MODELS[key];
+    const arm: LiteraryArm = { model, textC: input.flawed, changeRatio: 0, attempts: [], proposals: [], after: out.before, unresolved: [], validation: "" };
+    try {
+      const rw = await runNaturalnessRewrite(input.flawed, { mode: "analyze_and_rewrite", writerVoice: input.writerVoice, promptBuilder: buildLiteraryPrompt, maxAttempts: 1 },
+        async (p) => ({ text: (await guardedModelCall(guard, caller, key, model, LITERARY_BENCHMARK_MAX_OUT.reviser)(p)).text }));
+      Object.assign(arm, { textC: rw.text, attempts: rw.attempts, proposals: rw.proposals ?? [], after: rw.after, unresolved: rw.unresolved, changeRatio: charChangeRatio(input.flawed, rw.text) });
+      // Validate the model's proposal (even if deterministic gates rejected it) so the author sees both.
+      const proposed = (rw.proposals?.[0] as { candidate?: string } | undefined)?.candidate ?? rw.text;
+      arm.validation = (await guardedModelCall(guard, caller, `${key}_validator`, LITERARY_BENCHMARK_MODELS.validator, LITERARY_BENCHMARK_MAX_OUT.validator)(input.validatorPrompt(proposed))).text;
+    } catch (e) { arm.aborted = (e as Error).message; }
+    out.arms[key] = arm;
+  }
   return { ...out, totalUSD: +guard.spent.toFixed(6) };
 }

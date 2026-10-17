@@ -4,13 +4,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { generateAIText } from "../_shared/ai/client.ts";
-import { runExperiment, runRewriteOnly, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
+import { runExperiment, runRewriteOnly, runLiteraryBenchmark, literaryBenchmarkWorstCase, LITERARY_BENCHMARK_CAP_USD, LITERARY_BENCHMARK_MODELS, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
 import type { Role } from "../_shared/ai/registry.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b, null, 2), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-const ROLE_FOR: Record<string, Role> = { [EXPERIMENT_MODELS.writer]: "writer", [EXPERIMENT_MODELS.rewriter]: "editor", [EXPERIMENT_MODELS.validator]: "continuity_checker" };
+const ROLE_FOR: Record<string, Role> = { [EXPERIMENT_MODELS.writer]: "writer", [EXPERIMENT_MODELS.rewriter]: "editor", [EXPERIMENT_MODELS.validator]: "continuity_checker", [LITERARY_BENCHMARK_MODELS.astra]: "literary_reviser", [LITERARY_BENCHMARK_MODELS.fable]: "literary_reviser" };
 
 const SOPHIA = "Sophia Laurent: reflective, emotionally resonant, character-focused interiority; precise sensory detail; restrained, never melodramatic.";
 const WRITER_PROMPT = {
@@ -34,7 +34,14 @@ Deno.serve(async (req) => {
   if (!uid) return json({ error: "Unauthorized" }, 401);
   const body = await req.json().catch(() => ({}));
   const rewriteOnly = body?.confirm === "RUN_REWRITE_ONLY_0.03";
-  if (!rewriteOnly && body?.confirm !== "RUN_PAID_EXPERIMENT_0.10") return json({ error: "confirmation required" }, 400);
+  const literary = body?.confirm === "RUN_LITERARY_BENCHMARK_0.21";
+  // Free dry run: worst-case plan only, no AI call.
+  if (body?.action === "literary_plan") {
+    const flawed = typeof body.flawed === "string" && body.flawed.length > 500 && body.flawed.length <= 20000 ? body.flawed : null;
+    if (!flawed) return json({ error: "flawed draft B required" }, 400);
+    return json({ dryRun: true, models: LITERARY_BENCHMARK_MODELS, capUSD: LITERARY_BENCHMARK_CAP_USD, worstCase: literaryBenchmarkWorstCase(flawed, validatorPrompt, SOPHIA) });
+  }
+  if (!rewriteOnly && !literary && body?.confirm !== "RUN_PAID_EXPERIMENT_0.10") return json({ error: "confirmation required" }, 400);
 
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const deps = createAIDeps(admin, uid);
@@ -43,7 +50,7 @@ Deno.serve(async (req) => {
   const caller: ExpCaller = async ({ model, system, user: u, maxOutputTokens }) => {
     const { text, meta } = await generateAIText({
       role: ROLE_FOR[model], userId: uid, bookId: null, maxRetries: 0,
-      config: { mode: "single", singleModel: model, fallbacks: {} }, // exact model, no fallback
+      config: { mode: "single", singleModel: model, fallbacks: {} }, requireUserKey: true, // exact model, own key, no fallback
       request: { system, user: u, maxOutputTokens, ...(model.startsWith("openai/") ? { reasoning: "low" as const } : {}) },
     }, deps);
     routes.push({ model: meta.model, credentialSource: meta.credentialSource, usedFallback: meta.usedFallback });
@@ -56,6 +63,12 @@ Deno.serve(async (req) => {
     };
   };
 
+  if (literary) {
+    const flawed = typeof body.flawed === "string" && body.flawed.length > 500 && body.flawed.length <= 20000 ? body.flawed : null;
+    if (!flawed) return json({ error: "flawed draft B required" }, 400);
+    const r = await runLiteraryBenchmark({ flawed, validatorPrompt, writerVoice: SOPHIA }, caller, new BudgetGuard(LITERARY_BENCHMARK_CAP_USD));
+    return json({ ...r, routes });
+  }
   if (rewriteOnly) {
     const flawed = typeof body.flawed === "string" && body.flawed.length > 500 && body.flawed.length <= 20000 ? body.flawed : null;
     if (!flawed) return json({ error: "flawed draft B required" }, 400);
