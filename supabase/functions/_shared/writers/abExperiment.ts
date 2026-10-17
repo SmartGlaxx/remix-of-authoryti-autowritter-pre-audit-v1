@@ -145,3 +145,18 @@ export async function runExperiment(input: { writerPrompt: Prompt; reuseOriginal
   return fin();
 }
 export const MAX_REWRITE_CALLS = MAX_NATURALNESS_ATTEMPTS;
+
+/** Rewrite-only retest: reuses an existing flawed draft B (no writer call). Rewriter output is capped
+ *  so two attempts + one validation fit the given cap; the guard still refuses any call that won't fit. */
+export const REWRITE_ONLY_MAX_OUT = { rewriter: 1000, validator: 1200 } as const;
+export async function runRewriteOnly(input: { flawed: string; validatorPrompt: (t: string) => Prompt; writerVoice?: string }, caller: ExpCaller, guard: BudgetGuard) {
+  const out = { textB: input.flawed, textC: input.flawed, before: analyzeSection(input.flawed), after: [] as NaturalnessFinding[], attempts: [] as unknown[], proposals: [] as unknown[], changeRatio: 0, deterministicIssuesB: 0, deterministicIssuesC: 0, validationAfter: "", usage: guard.log, totalUSD: 0, capUSD: guard.cap, aborted: undefined as string | undefined };
+  out.after = out.before;
+  try {
+    const rw = await runNaturalnessRewrite(input.flawed, { mode: "analyze_and_rewrite", writerVoice: input.writerVoice }, async (p) => ({ text: (await guardedCall(guard, caller, "rewriter", REWRITE_ONLY_MAX_OUT.rewriter)(p)).text }));
+    out.textC = rw.text; out.after = rw.after; out.attempts = rw.attempts; out.proposals = rw.proposals ?? [];
+    out.validationAfter = (await guardedCall(guard, caller, "validator", REWRITE_ONLY_MAX_OUT.validator)(input.validatorPrompt(out.textC))).text;
+  } catch (e) { out.aborted = (e as Error).message; }
+  out.changeRatio = charChangeRatio(input.flawed, out.textC);
+  return { ...out, totalUSD: +guard.spent.toFixed(6) };
+}
