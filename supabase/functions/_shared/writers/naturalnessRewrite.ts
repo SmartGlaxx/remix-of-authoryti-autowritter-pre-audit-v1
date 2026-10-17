@@ -120,3 +120,9 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
   }
   return { ...res, text: best, changed: best !== draft, after: bestFindings };
 }
+
+/** Author explicitly asked for a targeted rewrite of a held draft: runs the same bounded engine
+ *  regardless of the book's automatic mode. Never accepts; caller saves a new candidate version. */
+export function authorNaturalnessRewrite(draft: string, o: Omit<RewriteOptions, "mode">, model: RewriteModel): Promise<RewriteResult> {
+  return runNaturalnessRewrite(draft, { ...o, mode: "analyze_and_rewrite" }, model);
+}
