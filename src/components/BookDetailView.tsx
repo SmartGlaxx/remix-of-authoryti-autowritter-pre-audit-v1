@@ -136,7 +136,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
     const qs = params.toString();
     window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
     toast.success(`Writing Chapter ${nextIncompleteChapter + 1} from your approved plan…`);
-    generateChapter(nextIncompleteChapter);
+    void generateChapter(nextIncompleteChapter).catch(() => {});
   }, [canGenerateChapter, nextIncompleteChapter, isAwaitingApproval, generateChapter]);
 
   const handleSaveTitle = () => {
@@ -299,7 +299,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
               {canGenerateChapter && nextIncompleteChapter >= 0 && !isAwaitingApproval && (
                 <>
                   {/* Desktop: full button */}
-                  <Button variant="hero" size="sm" onClick={() => generateChapter(nextIncompleteChapter)} className="hidden sm:inline-flex">
+                  <Button variant="hero" size="sm" onClick={() => void generateChapter(nextIncompleteChapter).catch(() => {})} className="hidden sm:inline-flex">
                     <Play className="w-4 h-4" />
                     Write Chapter {nextIncompleteChapter + 1}
                   </Button>
@@ -311,7 +311,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => generateChapter(nextIncompleteChapter)}>
+                      <DropdownMenuItem onClick={() => void generateChapter(nextIncompleteChapter).catch(() => {})}>
                         <Play className="w-4 h-4 mr-2" />
                         Write Chapter {nextIncompleteChapter + 1}
                       </DropdownMenuItem>
@@ -519,7 +519,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
               onRegenerate={() => {
                 const req = generationState.approvalRequest;
                 if (req?.chapterIndex !== undefined) {
-                  generateChapter(req.chapterIndex);
+                  void generateChapter(req.chapterIndex).catch(() => {});
                 }
               }}
             />
