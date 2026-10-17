@@ -13,6 +13,7 @@ import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narra
 import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
 import { authorNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
 import { buildLedger } from "../_shared/writers/rhetoric.ts";
+import { recordSignals, sectionFindingCategories } from "../_shared/writers/learningRepo.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const cors = corsHeaders;
@@ -46,7 +47,17 @@ async function handleRequest(req: Request): Promise<Response> {
     if (action === "discard") {
       if (!UUID.test(String(body.candidateId))) return json({ error: "Invalid candidateId" }, 400);
       const { data, error } = await userDb.rpc("discard_candidate_draft", { p_candidate_id: body.candidateId });
-      return error ? json({ error: error.message }, 400) : json(data);
+      if (error) return json({ error: error.message }, 400);
+      // Stage D: a discarded rewritten version is negative evidence (best-effort, owner's own data only).
+      try {
+        const sdb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: c } = await sdb.from("book_candidate_drafts").select("book_id, chapter_index, subsection_index, parent_candidate_id").eq("id", body.candidateId).eq("user_id", userId).maybeSingle();
+        if (c?.parent_candidate_id) {
+          const { data: bk } = await sdb.from("books").select("book_type, controls").eq("id", c.book_id).eq("user_id", userId).maybeSingle();
+          if (bk) await recordSignals(sdb, { userId, bookId: c.book_id, controls: bk.controls, bookType: bk.book_type, chapter: c.chapter_index, sub: c.subsection_index, categories: await sectionFindingCategories(sdb, c.book_id, c.chapter_index, c.subsection_index), kind: "rejected", sourceRef: `discard:${body.candidateId}` });
+        }
+      } catch { /* learning is best-effort */ }
+      return json(data);
     }
 
     if (!UUID.test(String(body.bookId))) return json({ error: "Invalid bookId" }, 400);
@@ -223,6 +234,11 @@ async function handleRequest(req: Request): Promise<Response> {
       }
       await db.rpc("write_accepted_outline_text", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_text: r.text, p_hash: hash }).then(() => {}, () => {});
       await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: "retry" });
+      // Stage D: an accepted author-edited version is an author-approved correction (best-effort).
+      if (c.parent_candidate_id) {
+        const cats = await sectionFindingCategories(db, bookId, c.chapter_index, c.subsection_index);
+        await recordSignals(db, { userId, bookId, controls: bk.controls, bookType: bk.book_type, chapter: c.chapter_index, sub: c.subsection_index, categories: cats, kind: "approved", sourceRef: `accept:${c.id}`, hash });
+      }
       return json({ status: "accepted", result: done, usage: r.usage, text: r.text });
     }
     return json({ error: "Invalid action" }, 400);
