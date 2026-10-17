@@ -189,7 +189,7 @@ export interface PreAcceptanceResult {
   text: string; findings: StagedFinding[]; rounds: number; outcome: LoopResult["outcome"] | "evaluator_unavailable";
   decision: "accept" | "blocked_material" | "needs_author_review"; heldForApproval?: { text: string; ratio: number };
   /** Material canon conflicts the agent resolved itself by conforming the prose to established canon. */
-  autoResolved?: { code: string; message: string; excerpt?: string }[];
+  autoResolved?: { code: string; message: string; excerpt?: string; reasoning?: string }[];
   usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number };
 }
 
@@ -207,7 +207,7 @@ export function buildAutoResolvePrompt(draft: string, material: StagedFinding[],
   return {
     system: "You conform prose to established canon with minimal, surgical edits. Established canon is always true; rewrite only the conflicting sentences so they match it exactly. Keep voice, length and everything else identical. Never use markdown. Return JSON only.",
     user: [`ESTABLISHED CANON (always true):\n${truths}`, `CONFLICTS TO RESOLVE:\n${list}`, `DRAFT:\n---\n${draft}\n---`,
-      `Respond with {"replacements":[{"find":"exact sentence copied from the draft","replace":"corrected sentence that matches canon"}]}`].join("\n\n"),
+      `Respond with {"reasoning":"2-4 short sentences explaining what conflicted with canon and how you fixed it","replacements":[{"find":"exact sentence copied from the draft","replace":"corrected sentence that matches canon"}]}`].join("\n\n"),
   };
 }
 
@@ -249,7 +249,9 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
         const before = new Set(all.map((f) => f.code));
         const regressions = after.filter((f) => !before.has(f.code) && (f.severity === "material" || f.severity === "moderate"));
         if (!stillMaterial && !regressions.length) {
-          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt }));
+          let reasoning: string | undefined;
+          try { const o = extractJson(r.text); if (typeof o?.reasoning === "string") reasoning = o.reasoning.trim().slice(0, 600) || undefined; } catch { /* optional */ }
+          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt, reasoning }));
           text = candidate; all = after;
         }
       }

@@ -50,7 +50,7 @@ export async function persistOutcome(r: PreAcceptanceResult, a: PersistArgs): Pr
     try {
       const dk = `auto_${a.bookId}_${a.chapter}_${a.sub}_${a.hash.slice(0, 16)}_${i}`.slice(0, 400);
       const { data: rec } = await a.db.rpc("record_canon_discrepancy", { p_book_id: a.bookId, p_user_id: a.userId, p_chapter: a.chapter, p_sub: a.sub, p_severity: "MAJOR",
-        p_type: f.code, p_description: `Auto-resolved: ${f.message}`, p_excerpt: f.excerpt ?? "", p_canon_ref: { source: "auto_resolver", finding_key: findingKey({ code: f.code, excerpt: f.excerpt } as never) },
+        p_type: f.code, p_description: `Auto-resolved: ${f.message}`, p_excerpt: f.excerpt ?? "", p_canon_ref: { source: "auto_resolver", finding_key: findingKey({ code: f.code, excerpt: f.excerpt } as never), reasoning: (f as { reasoning?: string }).reasoning ?? null },
         p_content_hash: a.hash, p_dedup_key: dk });
       const logId = rec?.log_id ?? rec?.id;
       if (logId) await a.db.rpc("decide_canon_reconciliation", { p_log_id: logId, p_decision: "KEEP_CANON_REVISE_PROSE",

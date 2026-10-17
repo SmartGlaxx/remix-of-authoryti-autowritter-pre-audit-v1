@@ -23,6 +23,7 @@ import { GuidedWritingToolbar } from "@/components/GuidedWritingToolbar";
 import { CharacterGallery } from "@/components/CharacterGallery";
 import { Textarea } from "@/components/ui/textarea";
 import { SceneBlueprintPanel, HeldDraftAlert } from "@/components/SceneBlueprintPanel";
+import { AutoResolveLog } from "@/components/AutoResolveLog";
 import { callReview, isProgressiveBook } from "@/lib/candidateReview";
 import { allIssuesDismissed, displayWritingStatus, type ReviewLog } from "@/lib/reviewDisplay";
 import { RECONCILIATION_EVENT } from "@/components/ContradictionReviewCard";
@@ -829,6 +830,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
                     </div>
                   )}
                   {progressive && <HeldDraftAlert bookId={book.id} />}
+                  {progressive && <AutoResolveLog bookId={book.id} />}
                   {currentChapter.subsections.map((sub, subIdx) => renderSubsectionContent(sub, subIdx, selectedChapter))}
                 </motion.div>
               </AnimatePresence>
