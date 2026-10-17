@@ -47,6 +47,20 @@ export async function loadIdentitiesFor(db: Db, userId: string, universeId: stri
   return (data ?? []).map((r: Record<string, any>) => ({ id: r.id, displayName: r.display_name, aliases: r.aliases ?? [], universeId: r.universe_id }));
 }
 
+/** Knowledge screen inputs for one source section: is that text still the accepted text, and which
+ *  planner-only secrets are revealed only after this chapter. Identity recognition never approves a claim. */
+export async function loadKnowledgeScreen(db: Db, bookId: string, userId: string, chapter: number, sub: number, contentHash: string): Promise<{ sourceCurrent: boolean; futureSecretTerms: string[] }> {
+  const [{ data: acc }, { data: ext }, { data: mp }] = await Promise.all([
+    db.from("book_section_acceptances").select("content_hash").eq("book_id", bookId).eq("user_id", userId).eq("chapter_index", chapter).eq("subsection_index", sub).order("updated_at", { ascending: false }).limit(1),
+    db.from("narrative_extractions").select("content_hash, status").eq("book_id", bookId).eq("user_id", userId).eq("chapter_index", chapter).eq("subsection_index", sub).order("updated_at", { ascending: false }).limit(1),
+    db.from("book_master_plans").select("plan_skeleton, status").eq("book_id", bookId).eq("user_id", userId).in("status", ["APPROVED", "DRAFT"]).order("created_at", { ascending: false }).limit(5),
+  ]);
+  const current = acc?.[0]?.content_hash ?? ext?.[0]?.content_hash ?? null;
+  const plan = (mp ?? []).find((r: any) => r.status === "APPROVED") ?? mp?.[0];
+  const reveals: any[] = Array.isArray(plan?.plan_skeleton?.reveals) ? plan.plan_skeleton.reveals : [];
+  return { sourceCurrent: current === contentHash, futureSecretTerms: reveals.filter((r) => Number(r?.revealChapter) > chapter).flatMap((r) => Array.isArray(r?.secretTerms) ? r.secretTerms.map(String) : []) };
+}
+
 export async function syncKnowledgeForSection(db: Db, o: {
   bookId: string; userId: string; universeId: string | null; pos: StoryPosition; extractionId: string; contentHash: string;
   items: ExtractedKnowledge[]; sectionDate?: string | null; nonLinear?: boolean;
@@ -58,7 +72,8 @@ export async function syncKnowledgeForSection(db: Db, o: {
 
   await ensureCastIdentities(db, o.userId, o.bookId, o.universeId);
   const identities = await loadIdentitiesFor(db, o.userId, o.universeId);
-  const plan = planKnowledgeWrites(o.items, { identities, universeId: o.universeId, bookId: o.bookId, chapterIndex: o.pos.chapterIndex, subsectionIndex: o.pos.subsectionIndex, contentHash: o.contentHash, sectionDate: o.sectionDate, nonLinear: o.nonLinear });
+  const screen = await loadKnowledgeScreen(db, o.bookId, o.userId, o.pos.chapterIndex, o.pos.subsectionIndex, o.contentHash).catch(() => ({ sourceCurrent: true, futureSecretTerms: [] as string[] }));
+  const plan = planKnowledgeWrites(o.items, { screen: { futureSecretTerms: screen.futureSecretTerms }, identities, universeId: o.universeId, bookId: o.bookId, chapterIndex: o.pos.chapterIndex, subsectionIndex: o.pos.subsectionIndex, contentHash: o.contentHash, sectionDate: o.sectionDate, nonLinear: o.nonLinear });
 
   if (plan.rows.length) {
     const { error } = await db.from("knowledge_acquisitions").upsert(plan.rows.map((r) => ({

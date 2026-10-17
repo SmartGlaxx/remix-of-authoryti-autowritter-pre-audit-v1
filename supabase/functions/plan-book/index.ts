@@ -19,7 +19,7 @@ import {
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
-import { loadIdentitiesFor, ensureCastIdentities } from "../_shared/narrative/knowledgeRepo.ts";
+import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -158,8 +158,14 @@ async function handle(req: Request): Promise<Response> {
         const known = await loadIdentitiesFor(db, userId, uni);
         for (const rv of pend) {
           const [chS, subS] = String(rv.source_section_key).split(":").map(Number);
-          const plan = planKnowledgeWrites([rv.payload as ExtractedKnowledge], { identities: known, universeId: uni, bookId, chapterIndex: chS, subsectionIndex: subS, contentHash: rv.content_hash });
-          if (!plan.rows.length) continue;
+          const screen = await loadKnowledgeScreen(db, bookId, userId, chS, subS, rv.content_hash);
+          const plan = planKnowledgeWrites([rv.payload as ExtractedKnowledge], { screen, identities: known, universeId: uni, bookId, chapterIndex: chS, subsectionIndex: subS, contentHash: rv.content_hash });
+          if (!plan.rows.length) {
+            // Identity now known, claim not approved: keep it pending as a knowledge check for the author.
+            const h = plan.reviews[0];
+            if (h?.reason === "knowledge_check") await db.from("knowledge_identity_reviews").update({ reason: "knowledge_check", candidate_identity_ids: h.candidate_identity_ids, payload: h.payload }).eq("id", rv.id).eq("status", "PENDING");
+            continue;
+          }
           const r = plan.rows[0];
           const { error } = await db.from("knowledge_acquisitions").upsert([{ user_id: userId, book_id: bookId, universe_id: uni, identity_id: r.identity_id, claim: r.claim, source: r.source,
             source_identity_id: r.source_identity_id, certainty: r.certainty, learned_date: r.learned_date, learned_chapter_index: r.learned_chapter_index, learned_subsection_index: r.learned_subsection_index,
