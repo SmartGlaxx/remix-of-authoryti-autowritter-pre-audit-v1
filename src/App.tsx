@@ -25,6 +25,7 @@ import AccountSettings from "./pages/AccountSettings";
 import TryWriter from "./pages/TryWriter";
 import PlanningStudio from "./pages/PlanningStudio";
 import PersonaStudio from "./pages/PersonaStudio";
+import WriterImprovement from "./pages/WriterImprovement";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BookOpen } from "lucide-react";
 import { BOOK_TYPE_INFO } from "@/types/book";
