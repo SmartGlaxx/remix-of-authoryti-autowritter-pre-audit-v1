@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { runNaturalnessRewrite, applyEdits, editViolation, MAX_NATURALNESS_ATTEMPTS } from "../../supabase/functions/_shared/writers/naturalnessRewrite";
 
-const stock = "Little did she know the storm was close. Mara crossed the yard slowly in the dusk. " +
+const stock = "At the end of the day the storm was close. Mara crossed the yard slowly in the dusk. " +
   Array.from({ length: 12 }, (_, i) => `She checked the lantern hook ${i} again and moved toward the dark barn wall.`).join(" ") +
   ' "Stay here," Tom said to her. The rain held off until the evening finally ended there.';
 const reply = (edits: unknown) => vi.fn(async () => ({ text: JSON.stringify({ edits }) }));
@@ -17,7 +17,7 @@ describe("Stage C targeted naturalness rewriting", () => {
   });
 
   it("keeps a strictly better targeted candidate", async () => {
-    const m = reply([{ find: "Little did she know the storm was close.", replace: "The storm was close." }]);
+    const m = reply([{ find: "At the end of the day the storm was close.", replace: "The storm was close." }]);
     const r = await runNaturalnessRewrite(stock, { mode: "advise", changeLimit: 0.5 }, m);
     expect(r.changed).toBe(true);
     expect(r.text.startsWith("The storm was close.")).toBe(true);

@@ -54,7 +54,8 @@ export function parseEdits(raw: string): Edit[] {
 }
 
 const QUOTE = /["\u201C\u201D]/;
-const properNouns = (s: string) => new Set((s.match(/(?<!^|[.!?]\s)\b[A-Z][a-z]{2,}\b/g) ?? []));
+const COMMON = new Set(["The","She","He","They","His","Her","Their","Its","It","And","But","Then","When","There","This","That","A","An","In","On","At","As","For","With","After","Before","Again","Now","We","You","I","Our","Your","So","Yet","Still","Even","Only","If","While","From","By","Of"]);
+const properNouns = (s: string) => new Set((s.match(/\b[A-Z][a-z]+\b/g) ?? []).filter((w) => !COMMON.has(w)));
 const digits = (s: string) => (s.match(/\d+/g) ?? []).join(",");
 
 /** Why an edit is unsafe, or null if it is allowed. */
