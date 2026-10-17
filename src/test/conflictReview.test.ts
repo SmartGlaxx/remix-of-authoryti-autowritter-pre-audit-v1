@@ -8,6 +8,12 @@ describe("paired conflict evidence and targeted repairs", () => {
   it("does not invent a page for missing evidence", () => {
     expect(locate({ chapters: [{ subsections: [{ content: "hello" }] }] }, 0, 0, null).page).toBeNull();
   });
+  it("does not present a rhythm paragraph as proof of a personal counting habit", () => {
+    expect(bestParagraph('Kiera magnified the waveform. The pulse held rhythm — nine beats, pause, nine beats.', 'Kiera Vance counts a nine-beat rhythm to keep her hands still')).toBeNull();
+  });
+  it("does not dismiss conflicting age claims just because most words overlap", () => {
+    expect(recommend({ severity: "MAJOR", priorSource: "accepted_text", priorText: "Aron was an adult man at the station", newText: "Aron was a child at the station" }).choice).toBe("prior");
+  });
   it("estimates pages by word count and records paragraph position", () => {
     const outline = { chapters: [{ title: "One", subsections: [{ content: "word ".repeat(250) }, { title: "Two", content: "The man entered." }] }] };
     expect(locate(outline, 0, 1, 0)).toMatchObject({ page: 2, paragraphNumber: 1, sectionTitle: "Two" });
