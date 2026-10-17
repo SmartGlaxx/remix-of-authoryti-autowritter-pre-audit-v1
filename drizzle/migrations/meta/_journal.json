@@ -148,6 +148,13 @@
       "when": 1792215984012,
       "tag": "0020_stage_d_writer_learning",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792251715062,
+      "tag": "0021_stage2_blueprints_knowledge_check",
+      "breakpoints": true
     }
   ]
 }
