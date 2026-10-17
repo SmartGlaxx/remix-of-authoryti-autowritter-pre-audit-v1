@@ -4,11 +4,9 @@ import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { isAiBlocked, detectAiBlock } from "@/lib/aiLimit";
 import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck";
 
-const isProgressiveBook = (b: { controls?: unknown }) =>
-  (b.controls as { planning_pipeline?: string } | undefined)?.planning_pipeline === "progressive";
 /** Fast draft is the default; "studio" keeps the full deep-check path after every section. */
-const isFastDraft = (b: { controls?: unknown }) =>
-  (b.controls as { writingSpeed?: string } | undefined)?.writingSpeed !== "studio";
+const isFastDraft = (controls: unknown) =>
+  (controls as { writingSpeed?: string } | undefined)?.writingSpeed !== "studio";
 import { awaitSectionOutcome, isProgressiveBook, priorSectionOutcome } from "@/lib/candidateReview";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
@@ -730,7 +728,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
           );
 
           // Narrative memory: record what this section established. Non-blocking on failure.
-          if (isProgressiveBook(book) && isFastDraft(book)) {
+          if (isProgressiveBook(book.controls) && isFastDraft(book.controls)) {
             // Fast draft: the server's pre-acceptance gate already validated this section
             // before it was saved, so the client re-check is redundant. Story memory updates
             // in the background — the next section's preflight waits for it if needed.
