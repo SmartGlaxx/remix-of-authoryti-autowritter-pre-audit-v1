@@ -5,6 +5,7 @@ import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
+import { loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
 import { runNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
 import { recordSignals } from "../_shared/writers/learningRepo.ts";
@@ -809,7 +810,7 @@ serve(async (req) => {
           let draftForValidation = cleaned;
           if (resolveNaturalnessMode(book.controls) === "analyze_and_rewrite") {
             try {
-              const nr = await runNaturalnessRewrite(cleaned, { mode: "analyze_and_rewrite", ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
+              const nr = await runNaturalnessRewrite(cleaned, { mode: "analyze_and_rewrite", protectedMotifs: await loadProtectedMotifs(adminSupabase, book.id), ledger: buildLedger(book.outline, { chapterIndex, subsectionIndex }), bookType: book.bookType, controls: book.controls, changeLimit: warnRatio }, repair);
               draftForValidation = nr.text;
               if (nr.changed) { const after = new Set(nr.after.map((f) => f.category)); provenCategories = [...new Set(nr.before.map((f) => f.category))].filter((c) => !after.has(c)); }
               console.log("[naturalness] rewrite", JSON.stringify({ changed: nr.changed, attempts: nr.attempts }));
@@ -850,7 +851,7 @@ serve(async (req) => {
           if (resolveNaturalnessMode((book as any).controls) !== "off") {
             try {
               const nl = buildLedger(book.outline, { chapterIndex, subsectionIndex });
-              const fs = analyzeSection(finalText, { ledger: nl, bookType: book.bookType });
+              const fs = analyzeSection(finalText, { ledger: nl, bookType: book.bookType, protectedMotifs: await loadProtectedMotifs(adminSupabase, book.id) });
               await adminSupabase.from("naturalness_findings").delete().eq("book_id", book.id).eq("chapter_index", absChapter).eq("subsection_index", subsectionIndex).eq("status", "open");
               if (fs.length) await adminSupabase.from("naturalness_findings").insert(fs.map((f) => ({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, category: f.category, severity: f.severity, message: f.message, evidence: f.evidence, content_hash: hash })));
               // Stage D: learning signals (best-effort; never blocks). Findings + proven rewrite improvements.
