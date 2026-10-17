@@ -1,5 +1,5 @@
 # Roadmap — Closed-world writing
-- [ ] Carry the selected Book Approach into Master Plan without asking for a new idea
+- [x] Carry selected Book Approach and full details into Master Plan; signed-in live dry-run verified, 721 tests passed, no paid AI or manuscript changes
 - [x] Restore Book Ideas in the library and saved-idea selection in book setup; verified signed-in with a temporary draft, no paid AI or manuscript changes
 - [x] Stage 1: planned cast counted as known; pending duplicates auto-resolve; no "new character" hooks in planned books
 - [x] Stage 2: chapter blueprint + microbeats; proposed people need separate cast approval; blueprints never bulk-approved; required-blueprint gate (opt-in for older progressive books)
