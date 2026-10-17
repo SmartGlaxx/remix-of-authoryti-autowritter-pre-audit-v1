@@ -1,5 +1,5 @@
 # Roadmap — Closed-world writing
-- [ ] Restore Book Ideas in the library and saved-idea selection in book setup; verify without paid AI or manuscript changes
+- [x] Restore Book Ideas in the library and saved-idea selection in book setup; verified signed-in with a temporary draft, no paid AI or manuscript changes
 - [x] Stage 1: planned cast counted as known; pending duplicates auto-resolve; no "new character" hooks in planned books
 - [x] Stage 2: chapter blueprint + microbeats; proposed people need separate cast approval; blueprints never bulk-approved; required-blueprint gate (opt-in for older progressive books)
 - [ ] Stage 2 browser check of blueprint screen with safe test data

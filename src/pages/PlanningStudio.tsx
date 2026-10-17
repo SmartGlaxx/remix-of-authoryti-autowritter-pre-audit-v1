@@ -68,7 +68,7 @@ export default function PlanningStudio() {
   const isFiction = useMemo(() => { try { return book ? adapterForBookType(book.book_type).isFiction : true; } catch { return true; } }, [book]);
 
   const refresh = useCallback(async () => {
-    const { data: b } = await supabase.from("books").select("id, title, book_type, theme, controls, outline, story_setup, word_count").eq("id", bookId).maybeSingle();
+    const { data: b } = await supabase.from("books").select("id, title, book_type, theme, genre, audience, tone_profile, controls, outline, story_setup, word_count").eq("id", bookId).maybeSingle();
     setBook(b);
     const [p, r] = await Promise.all([callPlanBook({ action: "status", bookId }), callReview({ action: "status", bookId })]);
     if (p.ok) setPlans({ masters: p.data.masters ?? [], plans: p.data.plans ?? [] });
