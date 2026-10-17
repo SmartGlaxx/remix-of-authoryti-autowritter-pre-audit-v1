@@ -134,3 +134,5 @@
 - [x] Stage B: held-draft card, free end-to-end setup→plan→accept→memory run, shared-world checks (fixed cross-world character link)
 - [ ] Stage C: final verification (awaiting go-ahead)
 - [ ] Stage C: full regression, live checks, deployment check
+
+- [x] Autonomous conflict-resolution agent: canon-locked auto-resolve round before holding drafts; choices logged + decided automatically; writer canon rule + evaluator desensitized to benign detail — 558 tests
