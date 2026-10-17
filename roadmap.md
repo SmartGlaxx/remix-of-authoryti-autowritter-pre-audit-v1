@@ -8,4 +8,4 @@
 - [ ] Stage 4: pre-acceptance flags unplanned people/places/events
 - [ ] Stage 5: versioned plan amendments
 
-- [ ] Correct instructional example roles in blueprint approval; verify without paid AI or manuscript changes
+- [x] Correct instructional example roles in blueprint approval; live affected blueprint approved and read back READY, 725 tests passed, no paid AI or manuscript changes

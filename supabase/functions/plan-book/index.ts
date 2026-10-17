@@ -18,7 +18,7 @@ import {
   normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, buildTwistPrompt, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
-import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
+import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
 
@@ -91,6 +91,8 @@ async function handle(req: Request): Promise<Response> {
       const { data: row } = await db.from("book_progressive_plans").select("id, plan_level, plan_status, content").eq("id", String(body.planId ?? "")).eq("book_id", bookId).maybeSingle();
       const prop = (row?.content?.blueprint?.castProposals ?? []).find((p: any) => p.id === body.proposalId);
       if (!row || row.plan_level !== "BLUEPRINT" || !prop) return json({ error: "Proposal not found" }, 404);
+      if (!book) return json({ error: "Book not found" }, 404);
+      if (isBlueprintExampleRole(prop.name, adapterForBookType(book.book_type).id)) return json({ ok: true, exampleRole: true });
       const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
       const cast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
       if (!pendingCastProposals({ castProposals: [prop] }, cast, book ? adapterForBookType(book.book_type).id : undefined).length) return json({ ok: true, already: true });

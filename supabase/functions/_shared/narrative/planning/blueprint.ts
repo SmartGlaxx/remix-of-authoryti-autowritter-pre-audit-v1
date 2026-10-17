@@ -67,7 +67,7 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
     user: `${renderWholeBook(m, { ...i.expanded, [ch]: chapter })}\n\n` +
       `CHAPTER ${ch + 1} — objective: ${chapter.objective}${i.stakes ? `\nStakes: ${i.stakes}` : ""}${i.focus ? `\nFocus: ${i.focus}` : ""}\nAbout ${chapter.targetWords} words.\nApproved sections:\n${sec}\n\n` +
       `Book cast (use these ids; never create a person outside this list — if the approved plan truly needs someone new, add them to castProposals with a justification and use the proposal id):\n${cast}\n\n` +
-      `For instructional books, generic roles such as Reader or Bill payer are plan-local example participants, not new people: put them in cast with local ids, never castProposals. Named people still require a proposal.\n` +
+      (isBlueprintExampleRole("Reader", m.skeleton.adapter) ? `Generic instructional roles such as Reader or Bill payer are plan-local example participants, not new people: put them in cast with local ids, never castProposals. Named people still require a proposal.\n` : "") +
       `Write the blueprint:\n` +
       `1. keyPoints and conclusion must preserve the chapter's approved objective, plot direction and ending.\n` +
       `2. synopsis: a flowing prose account of the whole chapter from opening to conclusion — as long as completeness needs; no word limit. Names may repeat; every pronoun must be unambiguous.\n` +
