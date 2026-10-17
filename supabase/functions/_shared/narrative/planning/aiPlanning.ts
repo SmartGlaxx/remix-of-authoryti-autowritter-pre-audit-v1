@@ -83,7 +83,7 @@ function parseWith<T>(raw: string, fn: (o: any, issues: string[]) => T | null): 
 }
 
 // ── Service 1: complete story alternatives (fiction only) ───────────────────
-export interface StoryAlternative { id: string; title: string; logline: string; summary: string; twist: string; ending: string }
+export interface StoryAlternative { id: string; title: string; logline: string; summary: string; twist: string; ending: string; coreThesis?: string; approach?: string; pillars?: string[]; readerOutcome?: string }
 
 export function assertAlternativesEligible(bookType: string, count: number): void {
   adapterForBookType(bookType); // any app book type may brainstorm alternatives

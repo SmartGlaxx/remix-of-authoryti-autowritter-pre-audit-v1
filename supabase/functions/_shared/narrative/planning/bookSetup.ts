@@ -2,7 +2,7 @@
 // they feed the existing master planner as planner-only guidance; twists become scheduled reveals,
 // never narrator knowledge. Shared by browser, plan-book and tests.
 import { adapterForBookType } from "./adapters.ts";
-import { STORY_ALTERNATIVE_COUNTS, extractJson, summaryBand, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
+import { STORY_ALTERNATIVE_COUNTS, conceptGuidance, extractJson, summaryBand, type BookBrief, type Prompt, type StoryAlternative, type ParseResult } from "./aiPlanning.ts";
 import { resolveIdentity, type KnownIdentity, type IdentityMatch } from "../identityResolution.ts";
 
 export const SETUP_SCHEMA = 1;
@@ -54,6 +54,7 @@ export function normalizeSetup(raw: any): BookSetup {
   if (!raw || typeof raw !== "object") return b;
   const alts: StoryAlternative[] = (Array.isArray(raw.alternatives) ? raw.alternatives : []).slice(0, 10).map((a: any, i: number) => ({
     id: s(a?.id, 40) || `alt${i + 1}`, title: s(a?.title, 300), logline: s(a?.logline, 1000), summary: s(a?.summary, 8000), twist: s(a?.twist, 2000), ending: s(a?.ending, 2000),
+    ...(typeof a?.approach === "string" ? { coreThesis: s(a.coreThesis, 1000), approach: s(a.approach, 2000), pillars: (Array.isArray(a.pillars) ? a.pillars : []).map((p: unknown) => s(p, 300)).filter(Boolean).slice(0, 8), readerOutcome: s(a.readerOutcome, 1000) } : {}),
   }));
   const cast: SetupCastMember[] = (Array.isArray(raw.cast) ? raw.cast : []).slice(0, 60).map((c: any, i: number) => ({
     key: s(c?.key, 60) || `c${i + 1}`, name: s(c?.name, 120), role: (BOOK_ROLES as readonly string[]).includes(c?.role) ? c.role : "supporting",
@@ -156,9 +157,14 @@ export function lockedChanges(prev: BookSetup, next: BookSetup, hasProse: boolea
  * Planner-only guidance from approved setup. Twist text stays planner-side (the master planner turns
  * it into reveals with setup directives); prose writers only ever see `proseWriterPlanView`.
  */
+export function selectedSetupApproach(st: BookSetup): StoryAlternative | null {
+  return st.storyMode === "explore" && st.selectedIndex !== null ? st.alternatives[st.selectedIndex] ?? null : null;
+}
+
 export function setupPlannerGuidance(st: BookSetup): { guidance: string; alternative: StoryAlternative | null } {
   const lines: string[] = [];
-  const alt = st.storyMode === "explore" && st.selectedIndex !== null ? st.alternatives[st.selectedIndex] ?? null : null;
+  const alt = selectedSetupApproach(st);
+  if (alt?.approach) lines.push(conceptGuidance({ id: alt.id, title: alt.title, coreThesis: alt.coreThesis || alt.logline, approach: alt.approach, pillars: alt.pillars ?? [], readerOutcome: alt.readerOutcome || alt.ending, summary: alt.summary }));
   if (st.fixedRequirements.length) lines.push(`Fixed author requirements (must hold):\n- ${st.fixedRequirements.join("\n- ")}`);
   const approved = st.twistsEnabled ? st.twists.filter((t) => t.status === "approved") : [];
   if (approved.length) {

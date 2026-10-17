@@ -25,6 +25,7 @@ import { ArrowRight } from "lucide-react";
 import { bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { buildOutlineFromPlans } from "@/lib/planToOutline";
+import { normalizeSetup, selectedSetupApproach } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
 type Row = Record<string, any>;
 
@@ -135,8 +136,8 @@ export default function PlanningStudio() {
 type RunFn = (label: string, fn: () => Promise<void>) => Promise<void>;
 
 function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: Row; carry: { chapterCount: number; targetWords: number } | null; isFiction: boolean; plans: { masters: Row[]; plans: Row[] }; busy: string | null; run: RunFn; refresh: () => Promise<void> }) {
-  const setup = (book.story_setup ?? {}) as Row;
-  const picked = Number.isInteger(setup.selectedIndex) ? setup.alternatives?.[setup.selectedIndex] : null;
+  const setup = normalizeSetup(book.story_setup);
+  const picked = selectedSetupApproach(setup);
   const [premise, setPremise] = useState<string>(picked ? `${picked.title}: ${picked.logline}` : setup.premise || book.theme || "");
   const [targetWords, setTargetWords] = useState(carry?.targetWords ?? 50000);
   const [chapterCount, setChapterCount] = useState(carry?.chapterCount ?? 12);
@@ -193,13 +194,18 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     <div className="space-y-6 mt-4">
       <Card>
         <CardHeader>
-          <CardTitle>1. Your story</CardTitle>
-          <CardDescription>Comes from step 1 (Setup). To compare other options, go back to Setup — that's the one place to choose a story.</CardDescription>
+          <CardTitle>1. {isFiction ? "Selected story" : "Selected book approach"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {picked ? <p className="text-sm rounded-md border border-primary/50 p-3">Chosen story: <b>{picked.title}</b>. Your cast, twists, narrator and series choice go into the plan automatically.</p>
-            : <p className="text-sm text-muted-foreground">No story option chosen — the plan is built from your own idea below.</p>}
-          <Textarea value={premise} onChange={(e) => setPremise(e.target.value)} rows={4} placeholder="Your premise or concept" />
+          {picked ? <div className="space-y-2">
+            <p className="text-xs text-primary">Option {(setup.selectedIndex ?? 0) + 1} of {setup.alternatives.length} · Selected</p>
+            <h3 className="font-medium">{picked.title}</h3>
+            <p className="text-sm text-muted-foreground">{picked.logline}</p>
+            <p className="text-sm whitespace-pre-wrap">{picked.summary}</p>
+            {picked.approach && <p className="text-sm"><b>Approach:</b> {picked.approach}</p>}
+            {picked.pillars?.length ? <ul className="list-disc pl-5 text-sm">{picked.pillars.map((p, i) => <li key={i}>{p}</li>)}</ul> : null}
+            {picked.ending && <p className="text-sm"><b>{isFiction ? "Ending" : "Reader outcome"}:</b> {picked.ending}</p>}
+          </div> : <Textarea value={premise} onChange={(e) => setPremise(e.target.value)} rows={4} placeholder="Your premise or concept" />}
           <div className="flex flex-wrap gap-3 items-center text-sm">
             <label className="flex items-center gap-2">Words <Input type="number" className="w-28" value={targetWords} onChange={(e) => setTargetWords(Number(e.target.value))} /></label>
             <label className="flex items-center gap-2">Chapters <Input type="number" className="w-20" value={chapterCount} onChange={(e) => setChapterCount(Number(e.target.value))} /></label>
@@ -211,10 +217,9 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
       <Card>
         <CardHeader>
           <CardTitle>2. Master plan</CardTitle>
-          <CardDescription>Built from your story above. Plans never count as story canon — only accepted text does.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button onClick={createMaster} disabled={!!busy || !premise.trim()}>{busy === "master" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Draft master plan</Button>
+          <Button onClick={createMaster} disabled={!!busy || !premise.trim()}>{busy === "master" && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{picked ? (master ? "Develop selected option again" : "Develop selected option into master plan") : "Draft master plan"}</Button>
           {master?.master_synopsis && <div className="rounded-lg border border-border p-4 space-y-2">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Whole-book summary (version {master.version})</p>
             <p className="text-sm whitespace-pre-wrap">{master.master_synopsis}</p>
@@ -224,7 +229,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Books in the series</p>
               {(master.plan_skeleton.genreData.series_books as Row[]).map((sb) => <details key={sb.bookNumber} className="rounded-md border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Book {sb.bookNumber}{sb.title ? `: ${sb.title}` : ""}</summary><p className="text-sm whitespace-pre-wrap mt-2">{sb.summary}</p></details>)}
             </div>}
-            {master.status === "DRAFT" && <p className="text-xs text-muted-foreground">Not right? Edit your premise above and draft again — the new version replaces this draft.</p>}
+            {master.status === "DRAFT" && !picked && <p className="text-xs text-muted-foreground">Not right? Edit your premise above and draft again — the new version replaces this draft.</p>}
           </div>}
           {plans.masters.map((m) => (
             <div key={m.id} className="flex items-center gap-3 text-sm border border-border rounded-md px-3 py-2">
