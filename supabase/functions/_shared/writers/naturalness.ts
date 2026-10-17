@@ -1,13 +1,19 @@
 // Stage A contracts for the Writing Naturalness Engine. Pure, no I/O, no analysis yet (Stage B).
 
-export type NaturalnessMode = "off" | "analyze_only" | "advise";
+/** off = nothing; analyze_only = advisory findings, never rewrites; analyze_and_rewrite = bounded targeted rewriting. */
+export type NaturalnessMode = "off" | "analyze_only" | "analyze_and_rewrite";
 export const DEFAULT_NATURALNESS_MODE: NaturalnessMode = "off";
 
-/** Reads books.controls.naturalness; anything missing or unknown = "off". */
+/** Reads books.controls.naturalness; missing/unknown = "off". Legacy "advise" maps to analyze_only (never rewrites). */
 export function resolveNaturalnessMode(controls: unknown): NaturalnessMode {
   const v = (controls as { naturalness?: unknown } | null | undefined)?.naturalness;
-  return v === "analyze_only" || v === "advise" ? v : "off";
+  if (v === "analyze_and_rewrite") return v;
+  if (v === "analyze_only" || v === "advise") return "analyze_only";
+  return "off";
 }
+
+/** Only this mode may ever rewrite prose automatically. */
+export const naturalnessMayRewrite = (m: NaturalnessMode) => m === "analyze_and_rewrite";
 
 export type NaturalnessCategory =
   | "opening_recurrence" | "figurative_density" | "burstiness"

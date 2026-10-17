@@ -96,7 +96,7 @@ export function charChangeRatio(original: string, revised: string): number {
 export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, model: RewriteModel): Promise<RewriteResult> {
   const before = analyzeSection(draft, o);
   const res: RewriteResult = { text: draft, changed: false, attempts: [], before, after: before };
-  if (o.mode !== "advise") return res;
+  if (o.mode !== "analyze_and_rewrite") return res;
   const limit = o.changeLimit ?? DEFAULT_NATURALNESS_CHANGE_LIMIT;
   const det = (t: string) => deterministicValidation(t, { controls: o.controls, motifs: o.protectedMotifs }).length;
   const baseDet = det(draft);
@@ -119,4 +119,10 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
     best = cand; bestFindings = after;
   }
   return { ...res, text: best, changed: best !== draft, after: bestFindings };
+}
+
+/** Author explicitly asked for a targeted rewrite of a held draft: runs the same bounded engine
+ *  regardless of the book's automatic mode. Never accepts; caller saves a new candidate version. */
+export function authorNaturalnessRewrite(draft: string, o: Omit<RewriteOptions, "mode">, model: RewriteModel): Promise<RewriteResult> {
+  return runNaturalnessRewrite(draft, { ...o, mode: "analyze_and_rewrite" }, model);
 }

@@ -8,7 +8,7 @@ describe("Naturalness Stage A", () => {
     expect(resolveNaturalnessMode(undefined)).toBe("off");
     expect(resolveNaturalnessMode({})).toBe("off");
     expect(resolveNaturalnessMode({ naturalness: "strict" })).toBe("off");
-    expect(resolveNaturalnessMode({ naturalness: "advise" })).toBe("advise");
+    expect(resolveNaturalnessMode({ naturalness: "advise" })).toBe("analyze_only");
   });
   it("stylistic findings never block acceptance", () => {
     expect(naturalnessBlocksAcceptance([{ category: "opening_recurrence", severity: "advisory", message: "x", evidence: {} }])).toBe(false);
