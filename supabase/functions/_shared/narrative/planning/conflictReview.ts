@@ -76,6 +76,25 @@ export function parseEdits(raw: string): Edit[] {
   try { const j = JSON.parse(m ? m[0] : raw); return Array.isArray(j?.edits) ? j.edits : []; } catch { return []; }
 }
 
+export interface ChatMsg { role: "author" | "assistant"; content: string }
+
+/** Editorial discussion about one conflict: the author explains intent; the assistant suggests and may propose targeted edits. */
+export function discussionPrompt(o: { truth: string; conflicting: string; description: string; recommendation: string; history: ChatMsg[] }) {
+  const turns = (o.history ?? []).slice(-12).map((m) => `${m.role === "author" ? "Author" : "Editor"}: ${m.content}`).join("\n");
+  return {
+    system: "You are a careful fiction continuity editor discussing one flagged contradiction with the author. Answer their question or opinion in 2-4 sentences, then optionally propose the smallest safe edits. No markdown. Reply only with JSON: {\"reply\":\"your answer to the author\",\"edits\":[{\"find\":\"exact text copied from the passage\",\"replace\":\"corrected text\"}]}. Include \"edits\" only when the author asked for a change or you can confidently suggest one; otherwise omit it or use an empty array. Never invent facts beyond the established detail.",
+    user: `Established detail (this is true):\n${o.truth}\n\nProblem found:\n${o.description}\n\nRecommendation:\n${o.recommendation}\n\nPassage containing the conflict:\n${o.conflicting}\n\nConversation so far:\n${turns || "(none yet)"}`,
+  };
+}
+
+export function parseDiscussion(raw: string): { reply: string; edits: Edit[] } {
+  const m = String(raw ?? "").match(/\{[\s\S]*\}/);
+  try {
+    const j = JSON.parse(m ? m[0] : raw);
+    return { reply: typeof j?.reply === "string" && j.reply.trim() ? j.reply.trim() : "I could not form a suggestion. Try rephrasing your thought.", edits: Array.isArray(j?.edits) ? j.edits : [] };
+  } catch { return { reply: "I could not form a suggestion. Try rephrasing your thought.", edits: [] }; }
+}
+
 export function targetedRewritePrompt(o: { truth: string; conflicting: string; description: string }) {
   return {
     system: "You are a careful fiction continuity editor. Make the smallest possible change so the passage agrees with the established story detail. Keep voice, length and everything else unchanged. No markdown. Reply only with JSON: {\"edits\":[{\"find\":\"exact text copied from the passage\",\"replace\":\"corrected text\"}]} with at most 3 edits.",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, ChevronDown, Loader2, Pencil, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, ChevronDown, Loader2, MessageSquare, Pencil, RefreshCw, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ export const RECONCILIATION_EVENT = "canon-reconciliation-changed";
 type Evidence = { summary: string; paragraph: string; location: Location | null; source: string };
 type Log = { id: string; severity: string; description: string; decision: string; application_status: string; chapter_index: number; subsection_index: number; candidate: { id: string; draft_text: string } | null; prior: Evidence; newer: Evidence; recommendation: Recommendation; memorySynced: boolean; accepted: boolean };
 type Work = { id: string; original: string; text: string; replace: boolean; outcome: string };
+type ChatTurn = { role: "author" | "assistant"; content: string; edits?: { find: string; replace: string }[]; applied?: boolean };
 const summary = (s: string) => s.split(/(?<=[.!?])\s/)[0];
 
 function Source({ evidence }: { evidence: Evidence }) {
@@ -36,6 +37,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
   const [work, setWork] = useState<Record<string, Work>>({});
   const [note, setNote] = useState("");
   const [history, setHistory] = useState(false);
+  const [chat, setChat] = useState<Record<string, ChatTurn[]>>({});
+  const [draft, setDraft] = useState("");
   const load = useCallback(async () => {
     try {
       const r = await callReview<{ logs?: Log[]; error?: string }>({ action: "conflicts", bookId });
@@ -113,6 +116,32 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Correction failed" }); }
     finally { setBusy(""); setPhase(""); }
   };
+  const sendChat = async (log: Log) => {
+    const text = draft.trim();
+    if (!text) return;
+    const turns = [...(chat[log.id] ?? []), { role: "author" as const, content: text }];
+    setChat((old) => ({ ...old, [log.id]: turns })); setDraft("");
+    setBusy(log.id); setPhase("Discussing with the continuity editor…");
+    try {
+      const r = await callReview<{ reply?: string; edits?: { find: string; replace: string }[]; error?: string }>({ action: "discuss_conflict", bookId, logId: log.id, messages: turns.map((t) => ({ role: t.role, content: t.content })) });
+      if (!r.ok || !r.data.reply) throw new Error(r.data.error ?? "The editor could not respond. Try again.");
+      setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: r.data.reply!, edits: r.data.edits?.length ? r.data.edits : undefined }] }));
+    } catch (e) { setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: e instanceof Error ? e.message : "The editor could not respond. Try again." }] })); }
+    finally { setBusy(""); setPhase(""); }
+  };
+  const applyChatEdits = async (log: Log, index: number) => {
+    const turn = chat[log.id]?.[index];
+    if (!turn?.edits?.length) return;
+    setBusy(log.id); setPhase("Applying the suggested edits…");
+    try {
+      const r = await callReview<{ candidate_id: string; draft_text: string; error?: string }>({ action: "apply_conflict_edits", bookId, logId: log.id, edits: turn.edits });
+      if (!r.ok) throw new Error(r.data.error ?? "Could not apply the suggestion");
+      updateWork(log.id, { id: r.data.candidate_id, original: r.data.draft_text, text: r.data.draft_text, outcome: "Suggestion applied as a new draft version. Run checks before accepting it." });
+      setChat((old) => ({ ...old, [log.id]: (old[log.id] ?? []).map((t, i) => i === index ? { ...t, applied: true } : t) }));
+      await load(); notify();
+    } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Could not apply the suggestion" }); }
+    finally { setBusy(""); setPhase(""); }
+  };
   const evidenceCard = (log: Log, side: "prior" | "new", detailed = false) => {
     const e = side === "prior" ? log.prior : log.newer;
     const isOpen = expanded.includes(side);
@@ -159,6 +188,23 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
             {!selected.candidate && selected.memorySynced && <p className="text-sm text-primary flex gap-2 items-center"><CheckCircle2 className="w-4 h-4" />Resolved — accepted text and story memory are up to date.</p>}
             {!selected.candidate && selected.accepted && !selected.memorySynced && selected.decision !== "DISMISS" && <Button variant="outline" disabled={!!busy} onClick={async () => { setBusy(selected.id); setPhase("Updating story memory…"); try { await runNarrativeExtraction(bookId, selected.chapter_index, selected.subsection_index); await load(); notify(); } catch (e) { updateWork(selected.id, { outcome: e instanceof Error ? e.message : "Memory update failed. Your accepted text is safe; try again." }); } finally { setBusy(""); setPhase(""); } }}>Retry story memory update</Button>}
           </>}
+          <div className="border border-border rounded-lg p-3 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2"><MessageSquare className="w-4 h-4 text-primary" />Discuss with the editor</p>
+            {(chat[selected.id] ?? []).length > 0 && <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {(chat[selected.id] ?? []).map((t, i) => <div key={i} className={`rounded-lg p-2.5 text-sm leading-relaxed ${t.role === "author" ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`}>
+                <p className="whitespace-pre-wrap break-words">{t.content}</p>
+                {t.edits && <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{t.applied ? "Suggestion applied" : `${t.edits.length} suggested edit${t.edits.length > 1 ? "s" : ""}`}</Badge>
+                  {!t.applied && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => void applyChatEdits(selected, i)}><Sparkles className="w-3.5 h-3.5 mr-1" />Apply suggestion</Button>}
+                </div>}
+              </div>)}
+            </div>}
+            <div className="flex gap-2 items-end">
+              <Textarea aria-label="Your thought or question" placeholder="Share your take — e.g. “she pauses only when stressed; merge both” — and the editor will suggest a fix." value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={2} disabled={!!busy} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(selected); } }} />
+              <Button size="icon" aria-label="Send" disabled={!!busy || !draft.trim()} onClick={() => void sendChat(selected)}><Send className="w-4 h-4" /></Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Suggestions only change text after you apply them and run checks.</p>
+          </div>
           {busy && <div role="status" aria-live="polite" className="flex gap-2 items-center text-sm text-primary"><Loader2 className="w-4 h-4 animate-spin" />{phase}</div>}
           {w?.outcome && <p role="status" className="text-sm leading-relaxed border-l-2 border-primary pl-3">{w.outcome}</p>}
           {pending.filter((l) => l.id !== selected.id).length > 0 && <div className="border-t border-border pt-3 space-y-2"><p className="text-sm font-medium">Other conflicts to review</p>{pending.filter((l) => l.id !== selected.id).map((l) => <Button key={l.id} variant="outline" className="w-full whitespace-normal h-auto py-2 text-left justify-start" onClick={() => open(l)}>{summary(l.description)}<ArrowRight className="w-4 h-4 shrink-0 ml-auto" /></Button>)}</div>}
