@@ -33,8 +33,9 @@ describe("word-level change ratio", () => {
     expect(diffStats(LONG, ps.slice(1).join("\n\n")).deleted).toBeGreaterThan(20);
   });
   it("reordered passages count as change (delete + insert)", () => {
-    const ps = LONG.split("\n\n"); const moved = [...ps.slice(15), ...ps.slice(0, 15)].join("\n\n");
-    expect(changeRatio(LONG, moved)).toBeGreaterThan(0.2);
+    const D = ["Rain fell on the harbour roofs.", "Theo found the letter under a ledger.", "Mara refused to open it before dawn.", "The kettle sang and nobody moved.", "Outside, a gull argued with the wind.", "She folded his cardigan twice, then again."];
+    const orig = D.join("\n\n"), moved = [...D.slice(3), ...D.slice(0, 3)].join("\n\n");
+    expect(changeRatio(orig, moved)).toBeGreaterThan(0.4);
   });
   it("whitespace/layout-only changes are 0", () => { expect(changeRatio("a b\n\nc", "a  b\n\n\nc")).toBe(0); });
 });
@@ -48,13 +49,15 @@ describe("rewrite engine uses the corrected measure", () => {
     expect(r.proposals![0].changeRatio).toBeLessThan(0.02);
   });
   it("changes accumulated over two attempts are measured against the original", async () => {
-    const ps = draft.split("\n\n");
     let n = 0;
-    const model = async () => { n++; const blk = ps.slice(n === 1 ? 1 : 8, n === 1 ? 7 : 14).join("\n\n"); return { text: JSON.stringify({ edits: [{ find: blk, replace: "Short." }] }) }; };
-    const r = await runNaturalnessRewrite(draft, { mode: "analyze_and_rewrite", changeLimit: 0.3 }, model);
-    // second proposal's ratio covers BOTH blocks vs the original, not just its own
-    if (r.proposals!.length === 2 && r.attempts[0].accepted) expect(r.proposals![1].changeRatio).toBeGreaterThan(r.proposals![0].changeRatio);
-    for (const p of r.proposals!) expect(p.changeRatio).toBeGreaterThan(0);
+    const model = async () => { n++; return { text: JSON.stringify({ edits: [n === 1 ? { find: "The truth is, Mara", replace: "Mara" } : { find: "At the end of the day, Mara", replace: "Mara" }] }) }; };
+    const r = await runNaturalnessRewrite(draft, { mode: "analyze_and_rewrite" }, model);
+    expect(r.proposals!.length).toBe(2);
+    // attempt 2 builds on attempt 1, but its ratio is vs the ORIGINAL, so it includes both edits
+    expect(r.proposals![1].changeRatio).toBeGreaterThan(r.proposals![0].changeRatio);
+    const tiny = 0.0001; // budget so small that the combined total must fail even though each edit alone is small
+    const r2 = await runNaturalnessRewrite(draft, { mode: "analyze_and_rewrite", changeLimit: tiny }, async () => ({ text: JSON.stringify({ edits: [{ find: "The truth is, Mara", replace: "Mara" }] }) }));
+    expect(r2.attempts[0].reason).toBe("change_too_broad");
   });
   it("protected content (dialogue, numbers) is still refused", () => {
     const t = 'She said "go home" at 9.';
