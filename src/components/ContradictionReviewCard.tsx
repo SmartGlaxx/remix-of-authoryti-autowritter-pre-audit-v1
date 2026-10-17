@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, ChevronDown, Loader2, Pencil, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, ChevronDown, Loader2, MessageSquare, Pencil, RefreshCw, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ export const RECONCILIATION_EVENT = "canon-reconciliation-changed";
 type Evidence = { summary: string; paragraph: string; location: Location | null; source: string };
 type Log = { id: string; severity: string; description: string; decision: string; application_status: string; chapter_index: number; subsection_index: number; candidate: { id: string; draft_text: string } | null; prior: Evidence; newer: Evidence; recommendation: Recommendation; memorySynced: boolean; accepted: boolean };
 type Work = { id: string; original: string; text: string; replace: boolean; outcome: string };
+type ChatTurn = { role: "author" | "assistant"; content: string; edits?: { find: string; replace: string }[]; applied?: boolean };
 const summary = (s: string) => s.split(/(?<=[.!?])\s/)[0];
 
 function Source({ evidence }: { evidence: Evidence }) {
