@@ -10,9 +10,19 @@ import { extractJson, renderWholeBook } from "./aiPlanning.ts";
 
 /** Generic instructional participants are plan-local roles, never story identities.
  * Unknown adapters and narrative books remain fail-closed for all proposed people. */
+const ROLE_WORDS = /^(reader|learner|student|customer|client|employee|manager|cook|user|practitioner|colleague|coworker|co-worker|friend|partner|spouse|parent|child|boss|supervisor|team|teammate|neighbo(u)?r|mentor|coach|founder|investor|owner|buyer|seller|beginner|novice|expert|person|someone|participant|patient|guest|host|stakeholder|lead|peer|reviewer|writer|speaker|listener|audience|example|you)$/i;
+const ROLE_SUFFIX = /(er|or|ist|ant|ent|ee|ian)$/i;
+/** Generic instructional roles ("Report writer", "Colleague", "A new manager") — never a named person. */
 export function isBlueprintExampleRole(name: string, adapter?: string): boolean {
-  return ["self_help", "business", "finance", "cookbook", "technical"].includes(adapter ?? "")
-    && /^(reader|bill payer|learner|student|customer|employee|manager|cook|user|practitioner)$/i.test(name.trim());
+  if (!["self_help", "business", "finance", "cookbook", "technical"].includes(adapter ?? "")) return false;
+  const toks = name.trim().replace(/^(the|a|an|your|my)\s+/i, "").split(/\s+/).filter(Boolean);
+  if (!toks.length || toks.length > 4) return false;
+  // Any capitalised token after the first looks like a proper name ("Omar Reyes", "Dr Lee").
+  if (toks.slice(1).some((t) => /^\p{Lu}/u.test(t))) return false;
+  if (/^(mr|mrs|ms|dr|prof|sir|lady|lord)\.?$/i.test(toks[0])) return false;
+  const head = toks[toks.length - 1];
+  if (toks.length === 1) return ROLE_WORDS.test(head);
+  return ROLE_WORDS.test(head) || ROLE_SUFFIX.test(head);
 }
 
 export const BLUEPRINT_SCHEMA_VERSION = 1;
