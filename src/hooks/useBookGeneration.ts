@@ -7,6 +7,21 @@ import { runContinuityCheck, type ContinuityResult } from "@/lib/continuityCheck
 /** Fast draft is the default; "studio" keeps the full deep-check path after every section. */
 const isFastDraft = (controls: unknown) =>
   (controls as { writingSpeed?: string } | undefined)?.writingSpeed !== "studio";
+
+/** Polls the extraction ledger until the section's story memory is actually recorded (or gives up). */
+async function waitForExtractionSettled(bookId: string, ch: number, sub: number, maxMs = 90_000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const { data } = await supabase.from("narrative_extractions").select("status")
+      .eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub)
+      .order("updated_at", { ascending: false }).limit(1);
+    const s = data?.[0]?.status;
+    if (s === "completed") return true;
+    if (s === "failed") return false;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  return false;
+}
 import { awaitSectionOutcome, isProgressiveBook, priorSectionOutcome } from "@/lib/candidateReview";
 
 /** Applies a continuity result (revised text + status) to one section of an outline. */
@@ -351,6 +366,8 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       if (needsMemory) {
         // Idempotent: if an update is already running, this waits/retries until it completes.
         await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 5 });
+        // A background update may still be finishing — wait for the ledger before asking to write.
+        await waitForExtractionSettled(bookData.id, prevPos.c, prevPos.s);
       }
     }
 
@@ -395,11 +412,12 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry.
     // Extraction can still be finishing when the first retry lands, so allow a few rounds.
-    for (let round = 0; round < 3 && response.status === 409; round++) {
+    for (let round = 0; round < 4 && response.status === 409; round++) {
       const errBody = await response.clone().json().catch(() => ({}));
       if (errBody?.code !== "RECOVER_EXTRACTION" || !bookData.id || !prevPos) break;
       const r = await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 4 });
       if (r.status !== "completed" && r.status !== "skipped") continue;
+      await waitForExtractionSettled(bookData.id, prevPos.c, prevPos.s);
       response = await send();
     }
 
