@@ -345,6 +345,50 @@ export type Database = {
           },
         ]
       }
+      book_literary_artifacts: {
+        Row: {
+          artifact_type: string
+          book_id: string
+          content: Json
+          created_at: string
+          id: string
+          label: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          artifact_type: string
+          book_id: string
+          content?: Json
+          created_at?: string
+          id?: string
+          label: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          artifact_type?: string
+          book_id?: string
+          content?: Json
+          created_at?: string
+          id?: string
+          label?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_literary_artifacts_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_master_plans: {
         Row: {
           approved_at: string | null
@@ -2391,6 +2435,65 @@ export type Database = {
           },
         ]
       }
+      naturalness_findings: {
+        Row: {
+          author_notes: string | null
+          book_id: string
+          category: string
+          chapter_index: number
+          content_hash: string | null
+          created_at: string
+          evidence: Json
+          id: string
+          message: string
+          severity: string
+          status: string
+          subsection_index: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_notes?: string | null
+          book_id: string
+          category: string
+          chapter_index: number
+          content_hash?: string | null
+          created_at?: string
+          evidence?: Json
+          id?: string
+          message: string
+          severity?: string
+          status?: string
+          subsection_index?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_notes?: string | null
+          book_id?: string
+          category?: string
+          chapter_index?: number
+          content_hash?: string | null
+          created_at?: string
+          evidence?: Json
+          id?: string
+          message?: string
+          severity?: string
+          status?: string
+          subsection_index?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "naturalness_findings_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personas: {
         Row: {
           ai_expansions: Json
@@ -3258,6 +3361,59 @@ export type Database = {
           source?: string | null
         }
         Relationships: []
+      }
+      writer_style_adaptations: {
+        Row: {
+          adjustment: Json
+          book_id: string | null
+          created_at: string
+          dimension: string
+          id: string
+          reverted_at: string | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+          version: number
+          writer_id: string
+        }
+        Insert: {
+          adjustment?: Json
+          book_id?: string | null
+          created_at?: string
+          dimension: string
+          id?: string
+          reverted_at?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+          writer_id: string
+        }
+        Update: {
+          adjustment?: Json
+          book_id?: string | null
+          created_at?: string
+          dimension?: string
+          id?: string
+          reverted_at?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+          writer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "writer_style_adaptations_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
