@@ -3362,15 +3362,79 @@ export type Database = {
         }
         Relationships: []
       }
+      writer_learning_signals: {
+        Row: {
+          book_id: string | null
+          category: string
+          chapter_index: number | null
+          content_hash: string | null
+          created_at: string
+          genre: string | null
+          id: string
+          kind: string
+          source_ref: string
+          subsection_index: number | null
+          user_id: string
+          weight: number
+          writer_id: string
+        }
+        Insert: {
+          book_id?: string | null
+          category: string
+          chapter_index?: number | null
+          content_hash?: string | null
+          created_at?: string
+          genre?: string | null
+          id?: string
+          kind: string
+          source_ref: string
+          subsection_index?: number | null
+          user_id: string
+          weight?: number
+          writer_id: string
+        }
+        Update: {
+          book_id?: string | null
+          category?: string
+          chapter_index?: number | null
+          content_hash?: string | null
+          created_at?: string
+          genre?: string | null
+          id?: string
+          kind?: string
+          source_ref?: string
+          subsection_index?: number | null
+          user_id?: string
+          weight?: number
+          writer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "writer_learning_signals_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       writer_style_adaptations: {
         Row: {
           adjustment: Json
           book_id: string | null
+          confidence: number
           created_at: string
           dimension: string
+          evidence: Json
+          expires_at: string | null
+          genre: string | null
           id: string
+          parent_id: string | null
           reverted_at: string | null
+          schema_version: number
+          scope: string
           source: string
+          source_writer_id: string | null
           status: string
           updated_at: string
           user_id: string
@@ -3380,11 +3444,19 @@ export type Database = {
         Insert: {
           adjustment?: Json
           book_id?: string | null
+          confidence?: number
           created_at?: string
           dimension: string
+          evidence?: Json
+          expires_at?: string | null
+          genre?: string | null
           id?: string
+          parent_id?: string | null
           reverted_at?: string | null
+          schema_version?: number
+          scope?: string
           source?: string
+          source_writer_id?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -3394,11 +3466,19 @@ export type Database = {
         Update: {
           adjustment?: Json
           book_id?: string | null
+          confidence?: number
           created_at?: string
           dimension?: string
+          evidence?: Json
+          expires_at?: string | null
+          genre?: string | null
           id?: string
+          parent_id?: string | null
           reverted_at?: string | null
+          schema_version?: number
+          scope?: string
           source?: string
+          source_writer_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string
