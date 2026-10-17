@@ -76,8 +76,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
         updateWork(log.id, { id: fix.data.candidate_id, original: fix.data.draft_text, text: fix.data.draft_text, outcome: "Correction saved. Run checks before accepting it." });
         await check(log, false, { id: fix.data.candidate_id, original: fix.data.draft_text, text: fix.data.draft_text, replace: false, outcome: "" });
       } else if (mode === "manual") updateWork(log.id, { outcome: "Choice saved — edit this section, then run checks." });
-      else if (mode === "new") updateWork(log.id, { outcome: "New text selected. It still needs full checks and memory update." });
-      else { updateWork(log.id, { outcome: "Dismissed by you — no manuscript or story facts were changed." }); toast.success("Marked as not a conflict"); }
+      else if (mode === "new") await check(log, false, { id: draft.candidate_id, original: draft.draft_text, text: draft.draft_text, replace: false, outcome: "" });
+      else { setSelected(null); toast.success("Marked as not a conflict"); }
       await load(); notify();
     } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Could not complete review" }); toast.error(e instanceof Error ? e.message : "Could not complete review"); await load(); }
     finally { setBusy(""); setPhase(""); }
@@ -89,7 +89,7 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     try {
       const r = await saveThenAccept(bookId, draft.id, draft.original, draft.text, replacement);
       updateWork(log.id, { id: r.candidateId, original: draft.text });
-      if (needsReplaceConfirmation(r.data)) { updateWork(log.id, { replace: true, outcome: "This replaces text already in your book. Confirm below; full checks still run." }); return; }
+      if (needsReplaceConfirmation(r.data)) { if (!replacement) return await check(log, true, { ...draft, id: r.candidateId, original: draft.text }); throw new Error("Could not replace the section text."); }
       if (!r.ok) throw new Error(r.data.message ?? r.data.error ?? "Checks did not complete");
       if (r.data.status === "accepted") {
         setPhase("Updating story memory…");
@@ -97,7 +97,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
         onAccepted?.();
         void queryClient.invalidateQueries({ queryKey: ["books"] });
         void queryClient.invalidateQueries({ queryKey: ["book", bookId] });
-        updateWork(log.id, { id: "", replace: false, outcome: "Section passed and was accepted. See the story memory status below." });
+        updateWork(log.id, { id: "", replace: false, outcome: "Resolved." });
+        setSelected(null); toast.success("Conflict resolved — the section is accepted and story memory is updated.");
       } else if (r.data.status === "held") {
         updateWork(log.id, { id: r.data.candidateId ?? draft.id, outcome: "Further issues were found. The section is held; review the new conflict cards or draft findings." });
       } else throw new Error(r.data.error ?? "Review still pending");
@@ -136,9 +137,16 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     try {
       const r = await callReview<{ candidate_id: string; draft_text: string; error?: string }>({ action: "apply_conflict_edits", bookId, logId: log.id, edits: turn.edits });
       if (!r.ok) throw new Error(r.data.error ?? "Could not apply the suggestion");
-      updateWork(log.id, { id: r.data.candidate_id, original: r.data.draft_text, text: r.data.draft_text, outcome: "Suggestion applied as a new draft version. Run checks before accepting it." });
       setChat((old) => ({ ...old, [log.id]: (old[log.id] ?? []).map((t, i) => i === index ? { ...t, applied: true } : t) }));
-      await load(); notify();
+      if (log.decision === "PENDING") {
+        setPhase("Recording your decision…");
+        const d = await callReview<{ error?: string }>({ action: "decide", bookId, logId: log.id, decision: "KEEP_CANON_REVISE_PROSE", rationale: "Author agreed an editorial fix in discussion: " + turn.content.slice(0, 1500) });
+        if (!d.ok) throw new Error(d.data.error ?? "Could not record your decision");
+      }
+      const saved = { id: r.data.candidate_id, original: r.data.draft_text, text: r.data.draft_text, replace: false, outcome: "" };
+      updateWork(log.id, saved);
+      setBusy(""); await check(log, false, saved);
+      return;
     } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Could not apply the suggestion" }); }
     finally { setBusy(""); setPhase(""); }
   };
@@ -203,7 +211,7 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
               <Textarea aria-label="Your thought or question" placeholder="Share your take — e.g. “she pauses only when stressed; merge both” — and the editor will suggest a fix." value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={2} disabled={!!busy} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(selected); } }} />
               <Button size="icon" aria-label="Send" disabled={!!busy || !draft.trim()} onClick={() => void sendChat(selected)}><Send className="w-4 h-4" /></Button>
             </div>
-            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Suggestions only change text after you apply them and run checks.</p>
+            <p className="text-xs text-muted-foreground">Discussion uses your book’s models and may cost credits. Applying a suggestion fixes the section, runs all checks and closes this box when resolved.</p>
           </div>
           {busy && <div role="status" aria-live="polite" className="flex gap-2 items-center text-sm text-primary"><Loader2 className="w-4 h-4 animate-spin" />{phase}</div>}
           {w?.outcome && <p role="status" className="text-sm leading-relaxed border-l-2 border-primary pl-3">{w.outcome}</p>}
