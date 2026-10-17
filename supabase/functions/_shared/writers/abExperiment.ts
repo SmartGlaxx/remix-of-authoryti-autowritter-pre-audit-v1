@@ -59,9 +59,9 @@ export class BudgetGuard {
 export type ExpCaller = (req: { model: string; system: string; user: string; maxOutputTokens: number }) =>
   Promise<{ text: string; inputTokens: number; outputTokens: number; cachedInputTokens?: number; modelUsed: string }>;
 
-export function guardedCall(guard: BudgetGuard, caller: ExpCaller, role: ExpRole) {
+export function guardedCall(guard: BudgetGuard, caller: ExpCaller, role: ExpRole, maxOutOverride?: number) {
   return async (p: Prompt) => {
-    const model = EXPERIMENT_MODELS[role], maxOut = MAX_OUTPUT_TOKENS[role];
+    const model = EXPERIMENT_MODELS[role], maxOut = maxOutOverride ?? MAX_OUTPUT_TOKENS[role];
     const reserved = guard.reserve(model, countTokens(p.system) + countTokens(p.user), maxOut); // throws before any request
     let r;
     try { r = await caller({ model, system: p.system, user: p.user, maxOutputTokens: maxOut }); }
