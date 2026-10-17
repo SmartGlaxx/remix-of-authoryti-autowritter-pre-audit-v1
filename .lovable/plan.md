@@ -1,50 +1,66 @@
-# Closed-World Writing: Every Character Planned Before Prose
+# Audit: Why New Characters Appear, and How to Lock the Story to the Plan
 
-## Goal
-The writer should carry out the approved story, not invent it. Every named character, important place and major event must exist in the chapter plan before any prose is written. The "Characters to confirm" step goes away, because nothing new should need confirming.
+This report covers the 9 questions in your brief. Nothing was changed, and no paid AI was used.
 
-## What the first look found (to confirm in Stage 0)
-- The writing instructions say to add a hook every few paragraphs. One allowed hook is a "new character entrance", so the writer is told to invent people.
-- Section plans break into short beats (kind + one note), but they have no list of who is present, where it happens, or what events occur. The writer fills those gaps.
-- After a section is accepted, story memory reads the prose. Any unknown name becomes a "new entity", which then appears in the review panel in Planning Studio. That is the confirmation step you saw.
-- Chapter summaries are short goal statements, not a paragraph-by-paragraph account.
+## Key finding first
+Your "Characters to confirm" list has two separate causes.
 
-## Stage 0 — Audit report (free, no changes)
-A written report covering the 9 questions in your brief: where invented characters come from, how detailed chapter summaries are, where detail is lost, which prompts allow invention, what can be reused, how to remove confirmation safely, data changes, how existing books are handled, and the staged plan. You review it before Stage 1.
+1. **A matching bug.** In your real book, 156 entries are waiting. The ones checked are all "Kiera Vance", from Chapter 1, Section 2, listed again and again. Kiera Vance is already in the book's cast. She gets flagged because the step that records "who knows what" only looks up names in your shared persona/universe list. It never checks the book's own cast. So characters you planned get asked about as if they were new.
+2. **Real invention.** The writing instructions allow and sometimes encourage new people (see 4). The chapter plans also don't say who is in each scene, so the writer fills the gaps.
 
-## Stage 1 — Chapter Blueprint (planning)
-- Each chapter plan gets two forms:
-  - **Readable synopsis**: a full account of the chapter, about one sentence per planned paragraph, naming people, places and events. No word limit for this part. Your 300–500 word whole-book summary stays as it is.
-  - **Structured blueprint**: cast, places, events, opening state, ending, continuity duties and what may be revealed, each linked to a known story entry.
-- Microbeats replace the current thin beats. Each one says who is present, where, what happens, why, and how it leads to the next.
-- Anyone the blueprint needs who isn't in the cast yet gets added during planning, and you approve them there. This is the only way a new character enters.
-- Check: if a chapter's beats leave gaps, or name someone with no entry, the plan can't be approved.
+Fixing cause 1 alone should clear most of that list. Cause 2 needs the blueprint work below.
 
-## Stage 2 — Writer obeys the blueprint
-- The writer receives the synopsis plus only that chapter's allowed cast, places and events, with the instruction: "Expand the approved story; do not create new story facts."
-- "New character entrance" is removed from the hook list for planned books. Gestures, sensory detail, atmosphere and dialogue wording stay free.
-- Secrets and future reveals keep the current protections. Characters who haven't debuted yet are still held back.
-- If the plan is missing something essential, writing stops and asks for a plan update. It does not invent.
+## 1. Where unplanned characters enter
+- The writer's pacing rules say to add a hook every few paragraphs, and "new character entrance" is one of the listed hooks.
+- Other instructions demand "NEW events, NEW developments" in every section.
+- After acceptance, story memory reads the prose. Any name it can't match becomes a review entry or a new story record.
 
-## Stage 3 — Catch inventions before acceptance
-- The pre-acceptance check compares the draft against the blueprint. Names are matched to known characters, nicknames and pronouns, never just to capital letters.
-- An unplanned named person, important place or major event is a serious finding. The draft is held for you with three choices: rewrite without it, amend the plan, or accept it as a planning change. Harmless detail is never flagged.
-- The "Characters to confirm" panel is removed for planned books. Story memory only links to planned entries; anything unknown is reported as a problem, never quietly added.
+## 2. How chapter plans look today
+- Whole-book summary: 300–500 words (unchanged by this work).
+- Chapter: objective, stakes, focus, and a list of sections with objectives.
+- Section: entry, focus, outcome, and optional reveal setup.
+- Beats: 2–8 per section, each just a type plus a one-line note.
+- No step lists the cast, places or events per chapter, section or beat, and there is nothing like one sentence per paragraph.
 
-## Stage 4 — Plan changes
-- Changing a plan creates a new version. Affected beats and later chapters are marked for update, and accepted chapters are never rewritten silently.
+## 3. Where detail is lost
+Between the whole-book summary and the section plan. Characters in the book's cast are passed to the writer as a general cast list (with future debuts held back). No plan level says who is present in this scene, where it happens, or which events happen.
 
-## Existing books
-- Books already written and the six [2D] books are untouched. Standard writing is unchanged.
-- Older planned books keep working. They get a "Build blueprint" button, and the new rules apply only after their blueprint is approved.
+## 4. Do the writing instructions allow invention?
+Yes. Nothing forbids new named people, places or major events, and the hook rule actively suggests new characters. The quality checks catch contradictions, but not "this person was never planned".
 
-## Tests (free, simulated AI only)
-All 12 checks from your brief, including: a character can't be invented and then confirmed afterward, nicknames and pronouns resolve correctly, hidden identities stay hidden, harmless detail passes, a plan change can add a character, an old manuscript is unaffected. The full existing suite must still pass. No paid AI calls.
+## 5. What can be reused (no duplicate systems)
+- The planning chain (master plan, chapters, sections, beats) gets richer beats and a chapter blueprint.
+- The book's cast and story records are the single list of characters, places and events.
+- The name matcher already handles nicknames, aliases and full names, and is not fooled by capital letters.
+- Debut timing and secret-reveal protection stay as they are.
+- The pre-acceptance check, held drafts, the contradiction cards and protected acceptance are where an unplanned person is caught.
+
+## 6. Removing post-writing confirmation safely
+- First, fix the lookup so the book's own cast counts as known, and clear the duplicate entries.
+- For planned books, an unknown name found after writing becomes a held-draft finding with three choices: rewrite without it, add it to the plan, or keep it as an approved plan change. It never becomes a silent new character.
+- The "Characters to confirm" panel is hidden for planned books. It stays for older books until they're migrated.
+
+## 7. Data changes
+- New optional fields inside chapter and section plans: a readable synopsis, a cast list, places, events, and detailed microbeats. Each beat lists its characters, place, events, purpose and handoff to the next beat, all linked to the book's existing records. These go inside the existing plan records, with a version bump.
+- A per-book "blueprint mode" switch.
+- One clean-up of the duplicate review entries. This is only done with your approval.
+
+## 8. Existing books
+- Accepted text, the six [2D] books, Standard writing and the 48 writer profiles are untouched.
+- Older planned books keep working. They get a "Build blueprint" option, and the strict rules apply only after you approve a blueprint.
+
+## 9. Staged plan
+- **Stage 1 (quick win):** fix the cast lookup, remove duplicate review entries (with your OK), and drop "new character entrance" from hooks for planned books.
+- **Stage 2:** chapter blueprint plus microbeats in planning, with no word limit on the synopsis. Anyone the plan needs who isn't in the cast yet is added and approved during planning.
+- **Stage 3:** the writer gets the blueprint and the instruction "expand the approved story; do not create new story facts". If something essential is missing, writing stops and asks for a plan update.
+- **Stage 4:** the pre-acceptance check flags unplanned people, important places and major events. Harmless detail is allowed.
+- **Stage 5:** plan changes are versioned and mark affected later chapters. Accepted chapters are never rewritten silently.
+
+Each stage gets free simulated-AI tests from your 12-point list, and the full existing suite must pass.
 
 ## Technical details
-- Extend `book_progressive_plans` content (schema version bump) with `synopsis`, `cast[]`, `locations[]`, `events[]`, and microbeats `{id, objective, text, characterIds, locationId, eventIds, transition}`. All IDs resolve to existing identity entities; no new registry.
-- `aiPlanning.ts`: new blueprint service plus parser/validator, with a coverage and reference check and bounded repair of 2 or fewer. `planningContext.ts` / `proseWriterPlanView` pass the blueprint while keeping reveal filtering. `cast.ts` debut gating stays.
-- `generate-content` hook rules: drop "new character entrance" only when a progressive plan is in use, so Standard prompts stay byte-identical.
-- `validation.ts` / `evaluator.ts`: new material category `unplanned_entity` using the identity resolver (`identity.ts`, aliases, knownNames). Routed to `canon_reconciliation_logs` and held via `book_candidate_drafts`.
-- `identitySync.ts`: in blueprint mode, NEW_ENTITY produces a finding, not a proposal. Hide `IdentityReviewPanel` for those books.
-- Migration: only new JSON fields and a mode flag. Accepted prose and the 48 profiles are untouched.
+- Bug: `knowledgeRepo.loadIdentitiesFor` reads only `narrative_identities` (universe/persona level). Book-level `story_characters` / `identity_entities` are ignored, so `planKnowledgeWrites` returns `no_identity` reviews (156 pending for book 7324…, `0:1`). Fix: merge book cast and identity entities into `KnownIdentity[]`, then dedupe reviews by book + name + reason.
+- Invention sources: `generate-content/index.ts:185` (hook list), lines 290 and 336 (NEW events mandate); no closed-world rule in `planningContext.ts`.
+- Planning: `aiPlanning.ts` Service 3 (chapter: objective/stakes/focus/sections), Service 4 (entry/focus/outcome), Service 5 (beats `{kind, note, weight}`). Extend Service 3/5 with `synopsis`, `cast[]`, `locations[]`, `events[]`, microbeats `{id, text, characterIds, locationId, eventIds, purpose, transition}`, plus a reference/coverage validator (repair limited to 2 rounds).
+- Gate: a new material category `unplanned_entity` in `validation.ts`/`evaluator.ts` via `identity.ts` `resolveReference`, routed to `canon_reconciliation_logs` and `book_candidate_drafts`. `identitySync` NEW_ENTITY becomes a finding in blueprint mode.
+- Standard prompts stay byte-identical: all prompt changes apply only when `planning_pipeline = "progressive"`.
