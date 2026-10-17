@@ -17,7 +17,7 @@ export function literaryCaller(plan: LiteraryPlan, ctx: { userId: string; bookId
       if (meta.usedFallback && !plan.fallback) throw new Error("FALLBACK_FORBIDDEN");
       const actual = estimateCostUSD(meta.model, { inputTokens: meta.usage.inputTokens ?? inTok, outputTokens: meta.usage.outputTokens ?? LITERARY_MAX_OUTPUT, cachedInputTokens: meta.usage.cachedInputTokens ?? 0 }) ?? reserved;
       ctx.budget.settle(reserved, Math.min(actual, reserved));
-      return { text };
+      return { text, stopReason: meta.usage.stopReason ?? null };
     } catch (e) { throw e; } // failed call: the worst case stays counted
   };
 }

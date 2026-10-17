@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
-import { resolveLiteraryReviser, resolveLiteraryMode, literaryCallConfig, LiteraryBudget, buildLiteraryPrompt, DEFAULT_LITERARY_CAP_USD } from "../../supabase/functions/_shared/writers/literaryReviser";
+import { resolveLiteraryReviser, resolveLiteraryMode, literaryCallConfig, LiteraryBudget, buildLiteraryPrompt, DEFAULT_LITERARY_CAP_USD, LITERARY_MAX_OUTPUT } from "../../supabase/functions/_shared/writers/literaryReviser";
 import { resolveModelForRole, LEGACY_ROLE_MODELS } from "../../supabase/functions/_shared/ai/roles";
 import { PROFILES } from "../../supabase/functions/_shared/writers/profiles";
 import { selectRoute } from "../../supabase/functions/_shared/ai/client";
@@ -60,7 +60,7 @@ describe("cost safeguards", () => {
   });
   it("reservation covers the authorized fallback too", () => {
     const plan = { mode: "automatic" as const, model: "openai/gpt-6-sol", fallback: "anthropic/claude-fable-5-1", capUsd: 1, maxAttempts: 2 };
-    expect(new LiteraryBudget(1).reserve(plan, 1000)).toBeCloseTo((1000 * 10 + 1500 * 50) / 1e6, 9);
+    expect(new LiteraryBudget(1).reserve(plan, 1000)).toBeCloseTo((1000 * 10 + LITERARY_MAX_OUTPUT * 50) / 1e6, 9);
   });
   it("own key required: no platform/gateway route", async () => {
     const deps = { env: { LOVABLE_API_KEY: "x" }, getUserKey: async () => null, recordUsage: async () => {} };
@@ -91,7 +91,7 @@ describe("prompt and engine", () => {
 
 describe("Astra vs Fable benchmark (mocked, no paid calls)", () => {
   it("uses the real Draft B when available", () => { if (B) expect(B.length).toBeGreaterThan(5000); });
-  it("worst case for Draft B fits $0.21", () => {
+  it("worst case for Draft B fits the v2 cap ($0.32)", () => {
     const w = literaryBenchmarkWorstCase(draftB, vp);
     expect(w.total).toBeLessThanOrEqual(LITERARY_BENCHMARK_CAP_USD);
   });

@@ -4,7 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { generateAIText } from "../_shared/ai/client.ts";
-import { runExperiment, runRewriteOnly, runLiteraryBenchmark, literaryBenchmarkWorstCase, LITERARY_BENCHMARK_CAP_USD, LITERARY_BENCHMARK_MODELS, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
+import { runExperiment, runRewriteOnly, runLiteraryBenchmark, literaryBenchmarkWorstCase, LITERARY_BENCHMARK_CAP_USD, LITERARY_BENCHMARK_CONFIRM, LITERARY_BENCHMARK_MODELS, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
 import type { Role } from "../_shared/ai/registry.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
   if (!uid) return json({ error: "Unauthorized" }, 401);
   const body = await req.json().catch(() => ({}));
   const rewriteOnly = body?.confirm === "RUN_REWRITE_ONLY_0.03";
-  const literary = body?.confirm === "RUN_LITERARY_BENCHMARK_0.21";
+  const literary = body?.confirm === LITERARY_BENCHMARK_CONFIRM;
   // Free dry run: worst-case plan only, no AI call.
   if (body?.action === "literary_plan") {
     const flawed = typeof body.flawed === "string" && body.flawed.length > 500 && body.flawed.length <= 20000 ? body.flawed : null;
@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
       inputTokens: meta.usage.inputTokens ?? countTokens(system) + countTokens(u),
       outputTokens: meta.usage.outputTokens ?? maxOutputTokens,
       cachedInputTokens: meta.usage.cachedInputTokens ?? 0,
+      stopReason: meta.usage.stopReason ?? null,
     };
   };
 

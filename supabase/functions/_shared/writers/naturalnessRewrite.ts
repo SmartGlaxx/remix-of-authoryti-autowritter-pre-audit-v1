@@ -14,7 +14,7 @@ const REWRITABLE = new Set(["opening_recurrence", "figurative_density", "burstin
 
 export interface Edit { find: string; replace: string }
 export interface Prompt { system: string; user: string }
-export type RewriteModel = (p: Prompt) => Promise<{ text: string }>;
+export type RewriteModel = (p: Prompt) => Promise<{ text: string; stopReason?: string | null }>;
 
 export interface RewriteOptions extends AnalyzeOptions {
   mode: NaturalnessMode;
@@ -30,7 +30,7 @@ export interface RewriteOptions extends AnalyzeOptions {
   maxAttempts?: number;
 }
 export interface RewriteAttempt { attempt: number; edits: number; accepted: boolean; reason: string; scoreBefore: number; scoreAfter?: number }
-export interface RewriteProposal { attempt: number; rawEdits: Edit[]; rejectedEdits: string[]; candidate: string; changeRatio: number }
+export interface RewriteProposal { attempt: number; rawEdits: Edit[]; rejectedEdits: string[]; candidate: string; changeRatio: number; outputStatus?: OutputStatus; stopReason?: string | null; rawOutput?: string }
 export interface RewriteResult { text: string; changed: boolean; attempts: RewriteAttempt[]; proposals?: RewriteProposal[]; before: NaturalnessFinding[]; after: NaturalnessFinding[]; unresolved: string[] }
 
 /** Lower is better. Counts each flagged item, so fixing one stock phrase inside a finding still counts. */
@@ -58,17 +58,50 @@ export function buildRewritePrompt(text: string, findings: NaturalnessFinding[],
   };
 }
 
-export function parseEdits(raw: string): Edit[] {
-  const t = raw.replace(/```(?:json)?/gi, "");
+export const MAX_EDITS = 12;
+/** "ok" = complete valid JSON; "salvaged" = invalid/truncated JSON but complete edit objects recovered;
+ *  "truncated" = output cut off with nothing recoverable; "malformed" = finished but unreadable;
+ *  "empty" = no output. Truncated/malformed are infrastructure outcomes, never quality verdicts. */
+export type OutputStatus = "ok" | "salvaged" | "truncated" | "malformed" | "empty";
+export interface ParsedEdits { edits: Edit[]; status: OutputStatus; truncated: boolean; dropped: number }
+
+const isTruncStop = (s?: string | null) => !!s && /max_tokens|max_output_tokens|length|incomplete/.test(s);
+const clean = (xs: any[]) => xs.filter((x: any) => typeof x?.find === "string" && typeof x?.replace === "string" && x.find.trim())
+  .map((x: any) => ({ find: x.find, replace: x.replace }));
+const STR = String.raw`"(?:[^"\\]|\\.)*"`;
+const OBJ = new RegExp(String.raw`\{\s*"(find|replace)"\s*:\s*(${STR})\s*,\s*"(find|replace)"\s*:\s*(${STR})\s*\}`, "g");
+
+/** Robust edit extraction: fences, preambles, Anthropic prose, truncated arrays. */
+export function parseEditsDetailed(raw: string, stopReason?: string | null): ParsedEdits {
+  const t = (raw ?? "").replace(/```(?:json)?/gi, "").trim();
+  const truncated = isTruncStop(stopReason);
+  if (!t) return { edits: [], status: truncated ? "truncated" : "empty", truncated, dropped: 0 };
   const s = t.indexOf("{"), e = t.lastIndexOf("}");
-  if (s < 0 || e <= s) return [];
-  try {
-    const o = JSON.parse(t.slice(s, e + 1));
-    return (Array.isArray(o?.edits) ? o.edits : [])
-      .filter((x: any) => typeof x?.find === "string" && typeof x?.replace === "string" && x.find.trim())
-      .slice(0, 12).map((x: any) => ({ find: x.find, replace: x.replace }));
-  } catch { return []; }
+  let parsedOk = false;
+  if (s >= 0 && e > s) {
+    try {
+      const o = JSON.parse(t.slice(s, e + 1));
+      parsedOk = true;
+      const all = clean(Array.isArray(o?.edits) ? o.edits : Array.isArray(o) ? o : []);
+      if (Array.isArray(o?.edits) && !truncated) return { edits: all.slice(0, MAX_EDITS), status: "ok", truncated, dropped: Math.max(0, all.length - MAX_EDITS) };
+    } catch { /* fall through to salvage */ }
+  }
+  // Salvage: every COMPLETE {"find","replace"} object; a half-written trailing object is discarded.
+  const found: Edit[] = [];
+  for (const m of t.matchAll(OBJ)) {
+    if (m[1] === m[3]) continue;
+    try {
+      const a = JSON.parse(m[2]), b = JSON.parse(m[4]);
+      const ed = m[1] === "find" ? { find: a, replace: b } : { find: b, replace: a };
+      if (typeof ed.find === "string" && ed.find.trim() && typeof ed.replace === "string") found.push(ed);
+    } catch { /* skip */ }
+  }
+  if (found.length) return { edits: found.slice(0, MAX_EDITS), status: "salvaged", truncated, dropped: Math.max(0, found.length - MAX_EDITS) };
+  const looksCut = truncated || (s >= 0 && !parsedOk && !/\}\s*$/.test(t));
+  return { edits: [], status: looksCut ? "truncated" : "malformed", truncated: looksCut, dropped: 0 };
 }
+
+export function parseEdits(raw: string): Edit[] { return parseEditsDetailed(raw).edits; }
 
 const QUOTE = /["\u201C\u201D]/;
 const COMMON = new Set(["The","She","He","They","His","Her","Their","Its","It","And","But","Then","When","There","This","That","A","An","In","On","At","As","For","With","After","Before","Again","Now","We","You","I","Our","Your","So","Yet","Still","Even","Only","If","While","From","By","Of"]);
@@ -129,12 +162,15 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
     const targets = bestFindings.filter((f) => REWRITABLE.has(f.category));
     if (!targets.length) break;
     const scoreBefore = naturalnessScore(bestFindings);
-    let edits: Edit[] = [];
-    try { edits = parseEdits((await model((o.promptBuilder ?? buildRewritePrompt)(best, targets, o))).text); }
+    let parsed: ParsedEdits; let out: { text: string; stopReason?: string | null };
+    try { out = await model((o.promptBuilder ?? buildRewritePrompt)(best, targets, o)); parsed = parseEditsDetailed(out.text, out.stopReason); }
     catch { res.attempts.push({ attempt: i, edits: 0, accepted: false, reason: "model_unavailable", scoreBefore }); break; }
+    const edits = parsed.edits;
     const { text: cand, applied, rejected } = applyEdits(best, edits, o.knownNames);
-    res.proposals!.push({ attempt: i, rawEdits: edits, rejectedEdits: rejected, candidate: cand, changeRatio: charChangeRatio(draft, cand) });
+    res.proposals!.push({ attempt: i, rawEdits: edits, rejectedEdits: rejected, candidate: cand, changeRatio: charChangeRatio(draft, cand), outputStatus: parsed.status, stopReason: out.stopReason ?? null, rawOutput: (out.text ?? "").slice(0, 20000) });
     const push = (accepted: boolean, reason: string, scoreAfter?: number) => res.attempts.push({ attempt: i, edits: applied, accepted, reason, scoreBefore, scoreAfter });
+    // Infrastructure outcomes are reported as such — never as "the model found nothing to fix".
+    if (!edits.length && (parsed.status === "truncated" || parsed.status === "malformed" || parsed.status === "empty")) { push(false, `output_${parsed.status}`); continue; }
     if (!applied) { push(false, "no_safe_edits"); continue; }
     if (charChangeRatio(draft, cand) > limit) { push(false, "change_too_broad"); continue; }
     if (det(cand) > baseDet) { push(false, "introduced_validation_issue"); continue; }

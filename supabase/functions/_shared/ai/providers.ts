@@ -23,6 +23,8 @@ export interface Usage {
   /** Anthropic only: tokens written to the prompt cache on this call (billed at 1.25× input). */
   cacheWriteInputTokens?: number | null;
   requestId: string | null;
+  /** Why generation stopped, normalised: "complete" | "max_tokens" | other provider reason. */
+  stopReason?: string | null;
 }
 
 export type AIEvent = { type: "text"; text: string } | { type: "usage"; usage: Partial<Usage> };
@@ -177,7 +179,8 @@ async function* responses(url: string, headers: Record<string, string>, modelId:
     if (type === "response.output_text.delta" && p.delta) yield { type: "text", text: p.delta };
     else if (type === "response.completed" || type === "response.incomplete") {
       const u = p.response?.usage;
-      yield { type: "usage", usage: { inputTokens: u?.input_tokens ?? null, outputTokens: u?.output_tokens ?? null, cachedInputTokens: u?.input_tokens_details?.cached_tokens ?? null, requestId: p.response?.id ?? null } };
+      const why = type === "response.completed" ? "complete" : (p.response?.incomplete_details?.reason === "max_output_tokens" ? "max_tokens" : String(p.response?.incomplete_details?.reason ?? "incomplete"));
+      yield { type: "usage", usage: { inputTokens: u?.input_tokens ?? null, outputTokens: u?.output_tokens ?? null, cachedInputTokens: u?.input_tokens_details?.cached_tokens ?? null, requestId: p.response?.id ?? null, stopReason: why } };
     } else if (type === "response.failed" || type === "error") {
       const msg = scrubSecrets(String(p.response?.error?.message ?? p.error?.message ?? p.message ?? "stream failed"), ctx.apiKey);
       throw new AIProviderError("unavailable", `${provider}: ${msg}`, null, false);
@@ -218,8 +221,9 @@ async function* messages(url: string, headers: Record<string, string>, modelId: 
       requestId = p.message?.id ?? null;
     } else if (p.type === "content_block_delta" && p.delta?.type === "text_delta") {
       yield { type: "text", text: p.delta.text };
-    } else if (p.type === "message_delta" && p.usage) {
-      yield { type: "usage", usage: { inputTokens: input, cachedInputTokens: cached, cacheWriteInputTokens: cacheWrite, outputTokens: p.usage.output_tokens ?? null, requestId } };
+    } else if (p.type === "message_delta" && (p.usage || p.delta?.stop_reason)) {
+      const sr = p.delta?.stop_reason;
+      yield { type: "usage", usage: { inputTokens: input, cachedInputTokens: cached, cacheWriteInputTokens: cacheWrite, outputTokens: p.usage?.output_tokens ?? null, requestId, stopReason: sr ? (sr === "end_turn" || sr === "stop_sequence" ? "complete" : String(sr)) : null } };
     } else if (p.type === "error") {
       throw new AIProviderError("unavailable", `${provider}: ${scrubSecrets(String(p.error?.message ?? "stream error"), ctx.apiKey)}`);
     }
