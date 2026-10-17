@@ -116,6 +116,32 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
     } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Correction failed" }); }
     finally { setBusy(""); setPhase(""); }
   };
+  const sendChat = async (log: Log) => {
+    const text = draft.trim();
+    if (!text) return;
+    const turns = [...(chat[log.id] ?? []), { role: "author" as const, content: text }];
+    setChat((old) => ({ ...old, [log.id]: turns })); setDraft("");
+    setBusy(log.id); setPhase("Discussing with the continuity editor…");
+    try {
+      const r = await callReview<{ reply?: string; edits?: { find: string; replace: string }[]; error?: string }>({ action: "discuss_conflict", bookId, logId: log.id, messages: turns.map((t) => ({ role: t.role, content: t.content })) });
+      if (!r.ok || !r.data.reply) throw new Error(r.data.error ?? "The editor could not respond. Try again.");
+      setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: r.data.reply!, edits: r.data.edits?.length ? r.data.edits : undefined }] }));
+    } catch (e) { setChat((old) => ({ ...old, [log.id]: [...turns, { role: "assistant", content: e instanceof Error ? e.message : "The editor could not respond. Try again." }] })); }
+    finally { setBusy(""); setPhase(""); }
+  };
+  const applyChatEdits = async (log: Log, index: number) => {
+    const turn = chat[log.id]?.[index];
+    if (!turn?.edits?.length) return;
+    setBusy(log.id); setPhase("Applying the suggested edits…");
+    try {
+      const r = await callReview<{ candidate_id: string; draft_text: string; error?: string }>({ action: "apply_conflict_edits", bookId, logId: log.id, edits: turn.edits });
+      if (!r.ok) throw new Error(r.data.error ?? "Could not apply the suggestion");
+      updateWork(log.id, { id: r.data.candidate_id, original: r.data.draft_text, text: r.data.draft_text, outcome: "Suggestion applied as a new draft version. Run checks before accepting it." });
+      setChat((old) => ({ ...old, [log.id]: (old[log.id] ?? []).map((t, i) => i === index ? { ...t, applied: true } : t) }));
+      await load(); notify();
+    } catch (e) { updateWork(log.id, { outcome: e instanceof Error ? e.message : "Could not apply the suggestion" }); }
+    finally { setBusy(""); setPhase(""); }
+  };
   const evidenceCard = (log: Log, side: "prior" | "new", detailed = false) => {
     const e = side === "prior" ? log.prior : log.newer;
     const isOpen = expanded.includes(side);
