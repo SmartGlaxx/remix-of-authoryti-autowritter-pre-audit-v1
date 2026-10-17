@@ -37,6 +37,8 @@ export function ContradictionReviewCard({ bookId, onAccepted }: { bookId: string
   const [work, setWork] = useState<Record<string, Work>>({});
   const [note, setNote] = useState("");
   const [history, setHistory] = useState(false);
+  const [chat, setChat] = useState<Record<string, ChatTurn[]>>({});
+  const [draft, setDraft] = useState("");
   const load = useCallback(async () => {
     try {
       const r = await callReview<{ logs?: Log[]; error?: string }>({ action: "conflicts", bookId });
