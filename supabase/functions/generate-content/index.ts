@@ -7,6 +7,8 @@ import { openingDirective } from "../_shared/writers/opening.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
 import { runNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
+import { recordSignals } from "../_shared/writers/learningRepo.ts";
+import { renderActiveOverlays } from "../_shared/writers/learning.ts";
 import { buildLedger, planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { buildNarrativeContext } from "../_shared/narrative/context.ts";
@@ -841,6 +843,10 @@ serve(async (req) => {
               const fs = analyzeSection(finalText, { ledger: nl, bookType: book.bookType });
               await adminSupabase.from("naturalness_findings").delete().eq("book_id", book.id).eq("chapter_index", absChapter).eq("subsection_index", subsectionIndex).eq("status", "open");
               if (fs.length) await adminSupabase.from("naturalness_findings").insert(fs.map((f) => ({ book_id: book.id, user_id: auth.user.id, chapter_index: absChapter, subsection_index: subsectionIndex, category: f.category, severity: f.severity, message: f.message, evidence: f.evidence, content_hash: hash })));
+              // Stage D: learning signals (best-effort; never blocks). Findings + proven rewrite improvements.
+              const sig = { userId: auth.user.id, bookId: book.id, controls: book.controls, bookType: book.bookType, chapter: absChapter, sub: subsectionIndex, hash };
+              await recordSignals(adminSupabase, { ...sig, categories: fs.map((f) => f.category), kind: "finding", sourceRef: `section:${book.id}:${absChapter}:${subsectionIndex}:${hash}` });
+              await recordSignals(adminSupabase, { ...sig, categories: provenCategories, kind: "proven", sourceRef: `rewrite:${book.id}:${absChapter}:${subsectionIndex}:${hash}` });
             } catch (e) { console.warn("[naturalness] skipped:", e instanceof Error ? e.message : e); }
           }
         }
