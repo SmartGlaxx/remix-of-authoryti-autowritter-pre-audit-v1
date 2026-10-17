@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { PersonaStudioView } from "@/pages/PersonaStudio";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Lock, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Loader2, Lock, BookOpen, Plus, RefreshCw, Trash2, Check, X, Sparkles, Wand2, ArrowLeft, ArrowRight } from "lucide-react";
 type ScreenKey = "idea" | "twists" | "cast" | "narration" | "writer";
 const SCREEN_LABEL: Record<ScreenKey, string> = { idea: "Idea & story", twists: "Twist reveals", cast: "Characters", narration: "Narrator & pen name", writer: "Writer & voice" };
 import { supabase } from "@/integrations/supabase/client";
@@ -18,10 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
 import { WriterPicker } from "@/components/WriterPicker";
+import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
 import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
 import { SLIDERS, MAX_ADJUST, NEUTRAL, readSliders, type SliderValues } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
-import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType } from "@/types/book";
+import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType, type CreateBookInput } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
@@ -63,6 +64,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const [premiseExpanded, setPremiseExpanded] = useState(false);
   const [screen, setScreen] = useState(0);
   const [studioOpen, setStudioOpen] = useState(false);
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const draftKey = `book-setup-draft:${book.id}`;
   const [dir, setDir] = useState<1 | -1>(1);
   const [hasProse, setHasProse] = useState(false);
@@ -193,6 +195,22 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
       .then(({ error }) => { if (error) toast.error("Couldn't update the book title"); else onSaved(); });
   };
   const run = async (label: string, fn: () => Promise<void>) => { setBusy(label); try { await fn(); } catch (e) { toast.error(e instanceof Error ? e.message : "Something went wrong"); } finally { setBusy(null); } };
+  const useSavedIdea = (idea: Partial<CreateBookInput>) => run("saved-idea", async () => {
+    if (hasProse) throw new Error("Writing has started — this book's story cannot be replaced.");
+    if (st.premise.trim() && !window.confirm("Replace this starting idea and writer settings with the saved idea? Written text will not change.")) return;
+    const next: BookSetup = { ...st, premise: idea.theme ?? "", alternatives: [], selectedIndex: null, storyMode: "skip", stage: "concept" };
+    const result = await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: next });
+    if (!result.ok) throw new Error(result.data.message ?? result.data.error ?? "Couldn't use this idea");
+    const { error } = await supabase.from("books").update({
+      title: idea.title, theme: idea.theme, book_type: idea.bookType, genre: idea.genre ?? null, audience: idea.audience,
+      tone_profile: { ...(book.tone_profile ?? {}), ...idea.toneProfile },
+      controls: { ...(book.controls ?? {}), ...idea.controls },
+    }).eq("id", book.id);
+    if (error) throw error;
+    setSt(result.data.setup); setExType(idea.bookType ?? exType); setExGenre(idea.genre ?? ""); setExAudience(idea.audience ?? "");
+    setWriterId(idea.controls?.writerId ?? ""); setSliders(readSliders({ ...idea.toneProfile }, { ...idea.controls }));
+    onTitleChange?.(idea.title ?? book.title); setIdeasOpen(false); onSaved(); toast.success("Saved idea added to your setup");
+  });
   const universeIds = identities.filter((i) => (i.universe_id ?? null) === st.universeId);
   const libraryHits = search.trim() ? universeIds.filter((i) => i.display_name.toLowerCase().includes(search.toLowerCase()) && !st.cast.some((c) => c.identityId === i.id)).slice(0, 8) : [];
 
@@ -322,6 +340,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
           </div>}
           {!locked && <p className="text-xs text-muted-foreground">Generating for: <span className="text-foreground">{[BOOK_TYPE_INFO[exType as BookType]?.label, exGenre || "any sub-category", exAudience || "any audience", curriculum?.country?.split(" (")[0], exFiction && (st.twistsEnabled ? "plot twist mode" : "no twist")].filter(Boolean).join(" · ")}</span></p>}
           <Textarea ref={premiseRef} rows={6} className="h-40 min-h-40 resize-none box-border" aria-label="Initial book idea" value={st.premise} disabled={locked} onFocus={() => setPremiseExpanded(true)} onBlur={() => setPremiseExpanded(false)} onChange={(e) => up({ premise: e.target.value })} placeholder="Your idea, title, theme or premise — or press Surprise me" />
+          {!locked && <Button variant="outline" size="sm" disabled={!!busy} onClick={() => setIdeasOpen(true)}><BookOpen className="mr-2 h-4 w-4" />Pick from Saved Ideas</Button>}
           {!locked && <div className="flex flex-wrap justify-end items-center gap-2">
             <Select value={adjustKey} onValueChange={setAdjustKey}><SelectTrigger className="w-56 h-9" aria-label="What to change"><SelectValue placeholder="What should change?" /></SelectTrigger>
               <SelectContent>{ADJUSTMENTS.filter((o) => exFiction ? o.value !== "practical" : !["twists", "romance", "darker"].includes(o.value)).map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select>
@@ -549,6 +568,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
               onAdd: ({ id, name }) => { const ex = st.cast.find((c) => !c.identityId && c.name.toLowerCase() === name.toLowerCase()); if (ex) setCast(ex.key, { identityId: id, lightweight: false }); else addCast({ name, identityId: id, lightweight: false }); toast.success(`${name} added to this book`); } }} />
         </DialogContent>
       </Dialog>
+      {ideasOpen && <BookIdeasGenerator initialTab="saved" onBack={() => setIdeasOpen(false)} onAccept={useSavedIdea} accepting={busy === "saved-idea"} />}
     </div>
   );
 }

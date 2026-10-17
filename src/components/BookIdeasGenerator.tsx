@@ -24,9 +24,10 @@ const audienceLabel = (v: string) => AUDIENCE_OPTIONS.find((a) => a.value === v)
 
 /** Idea → Creation Engine pre-fill (15 sliders mapped onto the book's tone/controls fields). */
 export function ideaToInput(i: BookIdea): Partial<CreateBookInput> {
-  const s = i.sliders ?? WRITER_BASELINES[i.writerId]!;
+  const s = i.sliders ?? WRITER_BASELINES[i.writerId] ?? WRITER_BASELINES[bestWriterFor(i.bookType).id];
+  if (!s) return { title: i.title, theme: i.description, bookType: i.bookType, genre: i.genre || undefined, audience: i.audience };
   return {
-    title: i.title, subtitle: i.subtitle || undefined, theme: i.description, bookType: i.bookType, genre: i.genre || undefined, audience: i.audience,
+    title: i.title, theme: i.description, bookType: i.bookType, genre: i.genre || undefined, audience: i.audience,
     toneProfile: { formality: s.formality, emotionalIntensity: s.emotion, warmth: s.warmth, humorLevel: s.humor, authorityLevel: s.authority, directness: s.directness, readerIntimacy: s.readerIntimacy } as any,
     controls: { writerId: i.writerId, velocity: s.pacing, scope: s.elaboration, entityComplexity: s.conceptualComplexity, perspectiveMultiplexing: s.perspective, creativity: s.creativity, hookFrequency: s.hookFrequency, sensoryDetail: s.sensoryDetail, sentenceVariation: s.sentenceVariation, divergenceMode: i.divergence, divergenceAllowed: i.divergence !== "strict" } as any,
   };
@@ -47,8 +48,9 @@ const rowToIdea = (r: SavedRow): BookIdea => {
   return { title: r.title, subtitle: r.subtitle, description: r.description, bookType: bt, genre: r.genre, audience: r.audience, ...d };
 };
 
-export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; onAccept: (input: Partial<CreateBookInput>) => void }) {
-  const [tab, setTab] = useState<"new" | "saved">("new");
+export function BookIdeasGenerator({ onBack, onAccept, initialTab = "new", accepting = false }: { onBack: () => void; onAccept: (input: Partial<CreateBookInput>) => void; initialTab?: "new" | "saved"; accepting?: boolean }) {
+  const [tab, setTab] = useState<"new" | "saved">(initialTab);
+  const [loadingSaved, setLoadingSaved] = useState(true);
   const [brief, setBrief] = useState("");
   const [ideas, setIdeas] = useState<LightIdea[]>([]);
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -59,8 +61,10 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
   const [open, setOpen] = useState<SavedRow | null>(null);
 
   const loadSaved = async () => {
-    const { data } = await supabase.from("saved_book_ideas").select("id,title,subtitle,description,book_type,genre,audience,details").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("saved_book_ideas").select("id,title,subtitle,description,book_type,genre,audience,details").order("created_at", { ascending: false });
+    if (error) { setErr("Couldn't load your saved ideas. Please try again."); setLoadingSaved(false); return; }
     setSaved((data ?? []) as unknown as SavedRow[]);
+    setLoadingSaved(false);
   };
   useEffect(() => { loadSaved(); }, []);
 
@@ -107,7 +111,6 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
     <div onClick={onClick} className={`space-y-2 rounded-2xl border bg-card p-4 text-left transition-colors ${onClick ? "cursor-pointer hover:border-primary/50" : ""} border-border`}>
       <div className="text-[11px] uppercase tracking-wide text-primary">{BOOK_TYPE_INFO[i.bookType]?.label}{i.genre && ` · ${i.genre}`} · {audienceLabel(i.audience)}</div>
       <h3 className="font-serif text-lg font-semibold leading-tight">{i.title}</h3>
-      {i.subtitle && <p className="text-sm text-muted-foreground">{i.subtitle}</p>}
       <p className="line-clamp-4 text-sm">{i.description}</p>
       {children}
     </div>
@@ -116,11 +119,10 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
+        <div className="mx-auto flex min-h-16 max-w-5xl flex-wrap items-center gap-3 px-4 py-2">
           <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back"><ArrowLeft className="h-5 w-5" /></Button>
           <div className="min-w-0 flex-1">
             <h1 className="font-serif text-xl font-semibold">Book Ideas</h1>
-            <p className="truncate text-sm text-muted-foreground">Browse ideas, save the ones you like, start a book from any saved idea.</p>
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant={tab === "new" ? "secondary" : "ghost"} className="rounded-full" onClick={() => setTab("new")}>New ideas</Button>
@@ -136,7 +138,6 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
               <Button className="rounded-full" onClick={run} disabled={loading || saving}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{ideas.length ? "Generate new ideas" : "Generate ideas"}</Button>
               {ideas.length > 0 && <Button variant="secondary" className="rounded-full" onClick={savePicked} disabled={!picked.size || saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bookmark className="mr-2 h-4 w-4" />}{saving ? "Preparing full setups…" : `Save selected (${picked.size})`}</Button>}
             </div>
-            {err && <p className="text-sm text-destructive">{err}</p>}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {ideas.map((i, n) => (
@@ -146,7 +147,7 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
             ))}
           </div>
         </>) : (
-          saved.length ? (
+          loadingSaved ? <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" aria-label="Loading saved ideas" /> : saved.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {saved.map((r) => { const i = rowToIdea(r); const w = WRITER_PERSONAS.find((p) => p.id === i.writerId); return (
                 <Card key={r.id} i={i}>
@@ -162,18 +163,20 @@ export function BookIdeasGenerator({ onBack, onAccept }: { onBack: () => void; o
             </div>
           ) : <p className="text-sm text-muted-foreground">No saved ideas yet. Generate some and save the ones you like.</p>
         )}
+        {err && <div className="flex items-center gap-2"><p role="alert" className="text-sm text-destructive">{err}</p>{tab === "saved" && <Button variant="outline" size="sm" onClick={loadSaved}>Retry</Button>}</div>}
       </main>
       {open && (
-        <IdeaDialog idea={rowToIdea(open)} onClose={() => setOpen(null)} onChange={(u) => updateSaved(open, u)} onAccept={(u) => onAccept(ideaToInput(u))} />
+        <IdeaDialog idea={rowToIdea(open)} onClose={() => setOpen(null)} onChange={(u) => updateSaved(open, u)} onAccept={(u) => onAccept(ideaToInput(u))} accepting={accepting} />
       )}
     </div>
   );
 }
 
-function IdeaDialog({ idea, onClose, onChange, onAccept }: { idea: BookIdea; onClose: () => void; onChange: (i: BookIdea) => void; onAccept: (i: BookIdea) => void }) {
-  const w = WRITER_PERSONAS.find((p) => p.id === idea.writerId)!;
-  const base = WRITER_BASELINES[idea.writerId];
-  const values = idea.sliders ?? base!;
+function IdeaDialog({ idea, onClose, onChange, onAccept, accepting }: { idea: BookIdea; onClose: () => void; onChange: (i: BookIdea) => void; onAccept: (i: BookIdea) => void; accepting: boolean }) {
+  const w = WRITER_PERSONAS.find((p) => p.id === idea.writerId) ?? bestWriterFor(idea.bookType);
+  const base = WRITER_BASELINES[w.id];
+  const values = idea.sliders ?? base;
+  if (!values) return null;
   const set = (patch: Partial<BookIdea>) => onChange({ ...idea, ...patch });
   const allowedAudiences = BOOK_TYPE_AUDIENCES[idea.bookType] ?? AUDIENCE_OPTIONS.map((a) => a.value);
   return (
@@ -186,7 +189,6 @@ function IdeaDialog({ idea, onClose, onChange, onAccept }: { idea: BookIdea; onC
         <div className="space-y-4 text-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1 sm:col-span-2"><span className="text-xs text-muted-foreground">Title</span><Input value={idea.title} maxLength={120} onChange={(e) => set({ title: e.target.value })} /></label>
-            <label className="space-y-1 sm:col-span-2"><span className="text-xs text-muted-foreground">Subtitle</span><Input value={idea.subtitle} maxLength={160} onChange={(e) => set({ subtitle: e.target.value })} /></label>
             <label className="space-y-1 sm:col-span-2"><span className="text-xs text-muted-foreground">Description</span><Textarea rows={3} value={idea.description} maxLength={800} onChange={(e) => set({ description: e.target.value })} /></label>
             <div className="space-y-1"><span className="text-xs text-muted-foreground">Book type</span><div>{BOOK_TYPE_INFO[idea.bookType]?.label}{idea.genre && ` · ${idea.genre}`}</div></div>
             <label className="space-y-1"><span className="text-xs text-muted-foreground">Audience</span>
@@ -222,7 +224,7 @@ function IdeaDialog({ idea, onClose, onChange, onAccept }: { idea: BookIdea; onC
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" className="rounded-full" onClick={onClose}>Close</Button>
-            <Button className="rounded-full" onClick={() => onAccept(idea)} disabled={!idea.title.trim()}>Accept & continue</Button>
+            <Button className="rounded-full" onClick={() => onAccept(idea)} disabled={accepting || !idea.title.trim()}>{accepting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Use this idea</Button>
           </div>
         </div>
       </DialogContent>
