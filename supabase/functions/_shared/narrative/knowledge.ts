@@ -100,7 +100,26 @@ export interface KnowledgeRow {
   learned_chapter_index: number | null; learned_subsection_index: number | null; evidence: string; scene_point: StoryPoint; dedup_key: string;
   supersedes: string | null;
 }
-export interface KnowledgeReview { character_name: string; reason: "ambiguous" | "no_identity"; candidate_identity_ids: string[]; payload: ExtractedKnowledge; dedup_key: string }
+export interface KnowledgeReview { character_name: string; reason: "ambiguous" | "no_identity" | "knowledge_check"; candidate_identity_ids: string[]; payload: ExtractedKnowledge & { hold?: string }; dedup_key: string }
+
+/**
+ * Knowledge screen (separate from identity). Recognising WHO holds a claim never approves the claim.
+ * Returns a hold reason, or null when the claim may be recorded as that character's knowledge
+ * (still AI-inferred character knowledge — never canonical fact):
+ *  - source_not_current: the text it came from is no longer the accepted text of that section;
+ *  - future_knowledge: it names a planner-only secret whose reveal comes after this chapter;
+ *  - unsupported_fact: a "certain, true" fact supported only by the character's own deduction.
+ */
+export function knowledgeHold(k: ExtractedKnowledge, o: { sourceCurrent?: boolean; futureSecretTerms?: readonly string[] }): string | null {
+  if (o.sourceCurrent === false) return "source_not_current";
+  const text = norm(`${k.claim} ${k.evidence ?? ""}`);
+  for (const t of o.futureSecretTerms ?? []) {
+    const term = norm(t);
+    if (term.length >= 3 && new RegExp(`(^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(text)) return "future_knowledge";
+  }
+  if (k.kind === "knows" && k.truth === "true" && k.source === "deduction") return "unsupported_fact";
+  return null;
+}
 
 const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
 function hashKey(t: string): string { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) >>> 0; return h.toString(36); }
