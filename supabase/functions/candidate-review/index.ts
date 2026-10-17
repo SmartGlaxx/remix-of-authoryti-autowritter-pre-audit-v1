@@ -13,7 +13,7 @@ import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narra
 import { conflictStatus, prepareConflict, rewriteConflict, discussConflict, applyConflictEdits } from "../_shared/narrative/planning/conflictReviewServer.ts";
 import { authorNaturalnessRewrite } from "../_shared/writers/naturalnessRewrite.ts";
 import { buildLedger } from "../_shared/writers/rhetoric.ts";
-import { recordSignals, sectionFindingCategories } from "../_shared/writers/learningRepo.ts";
+import { recordSignals, sectionFindingCategories, loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const cors = corsHeaders;

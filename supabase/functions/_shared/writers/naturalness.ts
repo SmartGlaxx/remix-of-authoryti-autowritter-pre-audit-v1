@@ -50,3 +50,13 @@ export function applyAdaptations<T extends object>(base: T, adaptations: StyleAd
   const active = adaptations.filter((a) => a.status === "active");
   return { ...structuredClone(base), adaptations: active };
 }
+
+/** Active motif/verbal-motif artifacts the author marked intentional → phrases the analyzer must not flag. */
+export function protectedMotifLabels(rows: { artifact_type: string; label: string; status: string }[] | null | undefined): string[] {
+  return [...new Set((rows ?? []).filter((r) => r.status === "active" && (r.artifact_type === "motif" || r.artifact_type === "verbal_motif"))
+    .map((r) => r.label.trim()).filter(Boolean))];
+}
+
+/** What the Naturalness Engine actually checks today vs. planned capabilities (shown honestly in the UI). */
+export const NATURALNESS_OPERATIONAL: NaturalnessCategory[] = ["opening_recurrence", "figurative_density", "burstiness", "mechanical_pattern"];
+export const NATURALNESS_PLANNED = ["Dialogue quality", "Character-voice differentiation", "Whole-manuscript literary judgement", "AI-detector scores"] as const;
