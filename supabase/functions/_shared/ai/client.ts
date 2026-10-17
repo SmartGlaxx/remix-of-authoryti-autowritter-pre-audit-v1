@@ -43,6 +43,8 @@ export interface RunAIOptions {
   modelOverride?: string | null;
   signal?: AbortSignal;
   maxRetries?: number;
+  /** Only the caller's own provider key may be used (no platform/gateway route, no surprise billing). */
+  requireUserKey?: boolean;
 }
 
 export interface RunAIMeta {
@@ -55,10 +57,11 @@ export interface RunAIMeta {
 
 interface Route { adapter: AdapterId; apiKey: string; source: CredentialSource }
 
-export async function selectRoute(modelKey: string, deps: AIDeps): Promise<Route> {
+export async function selectRoute(modelKey: string, deps: AIDeps, requireUserKey = false): Promise<Route> {
   const m = requireModel(modelKey);
   const userKey = await deps.getUserKey(m.provider);
   if (userKey) return { adapter: m.provider, apiKey: userKey, source: "user_key" };
+  if (requireUserKey) throw new AIProviderError("missing_key", `${m.displayName} requires your own ${m.provider} key; no substitute route is used.`);
   if (m.provider === "deepseek") {
     if (deps.env.DEEPSEEK_API_KEY) return { adapter: "deepseek", apiKey: deps.env.DEEPSEEK_API_KEY, source: "platform" };
     throw new AIProviderError("missing_key", `No DeepSeek key is configured for ${m.displayName}. Add your DeepSeek key in API Keys.`);
@@ -98,7 +101,7 @@ export async function* streamAI(opts: RunAIOptions, deps: AIDeps, meta: Partial<
     const usage = emptyUsage();
     let emitted = false;
     try {
-      route = await selectRoute(modelKey, deps);
+      route = await selectRoute(modelKey, deps, opts.requireUserKey === true);
       Object.assign(meta, { model: modelKey, provider: route.adapter, credentialSource: route.source, usedFallback: ci > 0, usage });
       for (let attempt = 0; ; attempt++) {
         try {

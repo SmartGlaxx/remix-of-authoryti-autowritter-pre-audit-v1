@@ -19,7 +19,7 @@ export type Profile = Record<ProfileRole, Slot>;
 /** Pipeline roles each profile role drives. */
 export const ROLE_MAP: Record<Role, ProfileRole> = {
   writer: "draft", difficult_chapter: "draft", intro_writer: "draft",
-  editor: "revision", continuity_reviser: "revision",
+  editor: "revision", continuity_reviser: "revision", literary_reviser: "revision",
   continuity_checker: "continuity", narrative_extractor: "continuity", summarizer: "continuity",
   manuscript_auditor: "auditor", planner: "auditor", character_generator: "auditor",
 };
