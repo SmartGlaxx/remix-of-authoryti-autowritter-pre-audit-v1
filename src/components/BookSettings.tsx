@@ -1,4 +1,5 @@
 import { NaturalnessSettingsCard } from "@/components/NaturalnessSettingsCard";
+import { LiteraryReviserSettingsCard } from "@/components/LiteraryReviserSettingsCard";
 import { WriterVersionLockCard } from "@/components/WriterVersionLockCard";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -131,6 +132,7 @@ const BookSettings = ({ book, onBack }: BookSettingsProps) => {
               </CardContent>
             </Card>
             <NaturalnessSettingsCard bookId={book.id} controls={book.controls as unknown as Record<string, unknown>} />
+            <LiteraryReviserSettingsCard bookId={book.id} controls={book.controls as unknown as Record<string, unknown>} />
             <WriterVersionLockCard bookId={book.id} writerId={writerId ?? bestWriterFor(book.bookType).id} controls={book.controls as unknown as Record<string, unknown>} />
             <Card>
               <CardHeader className="pb-3">
