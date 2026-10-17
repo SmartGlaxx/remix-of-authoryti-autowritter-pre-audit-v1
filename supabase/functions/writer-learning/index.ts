@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       const slider = clampOverlayToSliders(rec.adjustment.slider);
       const { data, error } = await db.from("writer_style_adaptations").insert({
         user_id: userId, writer_id: writerId, book_id: null, dimension: rec.dimension, adjustment: { directive: rec.adjustment.directive, ...(slider ? { slider } : {}) },
-        source: "learning", status: "active", version: (prev?.[0]?.version ?? 0) + 1, schema_version: rec.schemaVersion, evidence: rec.evidence,
+        source: "author", status: "active", version: (prev?.[0]?.version ?? 0) + 1, schema_version: rec.schemaVersion, evidence: rec.evidence,
         confidence: rec.confidence, scope: rec.scope, genre: rec.genre, source_writer_id: rec.sourceWriterId ?? null, parent_id: prev?.[0]?.id ?? null,
       }).select().single();
       if (error) return json({ error: error.message }, 400);
