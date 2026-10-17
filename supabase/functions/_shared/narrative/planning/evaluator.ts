@@ -198,7 +198,7 @@ export interface PreAcceptanceResult {
  * sentences are rewritten to match it exactly. Used for one final autonomous round before a
  * draft is ever held for the author.
  */
-export function buildAutoResolvePrompt(draft: string, material: Finding[], ctx: EvalContext): Prompt {
+export function buildAutoResolvePrompt(draft: string, material: StagedFinding[], ctx: EvalContext): Prompt {
   const list = material.slice(0, 8).map((f, i) => `${i + 1}. [${f.code}] ${f.message}${f.excerpt ? ` — conflicting excerpt: "${f.excerpt}"` : ""}${f.sourceRef ? ` (canon: ${f.sourceRef})` : ""}`).join("\n");
   const truths = [
     ...ctx.anchors.slice(0, 40).map((a) => `- ${a.key}: "${clip(a.text, 200)}"`),
