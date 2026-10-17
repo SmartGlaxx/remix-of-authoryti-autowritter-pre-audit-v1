@@ -159,7 +159,7 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
             <CardContent className="p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-destructive" />
-                <span className="text-sm font-medium flex-1 min-w-0">Section {c.subsection_index + 1} draft is held{reason ? `: ${reason}` : ""}</span>
+                <span className="text-sm font-medium flex-1 min-w-0">Chapter {c.chapter_index + 1}, Section {c.subsection_index + 1} draft is held{reason ? `: ${reason}` : ""}</span>
                 {repair && (
                   <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => {
                     setEdits({ ...edits, [c.id]: repair }); setOpen(c.id);
