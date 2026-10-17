@@ -68,6 +68,27 @@ describe("Phase G runtime: combined evaluator", () => {
     expect(r.decision).toBe("blocked_material");
   });
 
+  it("auto-resolution conforms prose to canon and accepts without holding for the author", async () => {
+    const bad = { ...clean, continuity: [{ kind: "fact", severity: "material", message: "Eyes are green in canon", excerpt: "read the first page twice", sourceRef: "f1" }] };
+    let fixed = false;
+    const evaluate: EvalModel = async () => ({ text: JSON.stringify(fixed ? clean : bad) });
+    const repair: EvalModel = async () => { fixed = true; return { text: JSON.stringify({ replacements: [{ find: "read the first page twice", replace: "read the first page once" }] }) }; };
+    const r = await runPreAcceptance(DRAFT, ctx(), evaluate, repair);
+    expect(r.decision).toBe("accept");
+    expect(r.autoResolved).toHaveLength(1);
+    expect(r.autoResolved?.[0].code).toBe("CANON_CONTRADICTION");
+    expect(r.text).toBe("Mara pulled the ledger from the drawer and read the first page once.");
+  });
+
+  it("auto-resolution that fails or regresses still holds the draft for the author", async () => {
+    const bad = { ...clean, continuity: [{ kind: "fact", severity: "material", message: "Eyes are green in canon", excerpt: "read the first page twice", sourceRef: "f1" }] };
+    // Repair changes text but the conflict persists on revalidation.
+    const repair: EvalModel = async () => ({ text: JSON.stringify({ replacements: [{ find: "read the first page twice", replace: "read the first page once" }] }) });
+    const r = await runPreAcceptance(DRAFT, ctx(), reply(bad), repair);
+    expect(r.decision).toBe("blocked_material");
+    expect(r.autoResolved).toBeUndefined();
+  });
+
   it("targeted repair only replaces exact sentences from the draft", () => {
     const out = applyReplacements(DRAFT, JSON.stringify({ replacements: [{ find: "read the first page twice", replace: "read it once" }, { find: "not in the draft at all", replace: "x" }] }));
     expect(out).toBe("Mara pulled the ledger from the drawer and read it once.");
