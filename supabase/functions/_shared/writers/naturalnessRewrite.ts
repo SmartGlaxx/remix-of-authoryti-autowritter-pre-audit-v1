@@ -34,7 +34,7 @@ export const naturalnessScore = (fs: NaturalnessFinding[]) => fs.reduce((s, f) =
   const ev = f.evidence as { stockPhrases?: unknown[]; starters?: unknown[]; templates?: { count: number }[]; duplicates?: { sentences?: { count: number }[]; paragraphs?: { count: number }[] } };
   const dup = [...(ev?.duplicates?.sentences ?? []), ...(ev?.duplicates?.paragraphs ?? [])].reduce((a, d) => a + d.count - 1, 0);
   return s + (f.severity === "advisory" ? 2 : 1) + (ev?.stockPhrases?.length ?? 0) + (ev?.starters?.length ?? 0)
-    + (ev?.templates ?? []).reduce((a, t) => a + t.count, 0) + dup * 2;
+    + (ev?.templates?.length ?? 0) * 2 + dup * 2;
 }, 0);
 
 export function buildRewritePrompt(text: string, findings: NaturalnessFinding[], o: { writerVoice?: string } = {}): Prompt {
@@ -139,6 +139,9 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
     if (templatesOf(after).some((t) => !oldT.has(t.template))) { push(false, "pattern_substituted", scoreAfter); continue; }
     const cvB = rhythmStats(best).cv, cvA = rhythmStats(cand).cv;
     if (cvB > 0 && cvA < cvB * 0.85) { push(false, "rhythm_flattened", scoreAfter); continue; }
+    if (localRepetition(cand) > localRepetition(best)) { push(false, "local_repetition", scoreAfter); continue; }
+    const stockB = new Set(mech(bestFindings).stockPhrases ?? []);
+    if ((mech(after).stockPhrases ?? []).some((p) => !stockB.has(p))) { push(false, "pattern_substituted", scoreAfter); continue; }
     if (scoreAfter >= scoreBefore) { push(false, "not_better", scoreAfter); continue; }
     push(true, "improved", scoreAfter);
     best = cand; bestFindings = after;
@@ -146,6 +149,14 @@ export async function runNaturalnessRewrite(draft: string, o: RewriteOptions, mo
   return { ...res, text: best, changed: best !== draft, after: bestFindings, unresolved: unresolvedOf(bestFindings) };
 }
 
+/** Sentences that repeat one word pair 3+ times — a fix that crams repetition into one line. */
+function localRepetition(text: string): number {
+  return (text.match(/[^.!?]+[.!?]/g) ?? []).filter((s) => {
+    const w = s.toLowerCase().match(/[a-z']+/g) ?? []; const c = new Map<string, number>();
+    for (let i = 0; i + 1 < w.length; i++) { const k = w[i] + " " + w[i + 1]; c.set(k, (c.get(k) ?? 0) + 1); }
+    return [...c.values()].some((n) => n >= 3);
+  }).length;
+}
 type MechEv = { stockPhrases?: string[]; templates?: { template: string; count: number }[]; duplicates?: { sentences?: { text: string; count: number }[] } };
 const mech = (fs: NaturalnessFinding[]) => (fs.find((f) => f.category === "mechanical_pattern")?.evidence ?? {}) as MechEv;
 const templatesOf = (fs: NaturalnessFinding[]) => mech(fs).templates ?? [];

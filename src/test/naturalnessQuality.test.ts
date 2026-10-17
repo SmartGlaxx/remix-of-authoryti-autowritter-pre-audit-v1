@@ -3,7 +3,8 @@ import { runNaturalnessRewrite, editViolation, naturalnessScore } from "../../su
 import { analyzeSection, repeatedTemplates, verbatimDuplicates } from "../../supabase/functions/_shared/writers/naturalnessMetrics";
 
 const things = ["light shifted", "minutes passed", "kettle cooled", "rain thinned", "clock ticked", "wind rose", "lamp flickered", "floor creaked", "fire settled", "night deepened", "house cooled"];
-const filler = (i: number) => `Mara sorted box ${i} on the long kitchen table, setting aside the lures her father had kept for decades without ever using.`;
+const FILL = ["Mara sorted fishing lures into a shoebox.", "Somewhere upstairs a pipe knocked twice and went quiet.", "Her father's handwriting covered every label in the pantry.", "Dust rose when she lifted the curtains.", "A moth beat itself against the window over the sink, stubborn and soft.", "She found three keys that opened nothing.", "Rubber bands, receipts, a broken compass.", "Snow had started on the far shore.", "The radio stayed off because she could not bear a voice.", "Mrs. Finch's porch light came on across the cove.", "Every drawer held one more thing he had refused to throw away.", "Cold came up through the floorboards."];
+const filler = (i: number) => FILL[i % FILL.length];
 const asOpen = things.map((t, i) => `As the ${t}, she waited. ${filler(i)}`).join(" ");
 const theOpen = things.map((t, i) => `The ${t} while she waited. ${filler(i)}`).join(" ");
 const reply = (edits: unknown) => vi.fn(async () => ({ text: JSON.stringify({ edits }) }));
@@ -21,7 +22,7 @@ describe("Naturalness quality corrections", () => {
 
   it("repetition moved from one phrase to another is not an improvement", async () => {
     const draft = Array.from({ length: 6 }, (_, i) => `At the end of the day the work went on. ${filler(i)}`).join(" ");
-    const edits = [{ find: "At the end of the day the work went on. " + filler(0), replace: "When all was said and done the work went on. " + filler(0) }];
+    const edits = [{ find: "At the end of the day the work went on. " + filler(0), replace: "The reality is the work went on. " + filler(0) }];
     const r = await runNaturalnessRewrite(draft, { mode: "analyze_and_rewrite", changeLimit: 0.5 }, reply(edits));
     expect(r.attempts.every((a) => !a.accepted)).toBe(true);
     expect(r.unresolved.length).toBeGreaterThan(0);
