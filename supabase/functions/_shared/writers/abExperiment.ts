@@ -183,7 +183,7 @@ export function guardedModelCall(guard: BudgetGuard, caller: ExpCaller, label: s
 
 /** Free: the full worst-case plan must fit the cap before anything is sent. */
 export function literaryBenchmarkWorstCase(flawed: string, validatorPrompt: (t: string) => Prompt, writerVoice?: string) {
-  const p = buildLiteraryPrompt(flawed, analyzeSection(flawed).filter((f) => f.category !== "dialogue_naturalness"), { writerVoice });
+  const p = buildLiteraryPrompt(flawed, analyzeSection(flawed), { writerVoice });
   const inTok = countTokens(p.system) + countTokens(p.user);
   const v = validatorPrompt(flawed); const vTok = countTokens(v.system) + countTokens(v.user) + 200;
   const g = new BudgetGuard(1000);
