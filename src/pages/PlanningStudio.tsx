@@ -150,13 +150,17 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const has = (level: string, ch: number) => mine.some((p) => p.plan_level === level && p.chapter_index === ch);
   const chapters = [...new Set(mine.filter((p) => p.plan_level === "CHAPTER").map((p) => p.chapter_index))].sort((a, b) => a - b);
   const brief = { premise, targetWords, chapterCount };
+  // Detailed-blueprint workflow: new Progressive books require it; older Progressive books opt in explicitly.
+  const blueprintsRequired = (book.controls as Row)?.blueprint_mode === "required" || !(book.controls as Row)?.planning_pipeline;
+  const legacyProgressive = (book.controls as Row)?.planning_pipeline === "progressive" && (book.controls as Row)?.blueprint_mode !== "required";
   // Every chapter of the approved master has chapter, section and beat plans.
   const planningComplete = master?.status === "APPROVED" && chapters.length > 0
     && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION", "BEATS"].every((lv) => has(lv, c)));
   const allReady = master?.status === "APPROVED" && chapters.length > 0 && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
-    && mine.every((p) => p.plan_status === "READY");
+    && mine.every((p) => p.plan_status === "READY")
+    && (!blueprintsRequired || chapters.every((c) => mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === c && p.plan_status === "READY")));
 
   const createMaster = () => run("master", async () => {
     const extra = {}; // the story chosen in Setup reaches the planner server-side
@@ -245,6 +249,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
                 const r = await callPlanBook({ action: "approve_plans", ids: bulkApprovableIds(mine as never) }); if (!r.ok) throw new Error(r.data.error); toast.success(`${r.data.approved} plans approved${blueprintsRequired ? " — approve each chapter blueprint separately" : ""}`); await refresh();
               })}>4. Approve all planned</Button>
             </div>
+            {legacyProgressive && <div className="rounded-md border border-border p-3 text-xs flex flex-wrap items-center gap-2"><span className="flex-1">This book started before detailed blueprints. Writing still follows your approved summaries. Turning blueprints on makes every chapter not yet written need an approved blueprint first; written text is not changed.</span><Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("bpOn", async () => { const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), blueprint_mode: "required" } }).eq("id", book.id); if (error) throw error; toast.success("Detailed blueprints now required for this book"); await refreshAll(); })}>Require blueprints</Button></div>}
             {progress && <Progress value={(progress.done / progress.total) * 100} />}
             <div className="space-y-2">
               {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground border border-border rounded-md">No chapter summaries yet. Press "Plan the whole book" to explode the summary into chapters and sections.</p>}
