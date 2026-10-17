@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { callReview, saveThenAccept } from "@/lib/candidateReview";
+import { callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import { sceneKnowledge } from "../../supabase/functions/_shared/narrative/sceneKnowledge";
 
@@ -100,6 +100,34 @@ export function HeldDraftAlert({ bookId, chapterIndex, onAccepted }: { bookId: s
     }));
   }, [bookId, chapterIndex]);
   useEffect(() => { void load(); }, [load]);
+  // candidate id shown in the card → saved version id awaiting a keep/replace choice
+  const [replaceAsk, setReplaceAsk] = useState<Record<string, string>>({});
+  const accept = async (c: Row, replace: boolean) => {
+    setBusy(`a-${c.id}`);
+    try {
+      const r = replace
+        ? await saveThenAccept(bookId, replaceAsk[c.id] ?? c.id, c.draft_text, undefined, true)
+        : await saveThenAccept(bookId, c.id, c.draft_text, edits[c.id]);
+      if (needsReplaceConfirmation(r.data)) { setReplaceAsk((m) => ({ ...m, [c.id]: r.candidateId })); return; }
+      setReplaceAsk((m) => { const n = { ...m }; delete n[c.id]; return n; });
+      if (r.data.status === "accepted") {
+        toast.success("Passed all checks — accepted");
+        await runNarrativeExtraction(bookId, c.chapter_index, c.subsection_index);
+        onAccepted?.();
+      } else if (r.data.status === "held") toast.warning("Still not passing checks — see the new findings");
+      else throw new Error(r.data.message ?? r.data.error ?? "Could not accept");
+      setEdits({}); await load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not accept"); } finally { setBusy(null); }
+  };
+  const keepCurrent = async (c: Row) => {
+    setBusy(`k-${c.id}`);
+    try {
+      const ids = new Set([c.id, replaceAsk[c.id]].filter(Boolean));
+      for (const id of ids) await callReview({ action: "discard", candidateId: id });
+      toast.success("Kept the accepted text; removed the old draft");
+      setReplaceAsk({}); setEdits({}); await load(); onAccepted?.();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not remove the draft"); } finally { setBusy(null); }
+  };
   if (!held.length) return null;
   return (
     <div className="space-y-2 mb-4">
