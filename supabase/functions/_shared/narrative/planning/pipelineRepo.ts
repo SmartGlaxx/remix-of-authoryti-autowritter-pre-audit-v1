@@ -1,6 +1,7 @@
 // Phase F I/O for the opt-in progressive pipeline (server only). Pure decisions live in pipeline.ts.
 import { previousPosition, priorFromAcceptances, progressiveGate, requiredAnchorKeys, scopedAnchors, type AnchorRow, type GateResult } from "./pipeline.ts";
 import { resolvePlanForSection, type PlanResolution } from "./planningContext.ts";
+import { adapterForBookType } from "./adapters.ts";
 import { blueprintGate, resolveBlueprintMode, type BlueprintGate } from "./blueprint.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -46,10 +47,12 @@ export async function loadProgressiveState(db: Db, bookId: string, userId: strin
 export async function loadBlueprintGate(db: Db, bookId: string, userId: string, controls: unknown, ch: number): Promise<BlueprintGate> {
   const mode = resolveBlueprintMode(controls);
   if (mode !== "required") return blueprintGate(mode, [], ch, []);
-  const [b, c] = await Promise.all([
+  const [b, c, book] = await Promise.all([
     db.from("book_progressive_plans").select("id, plan_status, version, content").eq("book_id", bookId).eq("plan_level", "BLUEPRINT").eq("chapter_index", ch).eq("plan_status", "READY"),
     db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true),
+    db.from("books").select("book_type").eq("id", bookId).eq("user_id", userId).maybeSingle(),
   ]);
-  for (const r of [b, c]) if (r?.error) throw new Error(r.error.message);
-  return blueprintGate(mode, b.data ?? [], ch, (c.data ?? []).map((x: Row) => ({ id: x.id, name: x.name, aliases: x.aliases ?? [] })));
+  for (const r of [b, c, book]) if (r?.error) throw new Error(r.error.message);
+  if (!book.data) throw new Error("Book not found");
+  return blueprintGate(mode, b.data ?? [], ch, (c.data ?? []).map((x: Row) => ({ id: x.id, name: x.name, aliases: x.aliases ?? [] })), adapterForBookType(book.data.book_type).id);
 }

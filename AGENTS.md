@@ -19,3 +19,5 @@
 - Portraits use private owner paths/signed URLs and the shared OpenAI image service; demotion archives profiles without deleting links. Reuse uses a profile whitelist, never canon or knowledge; cast changes use setup_save.
 - Conflict repairs stay versioned and fenced; display reconciliation never alters canon/history. Verbatim duplicates use pure `naturalnessMetrics.ts` and existing advisory findings, preserving statistical thresholds and acceptance.
 - Subdirectories have their own `AGENTS.md` (e.g. `supabase/functions/_shared/writers/`) — read it before changing files there.
+
+- Blueprint cast checks use the shared adapter-aware example-role classifier across parsing, approval, writing gates and UI; instructional roles stay plan-local while named people and narrative books still require cast approval.

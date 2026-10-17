@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { bulkApprovableIds } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
+import { bulkApprovableIds, isBlueprintExampleRole } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
@@ -259,7 +259,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             <div className="space-y-2">
               {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground border border-border rounded-md">No chapter summaries yet. Press "Plan the whole book" to explode the summary into chapters and sections.</p>}
               {chapters.map((ch) => (
-                <ChapterCard key={ch} ch={ch} rows={mine.filter((p) => p.chapter_index === ch)} busy={busy} run={run} refresh={refresh}
+                <ChapterCard key={ch} adapter={adapterForBookType(book.book_type).id} ch={ch} rows={mine.filter((p) => p.chapter_index === ch)} busy={busy} run={run} refresh={refresh}
                   onSections={() => run("sec", async () => { const r = await callPlanBook({ action: "sections", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}
                   onBeats={() => run("beats", async () => { const r = await callPlanBook({ action: "beats", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error(r.data.error); await refresh(); })}
                   onBlueprint={() => run("blueprint", async () => { const r = await callPlanBook({ action: "blueprint", bookId: book.id, masterPlanId: master.id, chapter: ch, requestId: crypto.randomUUID() }); if (!r.ok) throw new Error([r.data.error, ...(r.data.issues ?? []).slice(0, 3)].join(" · ")); toast.success("Blueprint ready for your review"); await refresh(); })} />
@@ -302,7 +302,7 @@ function EditableText({ label, value, editable, onSave, busy }: { label: string;
   );
 }
 
-function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats, onBlueprint }: { ch: number; rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onSections: () => void; onBeats: () => void; onBlueprint: () => void }) {
+function ChapterCard({ adapter, ch, rows, busy, run, refresh, onSections, onBeats, onBlueprint }: { adapter: string; ch: number; rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onSections: () => void; onBeats: () => void; onBlueprint: () => void }) {
   const [open, setOpen] = useState(ch === 0);
   const chap = rows.find((p) => p.plan_level === "CHAPTER");
   const secs = rows.filter((p) => p.plan_level === "SECTION").sort((a, b) => a.subsection_index - b.subsection_index);
@@ -336,16 +336,17 @@ function ChapterCard({ ch, rows, busy, run, refresh, onSections, onBeats, onBlue
             </div>; })}
           {secs.length > 0 && beats.length === 0 && <Button size="sm" variant="outline" disabled={!!busy} onClick={onBeats}>Add scene beats</Button>}
         </div>
-        {secs.length > 0 && <BlueprintBlock rows={rows.filter((p) => p.plan_level === "BLUEPRINT")} busy={busy} run={run} refresh={refresh} onBuild={onBlueprint} />}
+        {secs.length > 0 && <BlueprintBlock adapter={adapter} rows={rows.filter((p) => p.plan_level === "BLUEPRINT")} busy={busy} run={run} refresh={refresh} onBuild={onBlueprint} />}
       </div>}
     </div>
   );
 }
 
-function BlueprintBlock({ rows, busy, run, refresh, onBuild }: { rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onBuild: () => void }) {
+function BlueprintBlock({ adapter, rows, busy, run, refresh, onBuild }: { adapter: string; rows: Row[]; busy: string | null; run: RunFn; refresh: () => Promise<void>; onBuild: () => void }) {
   const row = rows.find((r) => r.plan_status === "READY") && !rows.some((r) => r.plan_status === "PLANNED") ? rows.find((r) => r.plan_status === "READY") : rows.find((r) => r.plan_status === "PLANNED") ?? rows[0];
   const { bookId = "" } = useParams();
   const bp = row?.content?.blueprint as Row | undefined;
+  const proposals = (bp?.castProposals as Row[] | undefined ?? []).filter((p) => !isBlueprintExampleRole(p.name, adapter));
   const name = (id: string) => (bp?.cast as Row[] | undefined)?.find((c) => c.id === id)?.name ?? (bp?.castProposals as Row[] | undefined)?.find((c) => c.id === id)?.name ?? id;
   const place = (id: string) => (bp?.locations as Row[] | undefined)?.find((l) => l.id === id)?.name ?? id;
   return (
@@ -362,11 +363,11 @@ function BlueprintBlock({ rows, busy, run, refresh, onBuild }: { rows: Row[]; bu
         <p className="whitespace-pre-wrap">{bp.synopsis}</p>
         <p className="text-xs text-muted-foreground"><span className="font-medium">Ends with:</span> {bp.conclusion}</p>
         <div className="grid gap-2 sm:grid-cols-3 text-xs">
-          <div><p className="font-medium">Characters</p>{(bp.cast as Row[]).map((c) => <p key={c.id}>{c.name}{c.pov ? " (viewpoint)" : ""} — {c.role}</p>)}</div>
+          <div><p className="font-medium">{["self_help", "business", "finance", "cookbook", "technical"].includes(adapter) ? "People & example roles" : "Characters"}</p>{(bp.cast as Row[]).map((c) => <p key={c.id}>{c.name}{c.pov ? " (viewpoint)" : ""} — {c.role}</p>)}</div>
           <div><p className="font-medium">Places</p>{(bp.locations as Row[]).map((l) => <p key={l.id}>{l.name} — {l.significance}</p>)}</div>
           <div><p className="font-medium">Events</p>{(bp.events as Row[]).map((e) => <p key={e.id}>{e.name}</p>)}</div>
         </div>
-        {(bp.castProposals as Row[]).length > 0 && <div className="text-xs rounded bg-muted/40 p-2"><p className="font-medium">New people the plan proposes — each must be approved and added to your cast before this blueprint can be approved</p>{(bp.castProposals as Row[]).map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 py-1"><span className="flex-1">{p.name} — {p.justification}</span>{row?.plan_status === "PLANNED" && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run(`cp-${p.id}`, async () => { const r = await callPlanBook({ action: "approve_cast_proposal", bookId, planId: row.id, proposalId: p.id }); if (!r.ok) throw new Error(r.data.error); toast.success(r.data.already ? `${p.name} is already in your cast` : `${p.name} added to your cast`); await refresh(); })}>Add to cast</Button>}</div>)}</div>}
+        {proposals.length > 0 && <div className="text-xs rounded bg-muted/40 p-2"><p className="font-medium">New people the plan proposes — each must be approved and added to your cast before this blueprint can be approved</p>{proposals.map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 py-1"><span className="flex-1">{p.name} — {p.justification}</span>{row?.plan_status === "PLANNED" && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run(`cp-${p.id}`, async () => { const r = await callPlanBook({ action: "approve_cast_proposal", bookId, planId: row.id, proposalId: p.id }); if (!r.ok) throw new Error(r.data.error); toast.success(r.data.already ? `${p.name} is already in your cast` : `${p.name} added to your cast`); await refresh(); })}>Add to cast</Button>}</div>)}</div>}
         <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Step-by-step beats ({(bp.microbeats as Row[]).length})</summary>
           <ol className="list-decimal ml-5 mt-1 space-y-1">{(bp.microbeats as Row[]).map((b) => <li key={b.id}>{b.text} <span className="text-muted-foreground">· {(b.characterIds as string[]).map(name).join(", ") || "no one"} · {place(b.locationId)} · why: {b.purpose}</span></li>)}</ol></details>
         <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Who knows what</summary>
