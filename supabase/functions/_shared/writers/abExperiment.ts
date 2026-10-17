@@ -4,7 +4,7 @@
 // the call is refused and nothing is sent. Fallbacks are disabled: one exact model per role.
 // Nothing here writes manuscripts, candidates, acceptance or story memory.
 import { getModel } from "../ai/registry.ts";
-import { analyzeSection } from "./naturalnessMetrics.ts";
+import { analyzeSection, sentences } from "./naturalnessMetrics.ts";
 import { runNaturalnessRewrite, charChangeRatio, naturalnessScore, MAX_NATURALNESS_ATTEMPTS, type Prompt } from "./naturalnessRewrite.ts";
 import type { NaturalnessFinding } from "./naturalness.ts";
 
@@ -78,12 +78,17 @@ export const INJECTED = {
   stock: ["The truth is,", "At the end of the day,"],
 };
 
+const STARTER_TAILS = ["light shifted", "minutes passed", "kettle cooled", "rain thinned", "clock ticked", "wind rose", "lamp flickered", "floor creaked", "fire settled", "night deepened", "house cooled", "water lapped"];
+/** Adds enough "As the …" openings to clear BOTH starter thresholds (≥4 and ≥15% of sentences). */
 export function injectFlaws(original: string): string {
   const paras = original.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const out = paras.map((p, i) => {
-    if (i < 5) return `${INJECTED.starter} ${["light shifted", "minutes passed", "kettle cooled", "rain thinned", "clock ticked"][i]}, she waited. ${p}`;
-    return p;
-  });
+  const base = sentences(original).length + 4; // + duplicate and stock sentences added below
+  const need = Math.max(4, Math.ceil((0.2 * base) / 0.8));
+  const out = [...paras];
+  for (let k = 0; k < need; k++) {
+    const i = k % out.length;
+    out[i] = `${INJECTED.starter} ${STARTER_TAILS[k % STARTER_TAILS.length]}${k >= STARTER_TAILS.length ? " again" : ""}, she waited. ${out[i]}`;
+  }
   out.splice(1, 0, INJECTED.duplicate);
   out.push(`${INJECTED.stock[0]} nothing had changed. ${INJECTED.stock[1]} she still had to choose. ${INJECTED.duplicate}`);
   return out.join("\n\n");
@@ -112,11 +117,15 @@ export interface ExperimentReport {
 }
 
 /** One generation reused for both conditions; B is an isolated in-memory copy. Returns all three texts. */
-export async function runExperiment(input: { writerPrompt: Prompt; validatorPrompt: (text: string) => Prompt; writerVoice?: string }, caller: ExpCaller, guard = new BudgetGuard()): Promise<ExperimentReport> {
+export async function runExperiment(input: { writerPrompt: Prompt; reuseOriginal?: string; validatorPrompt: (text: string) => Prompt; writerVoice?: string }, caller: ExpCaller, guard = new BudgetGuard()): Promise<ExperimentReport> {
   const rep: ExperimentReport = { textA_original: "", textB_flawed: "", textC_revised: "", detection: { A: [], B: [], C: [] }, scores: { A: 0, B: 0, C: 0 }, changeRatioBtoC: 0, rewriteAttempts: [], validation: { before: "", after: "" }, usage: guard.log, totalUSD: 0, capUSD: guard.cap };
-  const fin = (aborted?: string) => ({ ...rep, totalUSD: +guard.spent.toFixed(6), aborted });
+  const fin = (aborted?: string) => {
+    rep.scores = { A: naturalnessScore(rep.detection.A), B: naturalnessScore(rep.detection.B), C: naturalnessScore(rep.detection.C) };
+    rep.changeRatioBtoC = rep.textC_revised ? charChangeRatio(rep.textB_flawed, rep.textC_revised) : 0;
+    return { ...rep, totalUSD: +guard.spent.toFixed(6), aborted };
+  };
   try {
-    rep.textA_original = (await guardedCall(guard, caller, "writer")(input.writerPrompt)).text;
+    rep.textA_original = input.reuseOriginal ?? (await guardedCall(guard, caller, "writer")(input.writerPrompt)).text;
     rep.textB_flawed = injectFlaws(rep.textA_original);
     const pre = preflightDetection(rep.textB_flawed);
     rep.detection.A = analyzeSection(rep.textA_original); rep.detection.B = pre.findings;
@@ -126,10 +135,6 @@ export async function runExperiment(input: { writerPrompt: Prompt; validatorProm
     rep.textC_revised = rw.text; rep.rewriteAttempts = rw.attempts; rep.detection.C = rw.after;
     rep.validation.after = (await guardedCall(guard, caller, "validator")(input.validatorPrompt(rep.textC_revised))).text;
   } catch (e) { return fin((e as Error).message); }
-  finally {
-    rep.scores = { A: naturalnessScore(rep.detection.A), B: naturalnessScore(rep.detection.B), C: naturalnessScore(rep.detection.C) };
-    rep.changeRatioBtoC = rep.textC_revised ? charChangeRatio(rep.textB_flawed, rep.textC_revised) : 0;
-  }
   return fin();
 }
 export const MAX_REWRITE_CALLS = MAX_NATURALNESS_ATTEMPTS;

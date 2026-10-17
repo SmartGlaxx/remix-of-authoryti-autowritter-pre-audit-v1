@@ -64,3 +64,15 @@ describe("experiment run (mock, zero cost)", () => {
     expect(r.usage.length).toBe(calls.length);
   });
 });
+
+describe("flaw injection scales to long drafts", () => {
+  it("clears the 15% starter threshold on a 40-sentence draft", () => {
+    const long = Array.from({ length: 10 }, (_, i) => `Mara stood by window ${i}. Wind moved the reeds. A boat knocked the dock. Theo said nothing for a while.`).join("\n\n");
+    expect(preflightDetection(injectFlaws(long)).checks.repeatedStarters).toBe(true);
+  });
+  it("reusing a paid original makes no writer call", async () => {
+    const { caller, calls } = mock();
+    await runExperiment({ writerPrompt: { system: "s", user: "u" }, reuseOriginal: PARAS, validatorPrompt: (t) => ({ system: "v", user: t }) }, caller);
+    expect(calls.includes(EXPERIMENT_MODELS.writer)).toBe(false);
+  });
+});

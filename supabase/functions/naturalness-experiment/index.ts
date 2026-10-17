@@ -4,7 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { createAIDeps } from "../_shared/ai/server.ts";
 import { generateAIText } from "../_shared/ai/client.ts";
-import { runExperiment, countTokens, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
+import { runExperiment, countTokens, BudgetGuard, EXPERIMENT_MODELS, type ExpCaller } from "../_shared/writers/abExperiment.ts";
 import type { Role } from "../_shared/ai/registry.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -55,6 +55,11 @@ Deno.serve(async (req) => {
     };
   };
 
-  const report = await runExperiment({ writerPrompt: WRITER_PROMPT, validatorPrompt, writerVoice: SOPHIA }, caller);
+  // Resume: reuse an already-paid original draft; the cap shrinks by what was already spent.
+  const reuse = typeof body.reuseOriginal === "string" && body.reuseOriginal.length <= 20000 ? body.reuseOriginal : undefined;
+  const prior = Number(body.priorSpentUSD ?? 0);
+  if (reuse && !(prior > 0 && prior < 0.1)) return json({ error: "priorSpentUSD required when reusing" }, 400);
+  const guard = new BudgetGuard(reuse ? 0.10 - prior : 0.10);
+  const report = await runExperiment({ writerPrompt: WRITER_PROMPT, reuseOriginal: reuse, validatorPrompt, writerVoice: SOPHIA }, caller, guard);
   return json({ ...report, routes });
 });
