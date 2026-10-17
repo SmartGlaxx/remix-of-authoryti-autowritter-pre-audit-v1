@@ -124,6 +124,7 @@
 - [x] Approving the whole-book summary goes straight on to chapter/section summaries
 
 # Phase 5
+- [ ] Paired conflict evidence, detailed review, AI/manual repair, checked acceptance and follow-up conflicts; zero-cost verification
 - [x] AI portrait choices (up to five), uploads, richer promotion cards and reversible demotion. Browser: five mocked choices, full view, real portrait storage, demotion preserving profile/picture, same-profile restoration; deployed test-mode block verified. 532/532 free tests pass. Real image quality remains untested (paid approval required).
 - [x] Simplified planning tooltip; deleted-book characters can become fresh personas for another book or future use. Live browser reuse-to-saved-cast verified, temporary records cleaned up, 529/529 free regression tests passed.
 - [x] Stage A: Scene plan panel, inline held-draft review (save edit before checks, full fenced acceptance), plan cards + Start writing handoff
