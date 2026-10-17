@@ -48,8 +48,8 @@ describe("Phase 4 — story alternatives (free engine, real parsers)", () => {
     expect(prompt).toContain(`Method ${n}`);
     expect(prompt).toContain(`First support ${n}`);
     expect(prompt).toContain(`Outcome ${n}`);
-    expect(prompt).not.toContain("Detailed summary 1");
-    expect(prompt).not.toContain("Method 1");
+    expect(prompt).not.toMatch(/Detailed summary 1\b/);
+    expect(prompt).not.toMatch(/Method 1\b/);
   });
   it("skipping stories leaves no chosen alternative for the planner", () => {
     expect(setupPlannerGuidance({ ...emptySetup(), storyMode: "skip", alternatives: [{ id: "a", title: "t", logline: "", summary: "", twist: "", ending: "" }], selectedIndex: 0 }).alternative).toBeNull();
