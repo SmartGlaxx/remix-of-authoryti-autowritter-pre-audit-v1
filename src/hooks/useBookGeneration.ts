@@ -748,7 +748,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
             if (cont.status === "NEEDS_REVIEW") toast.warning(`Continuity: ${subsection.title} needs your review`);
 
             // Unresolved contradictions must not become story memory until the author decides.
-            if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book)) await runNarrativeExtraction(book.id, chIdx, subIdx);
+            if (cont.status !== "NEEDS_REVIEW" || isProgressiveBook(book.controls)) await runNarrativeExtraction(book.id, chIdx, subIdx);
           }
 
           // APPROVAL GATES based on automation level
@@ -1027,7 +1027,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         });
 
         // Narrative memory: record what this section established. Non-blocking on failure.
-        if (isProgressiveBook(book) && isFastDraft(book)) {
+        if (isProgressiveBook(book.controls) && isFastDraft(book.controls)) {
           // Fast draft: server-side pre-acceptance already validated this section; story
           // memory updates in the background and the next section's preflight waits for it.
           void runNarrativeExtraction(book.id, chapterIndex, subIdx);
