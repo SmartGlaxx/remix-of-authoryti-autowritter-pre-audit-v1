@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ACTIVE_ROLES, MODEL_REGISTRY, ROLE_LABELS, USER_ROLES, modelLabel, type Role } from "../../supabase/functions/_shared/ai/registry";
-import { PROFILES, PROFILE_ROLE_LABELS, TIERS, type ProfileRole, type Tier } from "../../supabase/functions/_shared/writers/profiles";
+import { PROFILES, PROFILE_ROLE_LABELS, TIERS, writerTierOrDefault, type ProfileRole, type Tier } from "../../supabase/functions/_shared/writers/profiles";
 import { OPTIMIZED_LABEL, resolveModelForRole, type BookModelConfig, type ConfigMode } from "../../supabase/functions/_shared/ai/roles";
 
 type Pipeline = { totalWords: number; per1kWordsUsd: number | null; totalUsd: number | null; note: string; roles: { role: ProfileRole; model: string; thinking: boolean; costUsd: number | null; per1kWordsUsd: number | null }[] };
@@ -94,7 +94,7 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
                 <button
                   key={m.value}
                   type="button"
-                  onClick={() => setConfig((c) => ({ ...c, mode: m.value, ...(m.value === "profile" ? { profileWriter: writerId, profileTier: c.profileTier ?? "balanced" } : {}) }))}
+                  onClick={() => setConfig((c) => ({ ...c, mode: m.value, ...(m.value === "profile" ? { profileWriter: writerId, profileTier: writerTierOrDefault(c.profileTier) } : {}) }))}
                   className={`text-left rounded-md border p-3 transition-colors ${config.mode === m.value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
                 >
                   <p className="text-sm font-medium">{m.label}</p>

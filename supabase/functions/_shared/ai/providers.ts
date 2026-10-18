@@ -7,6 +7,8 @@ export interface AIRequest {
   system?: string;
   user: string;
   json?: boolean;
+  /** Opt-in strict shape for structured Responses calls; other callers remain unchanged. */
+  jsonSchema?: Record<string, unknown>;
   temperature?: number;
   reasoning?: "low" | "medium" | "high";
   /** DeepSeek V4 thinking mode (model parameter, not a separate model id). undefined = provider default. */
@@ -168,7 +170,8 @@ async function* responses(url: string, headers: Record<string, string>, modelId:
     body.include = ["reasoning.encrypted_content"];
   }
   if (req.temperature != null && !ctx.model.rejectsSampling) body.temperature = req.temperature;
-  if (req.json) body.text = { format: { type: "json_object" } };
+  if (req.jsonSchema) body.text = { format: { type: "json_schema", name: "initial_idea", strict: true, schema: req.jsonSchema } };
+  else if (req.json) body.text = { format: { type: "json_object" } };
   if (req.maxOutputTokens) body.max_output_tokens = req.maxOutputTokens; // includes reasoning tokens
   const res = await post(ctx, url, headers, body, provider);
   for await (const { event, data } of sseEvents(res.body!)) {

@@ -1,6 +1,7 @@
 - Narrative engine pure logic lives in `supabase/functions/_shared/narrative/` (rules, context, extraction) and is imported by both edge functions and `src/` — one source of truth for browser, backend and tests.
 - Story-state extraction runs server-side (`extract-narrative-state`) from the saved section text, idempotent per section via `narrative_extractions` (content hash + undo log) — prevents duplicates and never trusts client prose.
 - All AI text calls go through `supabase/functions/_shared/ai/` (registry → `resolveModelForRole` → adapters → `streamAI`/`generateAIText`) — one place for models, pricing, providers, retries, fallbacks and usage records.
+- Initial actions use `ai/ideation.ts` call-local config and strict schemas; later planning keeps book routing to protect fixed profiles.
 - User provider keys are AES-GCM encrypted server-side (`BYOK_ENCRYPTION_KEY`, per-user HKDF) in `user_provider_keys`, which has no client access — keys are write-only from the browser.
 - Books without a `book_model_configs` row use the `legacy` role map, reproducing pre-Pass-3 models exactly — backward compatibility without migration.
 - Continuity (Pass 4) runs server-side in `check-continuity` via pure logic in `_shared/narrative/continuity.ts`, before extraction; history is append-only in `continuity_checks` — only the accepted final text ever reaches story memory.

@@ -7,7 +7,7 @@ import { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { WRITER_PERSONAS } from "../../supabase/functions/_shared/writers/personas";
-import { PROFILES, TIERS, PROFILE_ROLE_LABELS, type Tier, type ProfileRole } from "../../supabase/functions/_shared/writers/profiles";
+import { PROFILES, TIERS, PROFILE_ROLE_LABELS, DEFAULT_WRITER_TIER, type Tier, type ProfileRole } from "../../supabase/functions/_shared/writers/profiles";
 import { SLIDERS, NEUTRAL, MAX_ADJUST, DIVERGENCE_OPTIONS, type SliderValues, type DivergenceMode } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
 
@@ -17,7 +17,7 @@ const defaults = (id: string): SliderValues => ({ ...(WRITER_BASELINES[id] ?? NE
 export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWriterId?: string; bookType?: string; onUse?: (id: string, tier: Tier) => void }) {
   const { toast } = useToast();
   const [writerId, setWriterId] = useState(() => WRITER_PERSONAS.some((w) => w.id === initialWriterId) ? initialWriterId as string : WRITER_PERSONAS[0].id);
-  const [tier, setTier] = useState<Tier>("balanced");
+  const [tier, setTier] = useState<Tier>(DEFAULT_WRITER_TIER);
   const [modeValues, setModeValues] = useState<Partial<Record<Tier, SliderValues>>>({});
   const [divergence, setDivergence] = useState<DivergenceMode>("strict");
   const [premise, setPremise] = useState("");
