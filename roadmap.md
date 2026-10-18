@@ -1,5 +1,5 @@
 # Roadmap — Closed-world writing
-- [ ] Use Astra for initial ideation only; Professional default for writers; preserve saved selections; deterministic regression and no paid AI checks
+- [x] Use Astra for initial ideation only; Professional default for writers; saved selections preserved; 733 tests passed; deployed plan-book and signed-in 3/5/7/10 dry-runs verified; no paid AI calls
 - [x] Carry selected Book Approach and full details into Master Plan; signed-in live dry-run verified, 721 tests passed, no paid AI or manuscript changes
 - [x] Restore Book Ideas in the library and saved-idea selection in book setup; verified signed-in with a temporary draft, no paid AI or manuscript changes
 - [x] Stage 1: planned cast counted as known; pending duplicates auto-resolve; no "new character" hooks in planned books
