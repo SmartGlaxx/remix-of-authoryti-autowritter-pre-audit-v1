@@ -85,11 +85,21 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const [adjustCustom, setAdjustCustom] = useState("");
   const [prevPremise, setPrevPremise] = useState<string | null>(null);
   const [exAudience, setExAudience] = useState<string>(book.audience ?? "");
-  const [exTone, setExTone] = useState("");
+  const [exTone, setExTone] = useState<string>(typeof book.controls?.bookTone === "string" ? book.controls.bookTone : "");
   const [exLength, setExLength] = useState(50000);
   const [exSetting, setExSetting] = useState("");
   const [writerId, setWriterId] = useState<string>(book.controls?.writerId ?? "");
   const [sliders, setSliders] = useState<SliderValues>(() => readSliders(book.tone_profile, book.controls));
+  const activeWriter = writerId || book.controls?.writerId || recommendWriterForTone(exTone || null, exType).id;
+  // Tone + writer move together: the writer is stored for the whole book and sliders lean toward the tone within baseline ±2.
+  const applyVoice = async (id: string, tone: string) => {
+    const preset = tonePreset(id, tone || null);
+    const tp: Row = { ...(book.tone_profile ?? {}) }; const controls: Row = { ...(book.controls ?? {}), writerId: id, bookTone: tone || null };
+    for (const s of SLIDERS) { if (TONE_KEYS[s.key]) tp[TONE_KEYS[s.key]!] = preset[s.key]; if (CONTROL_KEYS[s.key]) controls[CONTROL_KEYS[s.key]!] = preset[s.key]; }
+    setWriterId(id); setSliders(preset);
+    const { error } = await supabase.from("books").update({ tone_profile: tp, controls }).eq("id", book.id);
+    if (error) toast.error("Couldn't save the writer choice"); else onSaved();
+  };
   // Where each slider value is stored so the writing engine reads it back (legacy field names).
   const TONE_KEYS: Partial<Record<keyof SliderValues, string>> = { formality: "formality", emotion: "emotionalIntensity", warmth: "warmth", humor: "humorLevel", authority: "authorityLevel", directness: "directness", readerIntimacy: "readerIntimacy" };
   const CONTROL_KEYS: Partial<Record<keyof SliderValues, string>> = { pacing: "velocity", elaboration: "scope", conceptualComplexity: "entityComplexity", perspective: "perspectiveMultiplexing", creativity: "creativity", hookFrequency: "hookFrequency", sensoryDetail: "sensoryDetail", sentenceVariation: "sentenceVariation" };
@@ -307,8 +317,9 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
       <motion.div key={cur} custom={dir} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: "easeOut" }}>
       {/* 1. Concept & story options */}
       {cur === "idea" && <Card>
-        <CardHeader><CardTitle>1. {exFiction ? "Story alternatives" : "Book approaches"}</CardTitle>
-          <CardDescription>{exFiction ? "Compare complete, genuinely different stories — or skip and plan from your own idea." : "Compare different ways to frame this book — or skip and plan from your own concept."}</CardDescription></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle>1. Book Variants</CardTitle>
+          <CardDescription>{exFiction ? "Compare complete, genuinely different stories — written in your writer's voice — or skip and plan from your own idea." : "Compare different ways to frame this book — written in your writer's voice — or skip and plan from your own concept."}</CardDescription></div>
+          <WriterToneSelector bookId={book.id} bookType={exType} tone={exTone} writerId={activeWriter} disabled={locked} onChange={(id) => applyVoice(id, exTone)} /></div></CardHeader>
         <CardContent className="space-y-3">
           {!locked && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
@@ -321,7 +332,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
               <Select value={exAudience || "__any"} onValueChange={(v) => setExAudience(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent><SelectItem value="__any">Any</SelectItem>{[...new Set([...(exAudience && !audList.includes(exAudience) ? [exAudience] : []), ...audList])].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Tone</label>
-              <Select value={exTone || "__any"} onValueChange={(v) => setExTone(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+              <Select value={exTone || "__any"} onValueChange={(v) => { const t = v === "__any" ? "" : v; setExTone(t); applyVoice(recommendWriterForTone(t || null, exType).id, t); }}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent><SelectItem value="__any">Any</SelectItem>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
           </div>}
           {!locked && exType === "textbook" && <div className="grid gap-3 sm:grid-cols-2">
