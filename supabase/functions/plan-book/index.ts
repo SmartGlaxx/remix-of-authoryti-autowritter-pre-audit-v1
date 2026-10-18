@@ -3,6 +3,7 @@
 // Never writes prose, books, story memory or canon. dryRun returns prompts with no AI call or write.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
+import { configForPlanningAction, schemaForIdeaAction } from "../_shared/ai/ideation.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { statusForAIError, failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -29,7 +30,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTIONS = ["edit_plan", "alternatives", "concepts", "adjust_premise", "twists", "master", "chapters", "sections", "beats", "blueprint", "approve_cast_proposal", "approve_master", "approve_plans", "status", "setup_get", "setup_save", "recommend_cast", "identity_reviews", "resolve_review"];
-// Story alternatives, concepts and twists use the real planner model for authors. Test mode (and STORY_AI_ENGINE=mock) always uses the free deterministic engine.
+// Initial ideation uses its fixed model; later planning uses the saved planner. Test mode stays free.
 const storyLive = () => Deno.env.get("STORY_AI_ENGINE") !== "mock";
 // Deployment handshake: test harnesses must read this BEFORE any AI-capable request and abort on mismatch,
 // so a stale deployment (which would ignore testMode) is never sent a request that could reach a paid model.
@@ -259,6 +260,8 @@ async function handle(req: Request): Promise<Response> {
       if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
     }
     const config = await loadBookModelConfig(db, bookId, userId);
+    const callConfig = configForPlanningAction(action, config);
+    const jsonSchema = schemaForIdeaAction(action);
     // Fail-closed test mode: every model call is answered by a mock or blocked; no key is ever reachable.
     const testMode = body.testMode === true || req.headers.get("x-ai-test-mode") === "1";
     const deps = testMode ? failClosedDeps(createAIDeps(db, userId)) : createAIDeps(db, userId);
@@ -269,7 +272,7 @@ async function handle(req: Request): Promise<Response> {
       prompts.push(p);
       if (dryRun) throw new DryRunStop();
       if (mockPlanner !== null) return mockPlanner;
-      const { text } = await generateAIText({ role: "planner", config, userId, bookId, request: { system: p.system, user: p.user, json: true } }, deps);
+      const { text } = await generateAIText({ role: "planner", config: callConfig, userId, bookId, request: { system: p.system, user: p.user, json: true, ...(jsonSchema ? { jsonSchema, reasoning: "low" as const } : {}) } }, deps);
       return text;
     };
     // Free deterministic engine for story services (same prompts, parsers and repair loop as live).
@@ -456,7 +459,7 @@ async function handle(req: Request): Promise<Response> {
       }
       return json({ error: "Invalid action" }, 400);
     } catch (e) {
-      if (e instanceof DryRunStop) return json({ dryRun: true, prompts });
+      if (e instanceof DryRunStop) return json({ dryRun: true, prompts, modelConfig: callConfig });
       throw e;
     }
   } catch (e) {

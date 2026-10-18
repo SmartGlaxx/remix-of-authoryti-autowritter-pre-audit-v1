@@ -5,6 +5,9 @@
 import type { Role } from "../ai/registry.ts";
 
 export type Tier = "economy" | "balanced" | "professional" | "maximum";
+export const DEFAULT_WRITER_TIER: Tier = "professional";
+/** Missing selections get the starting tier; explicit saved tiers are retained. */
+export function writerTierOrDefault(tier: Tier | null | undefined): Tier { return tier ?? DEFAULT_WRITER_TIER; }
 export const TIERS: { value: Tier; label: string }[] = [
   { value: "economy", label: "Economy" }, { value: "balanced", label: "Balanced" },
   { value: "professional", label: "Professional" }, { value: "maximum", label: "Maximum" },
