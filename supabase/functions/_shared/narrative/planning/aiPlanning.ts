@@ -43,6 +43,8 @@ export interface BookBrief {
   seriesPlan?: { books: number } | null;
   /** Inception plot-twist mode (fiction alternatives): true = twist-architected, false = clean arcs, undefined = unspecified. */
   twistMode?: boolean;
+  /** Book Variants / idea services only: the selected writer's voice block (see writers/toneMatch.ts). */
+  voice?: string | null;
 }
 
 // ── Elastic summary length by book type (a guideline for the model, a loose bound for checks) ──
@@ -63,6 +65,7 @@ const briefText = (b: BookBrief) => [
   `Title: ${b.title}`, `Book type: ${b.bookType}`, b.genre ? `Genre: ${b.genre}` : "", b.audience ? `Audience: ${b.audience}` : "",
   `Target length: about ${b.targetWords} words across about ${b.chapterCount} chapters (estimates).`,
   `Premise: ${b.premise}`, b.guidance ? `Author guidance: ${b.guidance}` : "",
+  b.voice ? `\n${b.voice}` : "",
 ].filter(Boolean).join("\n");
 
 // ── JSON helpers ─────────────────────────────────────────────────────────────

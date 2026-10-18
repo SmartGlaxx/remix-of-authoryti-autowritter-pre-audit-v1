@@ -4,6 +4,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { configForPlanningAction, schemaForIdeaAction } from "../_shared/ai/ideation.ts";
+import { getWriter, resolveWriter } from "../_shared/writers/personas.ts";
+import { ideationVoiceBlock } from "../_shared/writers/toneMatch.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { statusForAIError, failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -305,6 +307,11 @@ async function handle(req: Request): Promise<Response> {
     if (banned.length) brief.guidance = [brief.guidance, `Never use these words or phrases anywhere (titles, summaries, plans): ${banned.join(", ")}.`].filter(Boolean).join("\n");
     const cur = (ex.curriculum && typeof ex.curriculum === "object") ? ex.curriculum as Record<string, unknown> : null;
     if (cur && ovType === "textbook") brief.guidance = [brief.guidance, `Textbook following the ${s(cur.country, 120)} curriculum at ${s(cur.level, 120)} level. Chapters are curriculum units; sections are topic lessons with learning objectives, explanations, worked examples, practice questions and a summary.`].filter(Boolean).join("\n");
+    // Book Variants and idea rewrites are written in the selected writer's voice (request writer, else the book's, else best fit).
+    if (action === "alternatives" || action === "concepts" || action === "adjust_premise") {
+      const wid = getWriter(body.writerId)?.id ?? resolveWriter((book as any).controls ?? {}, ovType).id;
+      brief.voice = ideationVoiceBlock(wid, s(ex.tone, 80) || null) || null;
+    }
 
     try {
       if (action === "adjust_premise") {
