@@ -10,3 +10,5 @@
 - [ ] Stage 5: versioned plan amendments
 
 - [x] Correct instructional example roles in blueprint approval; live affected blueprint approved and read back READY, 725 tests passed, no paid AI or manuscript changes
+
+- [x] Upfront writer picker in Book Variants (tone-matched, tier, voice in variants)

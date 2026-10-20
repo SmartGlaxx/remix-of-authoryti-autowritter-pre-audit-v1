@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callPlanBook } from "@/lib/candidateReview";
 import { WriterPicker } from "@/components/WriterPicker";
+import { WriterToneSelector } from "@/components/WriterToneSelector";
+import { recommendWriterForTone, tonePreset } from "../../supabase/functions/_shared/writers/toneMatch";
 import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
 import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
 import { SLIDERS, MAX_ADJUST, NEUTRAL, readSliders, type SliderValues } from "../../supabase/functions/_shared/writers/sliders";
@@ -245,7 +247,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const genAlternatives = (replaceIndex?: number) => run(replaceIndex === undefined ? "alts" : `alt${replaceIndex}`, async () => {
     // Save fixed requirements first so the server keeps them in every option.
     await callPlanBook({ action: "setup_save", bookId: book.id, chapterCount, setup: st });
-    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, bannedWords: banned, twistMode: exFiction ? st.twistsEnabled : undefined, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality, curriculum }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
+    const r = await callPlanBook({ action: exFiction ? "alternatives" : "concepts", bookId: book.id, count: replaceIndex === undefined ? count : 3, premise: st.premise, chapterCount, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, targetWords: exLength, bannedWords: banned, twistMode: exFiction ? st.twistsEnabled : undefined, writerId: activeWriter, explore: { tone: exTone, setting: exSetting, comparables: exComparables, avoid: exAvoid, originality: exOriginality, curriculum }, guidance: replaceIndex === undefined ? undefined : `variation ${Date.now()}` });
     if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The options didn't pass checks; try again." : r.data.error);
     const list: Row[] = (exFiction ? r.data.alternatives : r.data.concepts).map((a: Row) => ({ ...a, summary: a.summary, twist: a.twist ?? "", ending: a.ending ?? a.readerOutcome ?? "", logline: a.logline ?? a.coreThesis ?? "" }));
     if (replaceIndex === undefined) up({ alternatives: list as any, selectedIndex: null, stage: "alternatives", storyMode: "explore" });
@@ -254,7 +256,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
 
   // "Adjust with AI": rewrite the seed idea in a chosen direction before any options are made.
   const adjustPremise = () => run("adjust", async () => {
-    const r = await callPlanBook({ action: "adjust_premise", bookId: book.id, premise: st.premise, adjustments: adjustKey && adjustKey !== "custom" ? [adjustKey] : [], custom: adjustKey === "custom" ? adjustCustom : undefined, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, chapterCount, targetWords: exLength, bannedWords: banned, explore: { tone: exTone } });
+    const r = await callPlanBook({ action: "adjust_premise", bookId: book.id, premise: st.premise, adjustments: adjustKey && adjustKey !== "custom" ? [adjustKey] : [], custom: adjustKey === "custom" ? adjustCustom : undefined, bookType: exType, genre: exGenre || undefined, audience: exAudience || undefined, chapterCount, targetWords: exLength, bannedWords: banned, writerId: activeWriter, explore: { tone: exTone } });
     if (!r.ok) throw new Error(r.data.error === "PLAN_INVALID" ? "The rewrite didn't pass checks; try again." : r.data.error);
     setPrevPremise(st.premise); up({ premise: r.data.premise });
     toast.success(r.data.changes || "Idea adjusted — edit it, adjust again, or undo");
