@@ -15,3 +15,4 @@
 - Try Writer (`try-writer` + /writers) is preview-only: it never writes books, manifests or story memory; DeepSeek thinking is a request parameter derived from the profile slot mode, never a separate model id.
 - Both writer preview entry points share one WriterStudio UI (same locked modes and bounded controls); `try-writer` stays preview-only.
 - Edit replies go through `parseEditsDetailed` (salvage + stop reasons); truncated/malformed output is an infrastructure outcome, never a quality verdict.
+- Tone↔writer harmony lives in pure `_shared/writers/toneMatch.ts`: a tone suggests a writer and nudges sliders only within baseline ±2; Book Variants/concepts/premise rewrites get the selected writer's voice block via `BookBrief.voice` — later planning and Standard prompts are unchanged.
