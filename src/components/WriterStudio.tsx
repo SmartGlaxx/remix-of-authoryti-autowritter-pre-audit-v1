@@ -65,7 +65,7 @@ export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWrit
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[220px_minmax(0,1fr)_260px] xl:grid-cols-[240px_minmax(0,1fr)_290px]">
         <aside className="min-w-0 space-y-2" aria-label="Writer modes">
-          <h3 className="text-sm font-semibold">Writer modes</h3>
+          <h3 className="text-sm font-semibold">Premier pipeline</h3>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
             {TIERS.map((t) => (
               <Button key={t.value} type="button" variant="ghost" onClick={() => selectTier(t.value)} aria-pressed={tier === t.value}
@@ -92,7 +92,7 @@ export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWrit
         </section>
 
         <aside className="min-w-0 space-y-4 lg:border-l lg:border-border lg:pl-5" aria-label="Expression settings">
-          <div><h3 className="text-sm font-semibold">{TIERS.find((t) => t.value === tier)?.label} expression</h3><p className="text-xs text-muted-foreground">{writer.name.split(" ")[0]}'s starting values are the same in all four modes. Adjust each by up to ±{MAX_ADJUST}.</p></div>
+          <div><h3 className="text-sm font-semibold">{TIERS.find((t) => t.value === tier)?.label} expression</h3><p className="text-xs text-muted-foreground">{writer.name.split(" ")[0]}'s starting values. Adjust each by up to ±{MAX_ADJUST}.</p></div>
           {SLIDERS.map((s) => <div key={s.key} className="space-y-1">
             <div className="flex justify-between gap-2 text-xs"><span>{s.label}</span><span className="shrink-0 text-muted-foreground">{values[s.key]}/10{offsetLabel(values[s.key], baseline?.[s.key])}</span></div>
             <BoundedSlider label={s.label} range={[Math.max(1, (baseline?.[s.key] ?? 5) - MAX_ADJUST), Math.min(10, (baseline?.[s.key] ?? 5) + MAX_ADJUST)]} base={baseline?.[s.key]} value={values[s.key]} onChange={(v) => changeValue(s.key, v)} />

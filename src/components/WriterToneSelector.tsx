@@ -87,12 +87,12 @@ export function WriterToneSelector({ bookId, bookType, genre, tone, writerId, di
       </HoverCard>
       <PopoverContent align="end" className="w-[22rem] max-h-[70vh] overflow-y-auto space-y-3">
         {explain}
-        <div className="space-y-1">
+        {TIERS.length > 1 && <div className="space-y-1">
           <p className="text-[11px] text-muted-foreground">Writer mode {saving && <Loader2 className="inline h-3 w-3 animate-spin" />}</p>
           <div className="flex flex-wrap gap-1">
             {TIERS.map((t) => <Button key={t.value} size="sm" className="h-7 px-2 text-xs" variant={(tier ?? DEFAULT_WRITER_TIER) === t.value ? "default" : "outline"} disabled={saving} onClick={() => pickTier(t.value)}>{t.label}</Button>)}
           </div>
-        </div>
+        </div>}
         <div className="space-y-1">
           <p className="text-[11px] text-muted-foreground">Change writer</p>
           {[...WRITER_PERSONAS].sort((a, b) => {

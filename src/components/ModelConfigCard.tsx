@@ -105,11 +105,11 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
 
             {config.mode === "profile" && PROFILES[writerId] && (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {TIERS.length > 1 && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {TIERS.map((t) => (
                     <Button key={t.value} type="button" size="sm" variant={config.profileTier === t.value ? "default" : "outline"} onClick={() => setConfig((c) => ({ ...c, profileWriter: writerId, profileTier: t.value as Tier }))}>{t.label}</Button>
                   ))}
-                </div>
+                </div>}
                 {config.profileTier && (
                   <div className="grid gap-1 rounded-md border border-border p-3 text-xs">
                     {(Object.keys(PROFILE_ROLE_LABELS) as ProfileRole[]).map((r) => {
