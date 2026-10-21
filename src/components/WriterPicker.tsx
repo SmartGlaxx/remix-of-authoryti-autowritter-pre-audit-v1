@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Star, Mic } from "lucide-react";
-import { WRITER_PERSONAS, bestWriterFor } from "../../supabase/functions/_shared/writers/personas";
+import { WRITER_PERSONAS, bestWriterFor, genreSpecialistFor } from "../../supabase/functions/_shared/writers/personas";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { WriterStudio } from "@/components/WriterStudio";
@@ -16,7 +16,8 @@ export function WriterPicker({ bookType, genre, value, onChange }: { bookType: s
   const [favs, setFavs] = useState<string[]>(loadFavs);
   const [testing, setTesting] = useState<string | null>(null);
   const toggleFav = (id: string) => setFavs((p) => { const n = p.includes(id) ? p.filter((x) => x !== id) : [...p, id]; localStorage.setItem(FAV_KEY, JSON.stringify(n)); return n; });
-  const score = (id: string, types: string[]) => (favs.includes(id) ? 2 : 0) + (types.includes(bookType) ? 1 : 0);
+  const specialist = genreSpecialistFor(genre, bookType)?.id;
+  const score = (id: string, types: string[]) => (favs.includes(id) ? 2 : 0) + (id === specialist ? 1.5 : 0) + (types.includes(bookType) ? 1 : 0);
   const list = [...WRITER_PERSONAS].sort((a, b) => score(b.id, b.bookTypes) - score(a.id, a.bookTypes));
   return (
     <>
