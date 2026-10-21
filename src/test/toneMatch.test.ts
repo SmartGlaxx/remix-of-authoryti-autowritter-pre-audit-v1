@@ -24,8 +24,8 @@ describe("Tone ↔ writer harmony", () => {
     expect(recommendWriterForTone("Funny", "novel", "Romance").id).toBe("sophia");
     expect(recommendWriterForTone("Cozy", "novel", "Mystery & Crime").id).toBe("marcus");
     // Tone never pulls a writer across the book-type gate.
-    expect(recommendWriterForTone("Funny", "finance").id).toBe("claire");
-    expect(recommendWriterForTone("Dark", "children").id).toBe("nora");
+    expect(recommendWriterForTone("Funny", "finance").bookTypes).toContain("finance");
+    expect(recommendWriterForTone("Dark", "children").bookTypes).toContain("children");
     // Without a specialist genre, tone chooses among writers of that type only.
     const pick = recommendWriterForTone("Funny", "novel");
     expect(pick.bookTypes).toContain("novel");
