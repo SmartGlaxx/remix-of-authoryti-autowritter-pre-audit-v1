@@ -741,7 +741,7 @@ serve(async (req) => {
     const normalWriter = resolveModelForRole(bookModelConfig, "writer", { bookType: book.bookType });
     const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast", bookType: book.bookType });
     const modelOverride = (bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null)
-      ?? (fastWriter.model !== normalWriter.model ? fastWriter.model : null);
+      ?? (fastWriter.model !== resolveModelForRole(bookModelConfig, "writer").model ? fastWriter.model : null);
     const aiMeta: Record<string, unknown> = {};
     const chunks = streamAI({
       role: "writer",
