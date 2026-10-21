@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { bookToneDirective } from "../_shared/writers/toneMatch.ts";
+import { resolveWriter } from "../_shared/writers/personas.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
@@ -175,9 +177,15 @@ serve(async (req) => {
 
     const __admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const __ctx = await aiBookContext(__admin, (body as Record<string, unknown>)?.bookId, userId);
+    // Book tone (Book Variants) applies to every paragraph rewrite, through the book's writer lens.
+    let toneDirective = "";
+    if (__ctx.bookId) {
+      const { data: tb } = await __admin.from("books").select("book_type, controls").eq("id", __ctx.bookId).eq("user_id", userId).maybeSingle();
+      if (tb) toneDirective = bookToneDirective(resolveWriter(tb.controls ?? {}, tb.book_type).id, (tb.controls as any)?.bookTone, "rewrite");
+    }
     let __text: string;
     try {
-      const __r = await generateAIText({ role: "editor", config: __ctx.config, userId: userId, bookId: __ctx.bookId, request: { system: systemPrompt, user: userMessage } }, createAIDeps(__admin, userId));
+      const __r = await generateAIText({ role: "editor", config: __ctx.config, userId: userId, bookId: __ctx.bookId, request: { system: systemPrompt + toneDirective, user: userMessage } }, createAIDeps(__admin, userId));
       __text = __r.text;
     } catch (e) {
       if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
