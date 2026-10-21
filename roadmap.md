@@ -17,4 +17,5 @@
 - [x] Book-type drafting model: drama → Sol, all prose → Sonnet 5 (locked premier pipeline)
 - [x] Book tone from Book Variants applied to every drafted section via writer lens
 - [x] In-progress books switcher in Planning Studio header
-- [ ] Tone in master plan/blueprint prompts and paragraph rewrites
+- [x] Tone in master plan, chapter, section, beat, blueprint prompts and paragraph rewrites
+- [x] Cache-aware cost estimator (cached context discount, no thinking surcharge on checks, optional audit excluded)
