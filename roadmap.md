@@ -12,3 +12,9 @@
 - [x] Correct instructional example roles in blueprint approval; live affected blueprint approved and read back READY, 725 tests passed, no paid AI or manuscript changes
 
 - [x] Upfront writer picker in Book Variants (tone-matched, tier, voice in variants)
+
+- [x] Just-in-time chapter blueprints (auto build + approve when writing reaches a chapter; stops only for new named people)
+- [x] Book-type drafting model: drama → Sol, all prose → Sonnet 5 (locked premier pipeline)
+- [x] Book tone from Book Variants applied to every drafted section via writer lens
+- [x] In-progress books switcher in Planning Studio header
+- [ ] Tone in master plan/blueprint prompts and paragraph rewrites

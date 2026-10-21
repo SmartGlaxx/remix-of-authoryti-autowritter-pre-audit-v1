@@ -3,6 +3,7 @@ import { buildVoiceManifest } from "../_shared/writers/manifest.ts";
 import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
 import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
+import { lensFor } from "../_shared/writers/toneMatch.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
@@ -302,7 +303,11 @@ META RULE: Show > tell. Panels > paragraphs.
     ? `\n- The following words and their close variants MUST NEVER appear in the output: ${userBannedWords.join(", ")}.`
     : "";
 
-  const writerBlock = renderWriterPrompt(resolveWriter(controls, book.bookType), book.bookType);
+  const activeWriterPersona = resolveWriter(controls, book.bookType);
+  const writerBlock = renderWriterPrompt(activeWriterPersona, book.bookType);
+  // Book tone chosen in Book Variants: applied to every paragraph through this writer's lens (absent = prompt unchanged).
+  const bookTone = typeof controls?.bookTone === "string" && controls.bookTone.trim() ? controls.bookTone.trim() : "";
+  const toneLensBlock = bookTone ? `\nBOOK TONE (applies to EVERY paragraph, including transitions, description and dialogue): "${bookTone}". ${lensFor(activeWriterPersona, bookTone)} Never drift out of this tone, and never let it override the writer's own voice.\n` : "";
   return `You are a master writer creating content for a ${book.bookType} book.
 
 ${writerBlock}
@@ -317,7 +322,7 @@ BOOK CONTEXT:
 - POV: ${book.pov}
 - Tone: ${book.toneProfile.primary} (formality: ${book.toneProfile.formality}/10, emotion: ${book.toneProfile.emotionalIntensity}/10)
 
-${renderExpressionBlock(effectiveSlidersFor(book), resolveDivergence(book.controls))}
+${renderExpressionBlock(effectiveSlidersFor(book), resolveDivergence(book.controls))}${toneLensBlock}
 
 LANGUAGE & GRAMMAR LEVEL (IELTS Band ${band}):
 ${languageGuidelines}
@@ -738,10 +743,10 @@ serve(async (req) => {
     // Writing speed: "fast" (default) swaps long-thinking prose models for their quick
     // counterparts and lowers reasoning effort; "studio" keeps the full deep-writing path.
     const writingSpeed = (book.controls as Record<string, unknown> | null)?.writingSpeed === "studio" ? "studio" : "fast";
-    const normalWriter = resolveModelForRole(bookModelConfig, "writer");
-    const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast" });
+    const normalWriter = resolveModelForRole(bookModelConfig, "writer", { bookType: book.bookType });
+    const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast", bookType: book.bookType });
     const modelOverride = (bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null)
-      ?? (fastWriter.model !== normalWriter.model ? fastWriter.model : null);
+      ?? (fastWriter.model !== resolveModelForRole(bookModelConfig, "writer").model ? fastWriter.model : null);
     const aiMeta: Record<string, unknown> = {};
     const chunks = streamAI({
       role: "writer",

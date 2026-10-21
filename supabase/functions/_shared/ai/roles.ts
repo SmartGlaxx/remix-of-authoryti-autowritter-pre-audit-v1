@@ -102,10 +102,18 @@ export function normalizeConfig(raw: unknown): BookModelConfig {
   return { mode: finalMode, profileWriter, profileTier, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
 }
 
-export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role, opts: { fast?: boolean } = {}): ResolvedModel {
+/** Script formats (dialogue mechanics, sluglines) draft on Sol; every prose book drafts on the profile's draft model. */
+export const SCRIPT_BOOK_TYPES: ReadonlySet<string> = new Set(["drama"]);
+export const SCRIPT_DRAFT_MODEL = "openai/gpt-6-sol";
+
+export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role, opts: { fast?: boolean; bookType?: string | null } = {}): ResolvedModel {
   const c = normalizeConfig(config ?? DEFAULT_CONFIG);
   const explicitFallback = c.fallbacks?.[role] ?? null;
-  const resolved = resolve(c, role, explicitFallback);
+  let resolved = resolve(c, role, explicitFallback);
+  // Locked premier pipeline: drafting model follows the book type automatically (no author control).
+  if (c.mode === "profile" && PROSE_ROLES.has(role) && opts.bookType && SCRIPT_BOOK_TYPES.has(opts.bookType)) {
+    resolved = { ...resolved, model: SCRIPT_DRAFT_MODEL, reasoning: undefined, thinking: undefined };
+  }
   if (!opts.fast || !PROSE_ROLES.has(role)) return resolved;
   const quicker = FAST_PROSE_MAP[resolved.model];
   if (!quicker) return resolved;

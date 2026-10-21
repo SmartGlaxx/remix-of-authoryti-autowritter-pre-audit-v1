@@ -432,6 +432,16 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       }
     }
 
+    // Just-in-time blueprint: the app builds and approves this chapter's blueprint itself, then retries.
+    if (response.status === 409 && bookData.id) {
+      const errBody = await response.clone().json().catch(() => ({}));
+      if (errBody?.code === "BLUEPRINT_REQUIRED") {
+        const { ensureChapterBlueprint } = await import("@/lib/autoBlueprint");
+        await ensureChapterBlueprint(bookData.id, chapterIndex);
+        response = await send();
+      }
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error || `Error: ${response.status}`;

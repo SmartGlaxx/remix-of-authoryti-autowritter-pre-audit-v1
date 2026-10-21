@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { bulkApprovableIds, isBlueprintExampleRole } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
+import { PlanningBookSwitcher } from "@/components/PlanningBookSwitcher";
+import { ensureChapterBlueprint } from "@/lib/autoBlueprint";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
@@ -96,7 +98,8 @@ export default function PlanningStudio() {
           <p className="text-xs text-muted-foreground">Planning Studio</p>
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground hidden sm:inline">Progressive Planning</span>
+          <PlanningBookSwitcher bookId={book.id} />
+          <span className="text-muted-foreground hidden lg:inline">Progressive Planning</span>
           <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild>
             <button type="button" aria-label="What is Progressive Planning?" className="text-muted-foreground hover:text-primary"><Info className="w-4 h-4" /></button>
           </TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
@@ -160,8 +163,8 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     && chapters.every((c) => ["CHAPTER", "SECTION", "BEATS"].every((lv) => has(lv, c)));
   const allReady = master?.status === "APPROVED" && chapters.length > 0 && chapters.length === (master.plan_skeleton?.chapters?.length ?? chapters.length)
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
-    && mine.every((p) => p.plan_status === "READY")
-    && (!blueprintsRequired || chapters.every((c) => mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === c && p.plan_status === "READY")));
+    && mine.every((p) => p.plan_level === "BLUEPRINT" || p.plan_status === "READY");
+  // Blueprints are built and approved automatically as writing reaches each chapter.
 
   const createMaster = () => run("master", async () => {
     const extra = {}; // the story chosen in Setup reaches the planner server-side
@@ -268,11 +271,10 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             <div className="border-t border-border pt-4 flex flex-wrap items-center gap-3">
               {allReady ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <AlertTriangle className="w-5 h-5 text-muted-foreground" />}
               <span className="text-sm flex-1 min-w-[200px]">{allReady
-                ? "The whole book is planned and approved. Writing will follow these exact summaries, section by section."
-                : blueprintsRequired && planningComplete && chapters.some((c) => !mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === c && p.plan_status === "READY"))
-                  ? "Approve each chapter’s detailed blueprint above before starting to write."
-                  : "Finish planning and approve the remaining plans above before starting to write."}</span>
+                ? blueprintsRequired ? "The whole book is planned and approved. Each chapter’s detailed blueprint is prepared automatically as writing reaches it." : "The whole book is planned and approved. Writing will follow these exact summaries, section by section."
+ : "Finish planning and approve the remaining plans above before starting to write."}</span>
               <Button disabled={!!busy || !allReady} onClick={() => run("write", async () => {
+                if (blueprintsRequired) await ensureChapterBlueprint(book.id, chapters[0] ?? 0, (m) => toast.message(m));
                 const controls = { ...(book.controls ?? {}), planning_pipeline: "progressive", ...(!(book.controls as Row)?.planning_pipeline ? { blueprint_mode: "required" } : {}) };
                 const outline = buildOutlineFromPlans(master, mine, book.outline);
                 const hasProse = outline.chapters.some((c: Row) => c.subsections.some((s: Row) => s.content));
