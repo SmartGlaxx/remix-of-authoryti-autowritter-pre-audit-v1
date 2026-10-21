@@ -92,7 +92,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const [exSetting, setExSetting] = useState("");
   const [writerId, setWriterId] = useState<string>(book.controls?.writerId ?? "");
   const [sliders, setSliders] = useState<SliderValues>(() => readSliders(book.tone_profile, book.controls));
-  const activeWriter = writerId || book.controls?.writerId || recommendWriterForTone(exTone || null, exType).id;
+  const activeWriter = writerId || book.controls?.writerId || recommendWriterForTone(exTone || null, exType, exGenre || null).id;
   // Tone + writer move together: the writer is stored for the whole book and sliders lean toward the tone within baseline ±2.
   const applyVoice = async (id: string, tone: string) => {
     const preset = tonePreset(id, tone || null);
@@ -321,20 +321,20 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
       {cur === "idea" && <Card>
         <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle>1. Book Variants</CardTitle>
           <CardDescription>{exFiction ? "Compare complete, genuinely different stories — written in your writer's voice — or skip and plan from your own idea." : "Compare different ways to frame this book — written in your writer's voice — or skip and plan from your own concept."}</CardDescription></div>
-          <WriterToneSelector bookId={book.id} bookType={exType} tone={exTone} writerId={activeWriter} disabled={locked} onChange={(id) => applyVoice(id, exTone)} /></div></CardHeader>
+          <WriterToneSelector bookId={book.id} bookType={exType} genre={exGenre} tone={exTone} writerId={activeWriter} disabled={locked} onChange={(id) => applyVoice(id, exTone)} /></div></CardHeader>
         <CardContent className="space-y-3">
           {!locked && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
-              <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); setExAudience(""); }}><SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); setExAudience(""); applyVoice(recommendWriterForTone(exTone || null, v, null).id, exTone); }}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(BOOK_TYPE_INFO).map(([k, v]) => <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">{exType === "textbook" ? "Subject" : "Sub-category"}</label>
-              <Select value={exGenre || "__any"} onValueChange={(v) => setExGenre(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+              <Select value={exGenre || "__any"} onValueChange={(v) => { const g = v === "__any" ? "" : v; setExGenre(g); applyVoice(recommendWriterForTone(exTone || null, exType, g || null).id, exTone); }}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent><SelectItem value="__any">Any / surprise me</SelectItem>{[...new Set([...(exGenre && !genresFor(exType).includes(exGenre) ? [exGenre] : []), ...genresFor(exType)])].map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Audience</label>
               <Select value={exAudience || "__any"} onValueChange={(v) => setExAudience(v === "__any" ? "" : v)}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent><SelectItem value="__any">Any</SelectItem>{[...new Set([...(exAudience && !audList.includes(exAudience) ? [exAudience] : []), ...audList])].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Tone</label>
-              <Select value={exTone || "__any"} onValueChange={(v) => { const t = v === "__any" ? "" : v; setExTone(t); applyVoice(recommendWriterForTone(t || null, exType).id, t); }}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+              <Select value={exTone || "__any"} onValueChange={(v) => { const t = v === "__any" ? "" : v; setExTone(t); applyVoice(recommendWriterForTone(t || null, exType, exGenre || null).id, t); }}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent><SelectItem value="__any">Any</SelectItem>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
           </div>}
           {!locked && exType === "textbook" && <div className="grid gap-3 sm:grid-cols-2">
@@ -525,7 +525,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
         <CardHeader><CardTitle>{isFiction ? "5" : "4"}. Writer & voice</CardTitle>
           <CardDescription>Choose the writer who will write this book, then tune their voice. Each slider can move up to {MAX_ADJUST} steps from the writer's own starting point — their style still carries through every chapter.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
-          <WriterPicker bookType={exType} value={writerId || book.controls?.writerId} onChange={(id) => run("writer", async () => {
+          <WriterPicker bookType={exType} genre={exGenre} value={writerId || book.controls?.writerId} onChange={(id) => run("writer", async () => {
             const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), writerId: id } }).eq("id", book.id);
             if (error) throw error;
             setWriterId(id);
