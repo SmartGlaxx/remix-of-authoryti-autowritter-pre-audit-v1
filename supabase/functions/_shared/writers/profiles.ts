@@ -8,10 +8,7 @@ export type Tier = "economy" | "balanced" | "professional" | "maximum";
 export const DEFAULT_WRITER_TIER: Tier = "professional";
 /** Missing selections get the starting tier; explicit saved tiers are retained. */
 export function writerTierOrDefault(tier: Tier | null | undefined): Tier { return tier ?? DEFAULT_WRITER_TIER; }
-export const TIERS: { value: Tier; label: string }[] = [
-  { value: "economy", label: "Economy" }, { value: "balanced", label: "Balanced" },
-  { value: "professional", label: "Professional" }, { value: "maximum", label: "Maximum" },
-];
+export const TIERS: { value: Tier; label: string }[] = [{ value: "professional", label: "Premier" }];
 export type ProfileRole = "draft" | "revision" | "continuity" | "auditor";
 export const PROFILE_ROLE_LABELS: Record<ProfileRole, string> = { draft: "Draft", revision: "Revision", continuity: "Continuity", auditor: "Audit" };
 /** Mode = thinking/effort; applied by the adapters (OpenAI/Gemini effort, DeepSeek/Gemini/Claude thinking). */
@@ -27,86 +24,20 @@ export const ROLE_MAP: Record<Role, ProfileRole> = {
   manuscript_auditor: "auditor", planner: "auditor", character_generator: "auditor",
 };
 
-const DSF = "deepseek/deepseek-flash", DSP = "deepseek/deepseek-v4-pro", GF = "google/gemini-3.8-flash", GP = "google/gemini-3.1-pro-preview";
-const HA = "anthropic/claude-haiku-4-5", SO = "anthropic/claude-sonnet-5", OP = "anthropic/claude-opus-5-5", FA = "anthropic/claude-fable-5-1";
+const SO = "anthropic/claude-sonnet-5";
 const LU = "openai/gpt-6-luna", SOL = "openai/gpt-6-sol", AS = "openai/gpt-6-astra";
 const s = (model: string, mode: Mode = null): Slot => ({ model, mode });
 const p = (d: Slot, r: Slot, c: Slot, a: Slot): Profile => ({ draft: d, revision: r, continuity: c, auditor: a });
 
-export const PROFILES: Record<string, Record<Tier, Profile>> = {
-  elena: {
-    economy: p(s(DSF, "thinking"), s(GF, "non-thinking"), s(LU), s(LU)),
-    balanced: p(s(DSF, "thinking"), s(SO), s(LU), s(GP)),
-    professional: p(s(SO), s(OP), s(LU), s(SOL)),
-    maximum: p(s(OP), s(FA), s(SOL), s(AS)),
-  },
-  maya: {
-    economy: p(s(DSF, "non-thinking"), s(DSF, "non-thinking"), s(LU), s(LU)),
-    balanced: p(s(DSF, "thinking"), s(SOL), s(LU), s(SOL)),
-    professional: p(s(SOL), s(SO), s(LU), s(SOL)),
-    maximum: p(s(AS), s(SOL), s(SOL), s(FA)),
-  },
-  claire: {
-    economy: p(s(GF, "thinking"), s(GF, "non-thinking"), s(LU), s(LU)),
-    balanced: p(s(GP), s(SOL), s(LU), s(GP)),
-    professional: p(s(SOL), s(GP), s(LU), s(AS)),
-    maximum: p(s(AS), s(GP), s(SOL), s(AS)),
-  },
-  nora: {
-    economy: p(s(HA), s(GF), s(LU), s(LU)),
-    balanced: p(s(HA, "extended"), s(SO), s(LU), s(LU)),
-    professional: p(s(SO), s(SO), s(LU), s(SOL)),
-    maximum: p(s(OP), s(OP), s(SOL), s(SOL)),
-  },
-  sophia: {
-    economy: p(s(DSP, "thinking"), s(HA), s(LU), s(LU)),
-    balanced: p(s(SO), s(SO), s(LU), s(SOL)),
-    professional: p(s(OP), s(FA), s(SOL), s(AS)),
-    maximum: p(s(OP, "adaptive"), s(FA), s(SOL), s(AS)),
-  },
-  priya: {
-    economy: p(s(DSF, "thinking"), s(GF), s(LU), s(LU)),
-    balanced: p(s(GF, "medium"), s(SO), s(LU), s(GP)),
-    professional: p(s(GP), s(SOL), s(LU), s(FA)),
-    maximum: p(s(GP), s(FA), s(SOL), s(AS)),
-  },
-  daniel: {
-    economy: p(s(DSF, "non-thinking"), s(DSF), s(LU), s(LU)),
-    balanced: p(s(DSF, "thinking"), s(SOL), s(LU), s(SOL)),
-    professional: p(s(SOL), s(SOL), s(LU), s(SOL)),
-    maximum: p(s(SOL, "high"), s(AS), s(SOL), s(AS)),
-  },
-  marcus: {
-    economy: p(s(DSF, "thinking"), s(DSF), s(LU), s(LU)),
-    balanced: p(s(DSP), s(SO), s(LU), s(SOL)),
-    professional: p(s(SO), s(SOL), s(LU), s(SOL)),
-    maximum: p(s(AS), s(OP), s(SOL), s(FA)),
-  },
-  adrian: {
-    economy: p(s(DSP, "thinking"), s(GF), s(LU), s(LU)),
-    balanced: p(s(GP), s(SOL), s(LU), s(GP)),
-    professional: p(s(SOL, "high"), s(SO), s(LU), s(FA)),
-    maximum: p(s(FA), s(AS), s(SOL), s(AS)),
-  },
-  ethan: {
-    economy: p(s(DSF, "non-thinking"), s(HA), s(LU), s(LU)),
-    balanced: p(s(HA, "extended"), s(SO), s(LU), s(LU)),
-    professional: p(s(SO), s(SO), s(LU), s(SOL)),
-    maximum: p(s(OP), s(SOL), s(SOL), s(AS)),
-  },
-  julian: {
-    economy: p(s(DSP, "thinking"), s(DSF), s(LU), s(LU)),
-    balanced: p(s(DSP), s(SO), s(LU), s(SOL)),
-    professional: p(s(SO), s(OP), s(SOL), s(SOL)),
-    maximum: p(s(OP, "adaptive"), s(FA), s(SOL), s(AS)),
-  },
-  luca: {
-    economy: p(s(DSF, "non-thinking"), s(GF), s(LU), s(LU)),
-    balanced: p(s(GF, "low"), s(SO), s(LU), s(GP)),
-    professional: p(s(SO), s(OP), s(LU), s(SOL)),
-    maximum: p(s(OP), s(OP), s(SOL), s(FA)),
-  },
-};
+/** One premier pipeline for every writer (tiers removed). Voice comes from persona, sliders and tone — never from weaker models.
+ * Planning/ideation: Astra · Draft: Sonnet 5 · Revision/dialogue/continuity repair: Sol · Memory & checks: Luna.
+ * Literary polish (Fable/Astra) is chosen per book via the literary_reviser control. No DeepSeek or Gemini. */
+export const PREMIER_PROFILE: Profile = p(s(SO), s(SOL), s(LU), s(AS, "high"));
+const WRITER_IDS = ["elena", "maya", "claire", "nora", "sophia", "priya", "daniel", "marcus", "adrian", "ethan", "julian", "luca"];
+/** Legacy saved tiers still resolve — every tier maps to the premier profile. */
+export const PROFILES: Record<string, Record<Tier, Profile>> = Object.fromEntries(
+  WRITER_IDS.map((id) => [id, { economy: PREMIER_PROFILE, balanced: PREMIER_PROFILE, professional: PREMIER_PROFILE, maximum: PREMIER_PROFILE }]),
+);
 
 export function isTier(t: unknown): t is Tier { return t === "economy" || t === "balanced" || t === "professional" || t === "maximum"; }
 
