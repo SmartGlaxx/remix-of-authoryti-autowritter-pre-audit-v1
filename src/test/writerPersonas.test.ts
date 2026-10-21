@@ -17,7 +17,7 @@ describe("Writer personas", () => {
     expect(bestWriterFor("novel", "Romance").id).toBe("sophia");
     expect(bestWriterFor("novel", "Mystery & Crime").id).toBe("marcus");
     expect(bestWriterFor("novel", "Science Fiction").id).toBe("julian");
-    expect(bestWriterFor("comic", "Sci-Fi & Cyberpunk").id).toBe("julian");
+    expect(bestWriterFor("comic", "Sci-Fi & Cyberpunk").id).toBe("ethan"); // Julian isn't comic-qualified; type gate wins
   });
   it("a genre never pulls a writer across book type", () => {
     expect(genreSpecialistFor("Romance", "finance")).toBeNull();
