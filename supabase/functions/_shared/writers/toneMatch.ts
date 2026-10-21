@@ -2,7 +2,7 @@
 // The book's tone sets the mood; the writer is the lens. A tone recommends the best-fitting writer,
 // nudges sliders only within the writer's baseline ±MAX_ADJUST, and explains how each writer
 // interprets the tone — writers never break character to hit a tone.
-import { WRITER_PERSONAS, getWriter, bestWriterFor, type WriterPersona } from "./personas.ts";
+import { WRITER_PERSONAS, getWriter, bestWriterFor, genreSpecialistFor, type WriterPersona } from "./personas.ts";
 import { WRITER_BASELINES } from "./manifest.ts";
 import { boundToBaseline, NEUTRAL, type SliderKey, type SliderValues } from "./sliders.ts";
 
@@ -83,15 +83,21 @@ export function lensFor(w: WriterPersona, tone: string): string {
   return `${first} expresses "${tone}" through their ${trait}; signature: ${w.signature.replace(/\.$/, "").toLowerCase()}.`;
 }
 
-/** Best writer for a tone: book-type specialists first, then the smallest tone gap. No tone = book-type best fit. */
-export function recommendWriterForTone(tone: string | null | undefined, bookType: string | null | undefined): WriterPersona {
-  if (!tone || !TONE_TARGETS[tone]) return bestWriterFor(bookType);
+/** Best writer, in hierarchy order: book type (domain gate) → genre (specialist) → tone (lens).
+ *  A genre specialist qualified for the book type always wins; tone then only tunes their sliders/lens.
+ *  Without a specialist, tone picks the smallest gap among writers qualified for the book type. */
+export function recommendWriterForTone(tone: string | null | undefined, bookType: string | null | undefined, genre?: string | null): WriterPersona {
+  const specialist = genreSpecialistFor(genre, bookType);
+  if (specialist) return specialist;
+  if (!tone || !TONE_TARGETS[tone]) return bestWriterFor(bookType, genre);
+  const qualified = bookType ? WRITER_PERSONAS.filter((w) => w.bookTypes.includes(bookType)) : WRITER_PERSONAS;
+  const pool = qualified.length ? qualified : WRITER_PERSONAS;
   const score = (w: WriterPersona) => {
     const m = matchWriterToTone(w.id, tone)!;
     const idx = bookType ? w.bookTypes.indexOf(bookType) : -1;
     return m.gap + (idx < 0 ? 2.5 : idx * 0.2);
   };
-  return [...WRITER_PERSONAS].sort((a, b) => score(a) - score(b))[0];
+  return [...pool].sort((a, b) => score(a) - score(b))[0];
 }
 
 /** Voice block for idea/variant prompts: everything the author reads is written as this writer would write it. */

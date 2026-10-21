@@ -204,7 +204,7 @@ export const WRITER_PERSONAS: WriterPersona[] = [
     philosophy: "The truest things are felt, not told.", strengths: "Immersion, character, plot momentum.",
     quirks: "Plants small details that pay off later.", avoids: "Telling emotions, flat dialogue, clichéd villains.",
     signature: "Vivid scenes that stay with you.",
-    bookTypes: ["novel", "fiction-serial", "short-story", "memoir", "drama"], topics: ["fantasy", "romance", "mystery", "self-development"],
+    bookTypes: ["novel", "fiction-serial", "short-story", "memoir", "drama"], topics: ["fantasy", "science fiction", "adventure", "mystery"],
   },
   {
     id: "luca", name: "Luca Moreno", tagline: "Lifestyle, food & magazine voice", gender: "male", age: "early 40s",
@@ -227,8 +227,35 @@ export function getWriter(id: unknown): WriterPersona | null {
   return typeof id === "string" ? WRITER_PERSONAS.find((w) => w.id === id) ?? null : null;
 }
 
-/** Best-fitting writer for a book type (priority by position in each writer's bookTypes). */
-export function bestWriterFor(bookType: string | null | undefined): WriterPersona {
+/** Genre/sub-category specialists. Selection hierarchy: book type (domain gate) → genre (specialist) → tone (lens).
+ *  A tone never pulls a writer across a genre they don't write; a genre never pulls across book type. */
+export const GENRE_SPECIALISTS: Record<string, string> = {
+  "Romance": "sophia",
+  "Literary": "sophia",
+  "Contemporary Drama": "sophia",
+  "Dark & Gothic": "sophia",
+  "Science Fiction": "julian",
+  "Sci-Fi & Cyberpunk": "julian",
+  "Speculative": "julian",
+  "Adventure": "julian",
+  "Mystery & Crime": "marcus",
+  "Thriller & Suspense": "marcus",
+  "Detective & Noir": "marcus",
+  "Mystery Script": "marcus",
+  "Humor & Satire": "ethan",
+};
+
+/** The specialist for a genre, but only when they actually write this book type. */
+export function genreSpecialistFor(genre: string | null | undefined, bookType: string | null | undefined): WriterPersona | null {
+  const id = genre ? GENRE_SPECIALISTS[genre] : undefined;
+  const w = id ? getWriter(id) : null;
+  return w && (!bookType || w.bookTypes.includes(bookType)) ? w : null;
+}
+
+/** Best-fitting writer: genre specialist first (when qualified for the book type), then book-type priority. */
+export function bestWriterFor(bookType: string | null | undefined, genre?: string | null): WriterPersona {
+  const specialist = genreSpecialistFor(genre, bookType);
+  if (specialist) return specialist;
   let best = WRITER_PERSONAS[0], score = -1;
   for (const w of WRITER_PERSONAS) {
     const i = w.bookTypes.indexOf(bookType ?? "");
@@ -239,8 +266,8 @@ export function bestWriterFor(bookType: string | null | undefined): WriterPerson
 }
 
 /** Resolves the writer for a book: explicit choice, else best fit. */
-export function resolveWriter(controls: { writerId?: unknown } | null | undefined, bookType: string | null | undefined): WriterPersona {
-  return getWriter(controls?.writerId) ?? bestWriterFor(bookType);
+export function resolveWriter(controls: { writerId?: unknown } | null | undefined, bookType: string | null | undefined, genre?: string | null): WriterPersona {
+  return getWriter(controls?.writerId) ?? bestWriterFor(bookType, genre);
 }
 
 /** Identity + style block for the writer's system prompt. Book type adapts the voice; hard format rules still win. */

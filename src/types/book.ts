@@ -676,11 +676,11 @@ export const TEXTBOOK_SUBJECTS = ["Mathematics", "English Language", "English Li
 
 // Per-book-type genres (overrides category presets when present)
 export const BOOK_TYPE_GENRES: Record<BookType, string[]> = {
-  novel: ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Horror", "Literary"],
-  "fiction-serial": ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Horror", "Adventure"],
+  novel: ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Literary"],
+  "fiction-serial": ["Mystery & Crime", "Thriller & Suspense", "Science Fiction", "Historical Fiction", "Contemporary Drama", "Romance", "Adventure"],
   "short-story": ["Flash Fiction", "Character Studies", "Speculative", "Slice of Life", "Dark & Gothic", "Humor & Satire"],
   children: ["Bedtime & Calming", "Early Learning & ABCs", "Animal Adventures", "Picture Book Story", "Fable & Folktale", "Friendship & Feelings", "Silly & Funny", "Nature & Discovery"],
-  comic: ["Superhero", "Slice of Life", "Mythic Adventure", "Sci-Fi & Cyberpunk", "Detective & Noir", "Horror", "Historical Adventure"],
+  comic: ["Superhero", "Slice of Life", "Mythic Adventure", "Sci-Fi & Cyberpunk", "Detective & Noir", "Historical Adventure"],
   biography: ["Historical Figures", "Visionary Leaders", "Innovators & Scientists", "Cultural Icons", "Unsung Heroes", "Political Leaders"],
   memoir: ["Coming of Age", "Overcoming Adversity", "Cultural Roots & Identity", "Travel & Adventure", "Family & Heritage", "Creative Life & Calling"],
   "self-help": ["Personal Growth & Mindset", "Habits & Productivity", "Emotional Healing & Grief", "Confidence & Communication", "Relationships", "Stress & Mindfulness"],
