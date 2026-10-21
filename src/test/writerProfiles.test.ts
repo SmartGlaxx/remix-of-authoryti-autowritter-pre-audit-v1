@@ -6,10 +6,20 @@ import { resolveModelForRole, normalizeConfig, LEGACY_ROLE_MODELS } from "../../
 import { parseGatewayCatalog, isStale } from "../../supabase/functions/_shared/ai/pricing";
 import { buildVoiceManifest } from "../../supabase/functions/_shared/writers/manifest";
 
-describe("48 fixed writer profiles", () => {
-  it("every writer has all 4 tiers (48 total)", () => {
+describe("premier writer pipeline (tiers removed)", () => {
+  it("every writer and every legacy saved tier resolves to the same premier pipeline", () => {
     expect(WRITER_PERSONAS.every((w) => PROFILES[w.id])).toBe(true);
-    expect(Object.values(PROFILES).flatMap((t) => TIERS.map((x) => t[x.value])).filter(Boolean)).toHaveLength(48);
+    expect(TIERS).toHaveLength(1);
+    for (const w of WRITER_PERSONAS) for (const tier of ["economy", "balanced", "professional", "maximum"] as const) {
+      const c = { mode: "profile" as const, profileWriter: w.id, profileTier: tier };
+      expect(resolveModelForRole(c, "writer").model).toBe("anthropic/claude-sonnet-5");
+      expect(resolveModelForRole(c, "continuity_reviser").model).toBe("openai/gpt-6-sol");
+      expect(resolveModelForRole(c, "planner").model).toBe("openai/gpt-6-astra");
+      expect(resolveModelForRole(c, "narrative_extractor").model).toBe("openai/gpt-6-luna");
+    }
+  });
+  it("no DeepSeek or Gemini anywhere in writer profiles", () => {
+    for (const tiers of Object.values(PROFILES)) for (const prof of Object.values(tiers)) for (const slot of Object.values(prof)) expect(slot.model).not.toMatch(/deepseek|gemini/);
   });
   it("every model id exists in the registry (no invented aliases)", () => {
     for (const tiers of Object.values(PROFILES)) for (const prof of Object.values(tiers)) for (const slot of Object.values(prof)) expect(getModel(slot.model), slot.model).toBeTruthy();
@@ -18,7 +28,7 @@ describe("48 fixed writer profiles", () => {
   it("profile mode is locked: overrides and fallbacks ignored", () => {
     const c = { mode: "profile" as const, profileWriter: "daniel", profileTier: "maximum" as const, roleModels: { writer: "openai/gpt-6-luna" }, fallbacks: { writer: "openai/gpt-6-luna" } };
     const r = resolveModelForRole(c, "writer");
-    expect(r.model).toBe("openai/gpt-6-sol"); expect(r.reasoning).toBe("high"); expect(r.fallback).toBeNull();
+    expect(r.model).toBe("anthropic/claude-sonnet-5"); expect(r.fallback).toBeNull();
     expect(resolveModelForRole(c, "manuscript_auditor").model).toBe("openai/gpt-6-astra");
   });
   it("invalid profile falls back to legacy", () => expect(normalizeConfig({ mode: "profile", profile_writer: "nope", profile_tier: "balanced" }).mode).toBe("legacy"));
@@ -38,7 +48,7 @@ import { thinkingFor } from "../../supabase/functions/_shared/writers/profiles";
 describe("DeepSeek thinking as a mode, not a model", () => {
   it("maps modes", () => { expect(thinkingFor("thinking")).toBe(true); expect(thinkingFor("non-thinking")).toBe(false); expect(thinkingFor(null)).toBeUndefined(); });
   it("profile resolution carries thinking", () => {
-    expect(resolveModelForRole({ mode: "profile", profileWriter: "maya", profileTier: "economy" }, "writer")).toMatchObject({ model: "deepseek/deepseek-flash", thinking: false });
+    expect(thinkingFor("adaptive")).toBe("deep");
   });
 });
 
@@ -51,5 +61,4 @@ describe("canonical baselines", () => {
     const e = effectiveSlidersFor({ book_type: "novel", tone_profile: { formality: 1 }, controls: { writerId: "claire", creativity: 10 } });
     expect(e.formality).toBe(7); expect(e.creativity).toBe(6);
   });
-  it("adaptive → deep thinking", () => expect(resolveModelForRole({ mode: "profile", profileWriter: "sophia", profileTier: "maximum" }, "writer").thinking).toBe("deep"));
 });
