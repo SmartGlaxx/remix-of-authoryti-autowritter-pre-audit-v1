@@ -16,3 +16,4 @@
 - Both writer preview entry points share one WriterStudio UI (same locked modes and bounded controls); `try-writer` stays preview-only.
 - Edit replies go through `parseEditsDetailed` (salvage + stop reasons); truncated/malformed output is an infrastructure outcome, never a quality verdict.
 - Tone↔writer harmony lives in pure `_shared/writers/toneMatch.ts`: a tone suggests a writer and nudges sliders only within baseline ±2; Book Variants/concepts/premise rewrites get the selected writer's voice block via `BookBrief.voice` — later planning and Standard prompts are unchanged.
+- Writer selection hierarchy is book type → sub-category/genre → tone: `GENRE_SPECIALISTS` in `personas.ts` maps genres to writers (Romance/Literary → Sophia, Sci-Fi/Speculative → Julian, Mystery/Thriller → Marcus, Humor → Ethan), but a specialist only wins when qualified for the book type, and tone only chooses among type-qualified writers.
