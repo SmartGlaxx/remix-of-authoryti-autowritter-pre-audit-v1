@@ -738,8 +738,8 @@ serve(async (req) => {
     // Writing speed: "fast" (default) swaps long-thinking prose models for their quick
     // counterparts and lowers reasoning effort; "studio" keeps the full deep-writing path.
     const writingSpeed = (book.controls as Record<string, unknown> | null)?.writingSpeed === "studio" ? "studio" : "fast";
-    const normalWriter = resolveModelForRole(bookModelConfig, "writer");
-    const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast" });
+    const normalWriter = resolveModelForRole(bookModelConfig, "writer", { bookType: book.bookType });
+    const fastWriter = resolveModelForRole(bookModelConfig, "writer", { fast: writingSpeed === "fast", bookType: book.bookType });
     const modelOverride = (bookModelConfig.mode === "legacy" && typeof reqAiModel === "string" ? LEGACY_PICKER_MAP[reqAiModel] ?? null : null)
       ?? (fastWriter.model !== normalWriter.model ? fastWriter.model : null);
     const aiMeta: Record<string, unknown> = {};
