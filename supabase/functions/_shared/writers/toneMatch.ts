@@ -114,3 +114,14 @@ export function ideationVoiceBlock(writerId: string, tone: string | null | undef
     "The voice shapes wording only; it never changes facts, structure, the required JSON or the author's requirements.",
   ].filter(Boolean).join("\n");
 }
+
+/** Book tone (chosen in Book Variants) for later planning and rewrites, read through the writer's lens.
+ *  Empty tone → "" so untoned books keep their prompts byte-identical. */
+export function bookToneDirective(writerId: string | null | undefined, tone: string | null | undefined, scope: "plan" | "rewrite"): string {
+  const t = typeof tone === "string" ? tone.trim() : "";
+  if (!t) return "";
+  const w = getWriter(writerId ?? "") ?? WRITER_PERSONAS[0];
+  return scope === "plan"
+    ? `\n\nBOOK TONE: "${t}". Every summary, chapter, section, beat and blueprint must carry this tone so the prose written from it stays in tone. ${lensFor(w, t)}`
+    : `\n\nBOOK TONE: "${t}". The rewrite must stay in this tone. ${lensFor(w, t)} Never let the tone override the writer's own voice.`;
+}
