@@ -10,8 +10,8 @@ export { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 const FAV_KEY = "favoriteWriters";
 const loadFavs = (): string[] => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; } };
 
-export function WriterPicker({ bookType, value, onChange }: { bookType: string; value?: string; onChange: (id: string) => void }) {
-  const best = bestWriterFor(bookType);
+export function WriterPicker({ bookType, genre, value, onChange }: { bookType: string; genre?: string; value?: string; onChange: (id: string) => void }) {
+  const best = bestWriterFor(bookType, genre);
   const selected = value ?? best.id;
   const [favs, setFavs] = useState<string[]>(loadFavs);
   const [testing, setTesting] = useState<string | null>(null);

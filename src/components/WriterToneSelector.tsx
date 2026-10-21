@@ -19,11 +19,11 @@ const FIT_CLASS: Record<ToneFit, string> = {
   stretch: "border-destructive/50 bg-destructive/10 text-destructive",
 };
 
-export function WriterToneSelector({ bookId, bookType, tone, writerId, disabled, onChange }: {
-  bookId: string; bookType: string; tone: string; writerId: string; disabled?: boolean; onChange: (id: string) => void;
+export function WriterToneSelector({ bookId, bookType, genre, tone, writerId, disabled, onChange }: {
+  bookId: string; bookType: string; genre?: string; tone: string; writerId: string; disabled?: boolean; onChange: (id: string) => void;
 }) {
-  const w = getWriter(writerId) ?? recommendWriterForTone(tone, bookType);
-  const rec = recommendWriterForTone(tone, bookType);
+  const w = getWriter(writerId) ?? recommendWriterForTone(tone, bookType, genre);
+  const rec = recommendWriterForTone(tone, bookType, genre);
   const match = matchWriterToTone(w.id, tone);
   const [tier, setTier] = useState<Tier | null>(null);
   const [cfg, setCfg] = useState<Record<string, unknown> | null>(null);
@@ -95,7 +95,11 @@ export function WriterToneSelector({ bookId, bookType, tone, writerId, disabled,
         </div>
         <div className="space-y-1">
           <p className="text-[11px] text-muted-foreground">Change writer</p>
-          {[...WRITER_PERSONAS].sort((a, b) => (matchWriterToTone(a.id, tone)?.gap ?? 0) - (matchWriterToTone(b.id, tone)?.gap ?? 0)).map((p) => {
+          {[...WRITER_PERSONAS].sort((a, b) => {
+            const qa = a.bookTypes.includes(bookType) ? 0 : 1, qb = b.bookTypes.includes(bookType) ? 0 : 1;
+            if (qa !== qb) return qa - qb;
+            return (matchWriterToTone(a.id, tone)?.gap ?? 0) - (matchWriterToTone(b.id, tone)?.gap ?? 0);
+          }).map((p) => {
             const m = matchWriterToTone(p.id, tone);
             return (
               <button key={p.id} type="button" onClick={() => { onChange(p.id); setOpen(false); }}
