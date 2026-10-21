@@ -11,9 +11,12 @@ async function capture(adapter: string, modelKey: string, req: AIRequest) {
   for await (const _ of getAdapter(adapter as any).stream(req, { model: requireModel(modelKey), apiKey: "k", fetch })) { /* drain */ }
   return { url, body };
 }
-const profileReq = (writer: string, tier: any, role: any = "writer"): AIRequest => {
-  const r = resolveModelForRole({ mode: "profile", profileWriter: writer, profileTier: tier }, role);
-  return { user: "x", temperature: 0.8, reasoning: r.reasoning, thinking: r.thinking };
+import { thinkingFor, reasoningFor, type Mode } from "../../supabase/functions/_shared/writers/profiles";
+// Adapter mapping per thinking mode (tiers removed; adapters still honour every mode).
+const MODES: Record<string, Mode> = { "sophia/maximum": "adaptive", "nora/balanced": "extended", "claire/economy": "non-thinking", "priya/balanced": "medium", "maya/economy": "non-thinking", "elena/economy": "thinking", "daniel/maximum": "high" };
+const profileReq = (writer: string, tier: any, _role: any = "writer"): AIRequest => {
+  const m = MODES[`${writer}/${tier}`]; void resolveModelForRole;
+  return { user: "x", temperature: 0.8, reasoning: reasoningFor(m), thinking: thinkingFor(m) };
 };
 
 describe("provider request mapping carries the profile's model + thinking", () => {
