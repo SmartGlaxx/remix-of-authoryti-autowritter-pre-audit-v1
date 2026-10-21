@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
 import { configForPlanningAction, schemaForIdeaAction } from "../_shared/ai/ideation.ts";
 import { getWriter, resolveWriter } from "../_shared/writers/personas.ts";
-import { ideationVoiceBlock } from "../_shared/writers/toneMatch.ts";
+import { ideationVoiceBlock, bookToneDirective } from "../_shared/writers/toneMatch.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { statusForAIError, failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -312,6 +312,9 @@ async function handle(req: Request): Promise<Response> {
       const wid = getWriter(body.writerId)?.id ?? resolveWriter((book as any).controls ?? {}, ovType).id;
       brief.voice = ideationVoiceBlock(wid, s(ex.tone, 80) || null) || null;
     }
+    // Book tone from Book Variants carries into master plan, chapters, sections, beats and blueprints (untoned books unchanged).
+    const toneDirective = bookToneDirective(resolveWriter((book as any).controls ?? {}, ovType).id, (book as any).controls?.bookTone, "plan");
+    const toned = <P extends { user: string }>(p: P): P => (toneDirective ? { ...p, user: p.user + toneDirective } : p);
 
     try {
       if (action === "adjust_premise") {
@@ -372,7 +375,7 @@ async function handle(req: Request): Promise<Response> {
           id: `alt${i + 1}`, title: s(a?.title, 300), logline: s(a?.logline, 1000), summary: s(a?.summary, 8000), twist: s(a?.twist, 2000), ending: s(a?.ending, 2000),
         })) : [];
         const chosen = Number.isInteger(body.selectedIndex) ? alts[body.selectedIndex] ?? null : null;
-        const r = await runWithRepair(call, buildMasterPrompt(brief, chosen), (t) => parseMaster(t, brief, chosen));
+        const r = await runWithRepair(call, toned(buildMasterPrompt(brief, chosen)), (t) => parseMaster(t, brief, chosen));
         if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
         const v = r.value!;
         const idem = planIdemKey(["master", bookId, s(body.requestId, 100) || crypto.randomUUID()]);
@@ -406,7 +409,7 @@ async function handle(req: Request): Promise<Response> {
           return json({ dryRun: true, prompts: first === undefined ? [] : [buildChapterPrompt(m, first, expanded)] });
         }
         const out = await runChapterBatch(list, (ch) => !!expanded[ch] && body.force !== true, async (ch) => {
-          const r = await runWithRepair(call, buildChapterPrompt(m, ch, expanded), (t) => parseChapter(t, m, ch, expanded));
+          const r = await runWithRepair(call, toned(buildChapterPrompt(m, ch, expanded)), (t) => parseChapter(t, m, ch, expanded));
           if (!r.ok) return { ok: false, issues: r.issues };
           const { error } = await db.rpc("save_progressive_plan_batch", {
             p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["chapter", mp.id, ch, runId]),
@@ -426,7 +429,7 @@ async function handle(req: Request): Promise<Response> {
       const runId = s(body.requestId, 100) || "default";
 
       if (action === "sections") {
-        const r = await runWithRepair(call, buildSectionPrompt(m, chapter, expanded), (t) => parseSections(t, m, chapter));
+        const r = await runWithRepair(call, toned(buildSectionPrompt(m, chapter, expanded)), (t) => parseSections(t, m, chapter));
         if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
         const items = r.value!.map((d) => { const sec = chapter.sections.find((x) => x.id === d.id)!; return { plan_level: "SECTION", chapter_index: ch, subsection_index: sec.sectionIndex, content: { section: sec, detail: d }, dependencies: sec.dependsOn }; });
         const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["sections", mp.id, ch, runId]), p_items: items });
@@ -438,7 +441,7 @@ async function handle(req: Request): Promise<Response> {
         const secRows = latest("SECTION", ch);
         const details = chapter.sections.map((sec) => secRows.find((r) => r.subsection_index === sec.sectionIndex)?.content?.detail).filter(Boolean);
         if (details.length !== chapter.sections.length) return json({ error: "Plan this chapter's sections first" }, 409);
-        const r = await runWithRepair(call, buildBeatsPrompt(m, chapter, details, expanded), (t) => parseBeats(t, m, chapter));
+        const r = await runWithRepair(call, toned(buildBeatsPrompt(m, chapter, details, expanded)), (t) => parseBeats(t, m, chapter));
         if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
         const items = r.value!.chapter.sections.map((sec) => ({ plan_level: "BEATS", chapter_index: ch, subsection_index: sec.sectionIndex,
           content: { beats: sec.beats, notes: r.value!.notes.filter((x) => x.id.startsWith(`${sec.id}b`)) }, dependencies: [] }));
@@ -457,7 +460,7 @@ async function handle(req: Request): Promise<Response> {
         const cast: CastRef[] = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
         const input: BlueprintInput = { m, chapter, details, notes, cast, expanded, stakes: chapRow?.content?.stakes, focus: chapRow?.content?.focus };
         const caller = mockPlanner === null && testMode ? storyCall(mockBlueprintOutput(input)) : call;
-        const r = await runWithRepair(caller, buildBlueprintPrompt(input), (t) => parseBlueprint(t, input));
+        const r = await runWithRepair(caller, toned(buildBlueprintPrompt(input)), (t) => parseBlueprint(t, input));
         if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
         const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["blueprint", mp.id, ch, runId]),
           p_items: [{ plan_level: "BLUEPRINT", chapter_index: ch, content: { blueprint: r.value }, dependencies: [] }] });
