@@ -49,32 +49,45 @@ const SECTION_WORDS = 600;
 /** Thinking/reasoning tokens are billed as output by every provider we use; assume +50% output when on. */
 const THINKING_OUTPUT_FACTOR = 1.5;
 
-function priceOf(model: string, live?: PriceMap): { inputPerM: number; outputPerM: number } | null {
+/** Share of each call's input that is a repeated, cacheable prefix (system prompt, persona, plan, story memory). */
+export const CACHED_INPUT_SHARE = 0.6;
+
+function priceOf(model: string, live?: PriceMap): { inputPerM: number; outputPerM: number; cachedPerM: number } | null {
+  const reg = getModel(model)?.pricing;
   const lp = live?.[model];
-  if (lp?.inputPerM != null && lp?.outputPerM != null) return { inputPerM: lp.inputPerM, outputPerM: lp.outputPerM };
-  const p = getModel(model)?.pricing;
-  return p?.inputPerM != null && p?.outputPerM != null ? { inputPerM: p.inputPerM, outputPerM: p.outputPerM } : null;
+  const base = lp?.inputPerM != null && lp?.outputPerM != null ? { inputPerM: lp.inputPerM, outputPerM: lp.outputPerM }
+    : reg?.inputPerM != null && reg?.outputPerM != null ? { inputPerM: reg.inputPerM, outputPerM: reg.outputPerM } : null;
+  if (!base) return null;
+  return { ...base, cachedPerM: reg?.cachedInputPerM ?? base.inputPerM };
+}
+
+/** Cache-aware input cost: the repeated prefix is billed at the cached rate. */
+export function cachedInputCost(inputTokens: number, p: { inputPerM: number; cachedPerM: number }, share = CACHED_INPUT_SHARE): number {
+  return (inputTokens * (1 - share) * p.inputPerM + inputTokens * share * p.cachedPerM) / 1e6;
 }
 
 export function estimatePipeline(config: BookModelConfig | null | undefined, totalWords: number, live?: PriceMap): PipelineEstimate {
   const words = Math.max(SECTION_WORDS, Math.round(totalWords));
   const sections = Math.ceil(words / SECTION_WORDS);
   const outTok = words * TOKENS_PER_WORD;
-  // [pipeline role, executing role, input tokens, output tokens] — cache-free (conservative).
-  const plan: [PipelineRoleCost["role"], Parameters<typeof resolveModelForRole>[1], number, number][] = [
-    ["draft", "writer", sections * 20000, outTok],
-    ["revision", "editor", sections * 3000 + outTok, outTok],
-    ["continuity", "continuity_checker", sections * 8000 + outTok, sections * 800],
-    ["auditor", "manuscript_auditor", outTok + 4000, 6000],
+  // [pipeline role, executing role, input tokens, output tokens, counted in total]. The whole-book audit is optional.
+  const plan: [PipelineRoleCost["role"], Parameters<typeof resolveModelForRole>[1], number, number, boolean][] = [
+    ["draft", "writer", sections * 20000, outTok, true],
+    ["revision", "editor", sections * 3000 + outTok, outTok, true],
+    ["continuity", "continuity_checker", sections * 8000 + outTok, sections * 800, true],
+    ["auditor", "manuscript_auditor", outTok + 4000, 6000, false],
   ];
   const roles = plan.map(([role, exec, inp, out]) => {
     const r = resolveModelForRole(config, exec);
     const thinking = !!(r.thinking || r.reasoning);
     const pr = priceOf(r.model, live);
-    const cost = pr ? (inp * pr.inputPerM + out * (thinking ? THINKING_OUTPUT_FACTOR : 1) * pr.outputPerM) / 1e6 : null;
+    // Thinking surcharge only for the drafting role; checks are short structured verdicts.
+    const outFactor = thinking && role === "draft" ? THINKING_OUTPUT_FACTOR : 1;
+    const cost = pr ? cachedInputCost(inp, pr) + (out * outFactor * pr.outputPerM) / 1e6 : null;
     return { role, model: r.model, thinking, costUsd: cost == null ? null : Math.round(cost * 1e4) / 1e4, per1kWordsUsd: cost == null ? null : Math.round((cost / words) * 1000 * 1e4) / 1e4 };
   });
-  const known = roles.every((r) => r.costUsd != null);
-  const total = known ? roles.reduce((n, r) => n + r.costUsd!, 0) : null;
-  return { totalWords: words, roles, totalUsd: total == null ? null : Math.round(total * 100) / 100, per1kWordsUsd: total == null ? null : Math.round((total / words) * 1000 * 1e4) / 1e4, note: "Estimate without cache discounts; thinking billed as extra output." };
+  const counted = roles.filter((_, i) => plan[i][4]);
+  const known = counted.every((r) => r.costUsd != null);
+  const total = known ? counted.reduce((n, r) => n + r.costUsd!, 0) : null;
+  return { totalWords: words, roles, totalUsd: total == null ? null : Math.round(total * 100) / 100, per1kWordsUsd: total == null ? null : Math.round((total / words) * 1000 * 1e4) / 1e4, note: "Estimate with prompt-cache discounts on repeated context; the optional whole-book audit is shown but not included in the total." };
 }
