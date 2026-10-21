@@ -19,6 +19,17 @@ describe("Tone ↔ writer harmony", () => {
     expect(recommendWriterForTone(null, "children").id).toBe("nora");
     expect(recommendWriterForTone("Funny", "novel").id).not.toBe(recommendWriterForTone("Literary", "novel").id);
   });
+  it("hierarchy: book type gates, genre specialist beats tone, tone picks within the type", () => {
+    // Genre specialist wins even when the tone would suit someone else better.
+    expect(recommendWriterForTone("Funny", "novel", "Romance").id).toBe("sophia");
+    expect(recommendWriterForTone("Cozy", "novel", "Mystery & Crime").id).toBe("marcus");
+    // Tone never pulls a writer across the book-type gate.
+    expect(recommendWriterForTone("Funny", "finance").id).toBe("claire");
+    expect(recommendWriterForTone("Dark", "children").id).toBe("nora");
+    // Without a specialist genre, tone chooses among writers of that type only.
+    const pick = recommendWriterForTone("Funny", "novel");
+    expect(pick.bookTypes).toContain("novel");
+  });
   it("Book Variants prompts carry the selected writer's voice", () => {
     const voice = ideationVoiceBlock("ethan", "Funny");
     expect(buildAlternativesPrompt({ ...brief, voice }, 3).user).toContain("Ethan Cole");
