@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { bulkApprovableIds, isBlueprintExampleRole } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
+import { PlanningBookSwitcher } from "@/components/PlanningBookSwitcher";
 import { ensureChapterBlueprint } from "@/lib/autoBlueprint";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
@@ -97,7 +98,8 @@ export default function PlanningStudio() {
           <p className="text-xs text-muted-foreground">Planning Studio</p>
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground hidden sm:inline">Progressive Planning</span>
+          <PlanningBookSwitcher bookId={book.id} />
+          <span className="text-muted-foreground hidden lg:inline">Progressive Planning</span>
           <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild>
             <button type="button" aria-label="What is Progressive Planning?" className="text-muted-foreground hover:text-primary"><Info className="w-4 h-4" /></button>
           </TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
