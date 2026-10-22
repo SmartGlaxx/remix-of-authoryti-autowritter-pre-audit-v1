@@ -1,1 +1,0 @@
-ALTER TABLE public.profiles ADD COLUMN credits_reset_at timestamp with time zone NOT NULL DEFAULT now();

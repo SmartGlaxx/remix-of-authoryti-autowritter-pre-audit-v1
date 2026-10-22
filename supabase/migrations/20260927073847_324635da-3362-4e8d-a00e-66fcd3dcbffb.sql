@@ -1,1 +1,0 @@
-CREATE POLICY "No client access to provider keys" ON public.user_provider_keys AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
