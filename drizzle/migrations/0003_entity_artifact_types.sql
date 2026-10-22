@@ -1,0 +1,2 @@
+ALTER TABLE public.story_entities DROP CONSTRAINT story_entities_entity_type_check;
+ALTER TABLE public.story_entities ADD CONSTRAINT story_entities_entity_type_check CHECK (entity_type = ANY (ARRAY['location','organization','object','faction','artifact','framework','definition','other']));
