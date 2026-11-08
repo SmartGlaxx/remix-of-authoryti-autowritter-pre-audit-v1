@@ -73,6 +73,7 @@ export interface RelativeShift {
 export function parseRelativeShift(relative: string): RelativeShift | null {
   const t = relative.toLowerCase().trim();
   if (!t) return null;
+  if (/\bhalf an?\s+(hour|day|week)\s+(later|on)\b/.test(t)) return { minutes: t.includes("hour") ? 30 : t.includes("day") ? 720 : 5040, dayAdvance: false, markerOnly: false };
   const dur = /\b([a-z]+|\d+(?:\.\d+)?)\s*(half\s+an\s+)?(minutes?|hours?|days?|weeks?)\s+(later|after|on|hence)\b/.exec(t)
     ?? /\b(?:in|within)\s+([a-z]+|\d+(?:\.\d+)?)\s*(half\s+an\s+)?(minutes?|hours?|days?|weeks?)\b/.exec(t);
   if (dur) {
