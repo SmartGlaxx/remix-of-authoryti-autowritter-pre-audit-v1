@@ -11,6 +11,8 @@ export interface SectionMemory {
   summary: { writerView: string[]; characterViews: Record<string, string[]> };
   dialogueCards: { incidents: Record<string, DialogueIncident>; people: Record<string, { incidentIds: string[] }> };
   sectionTime: { date: string | null; time: string | null };
+  /** One anchor per paragraph, in paragraph order. Time mentions must also appear in that paragraph's summary sentence. */
+  paragraphTimes: ParagraphTimeAnchor[];
 }
 export function paragraphsOf(text: string): string[] {
   return text.replace(/<br\s*\/?>(\s*<br\s*\/?>)+/gi, '\n\n').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
@@ -55,7 +57,29 @@ export function parseSectionMemory(raw: unknown, text: string, source: string): 
       people[person] ??= { incidentIds: [] }; people[person].incidentIds.push(id);
     }
   }
-  return { summary: r.summary, dialogueCards: { incidents, people }, sectionTime: { date: r.sectionTime?.date ?? null, time: r.sectionTime?.time ?? null } };
+  const paragraphTimes = parseParagraphTimes(r.paragraphTimes, count);
+  const findings = validateTemporalFrames(paragraphTimes);
+  if (findings.length) throw new Error(`Timeline does not hold: ${findings.map((f) => `paragraph ${f.paragraphIndex + 1} (${f.kind}): ${f.detail}`).join(" | ")}`);
+  return { summary: r.summary, dialogueCards: { incidents, people }, sectionTime: { date: r.sectionTime?.date ?? null, time: r.sectionTime?.time ?? null }, paragraphTimes };
+}
+
+function parseParagraphTimes(raw: unknown, count: number): ParagraphTimeAnchor[] {
+  if (!Array.isArray(raw) || raw.length !== count) throw new Error('Each paragraph needs exactly one time anchor (null fields when the paragraph carries no time)');
+  return raw.map((v, i) => {
+    const a = v as Partial<ParagraphTimeAnchor> | null;
+    if (!a || typeof a !== 'object') throw new Error('Invalid paragraph time anchor');
+    if (a.paragraphIndex !== i) throw new Error('Paragraph time anchors must be in paragraph order');
+    const frameType = a.frameType as TemporalFrameType;
+    if (!FRAME_TYPES.includes(frameType)) throw new Error('Invalid temporal frame type');
+    const frameId = typeof a.frameId === 'string' && a.frameId.trim() ? a.frameId.trim() : null;
+    if (!frameId) throw new Error('Every temporal frame needs a stable id');
+    if (frameType === 'linear' && frameId !== 'main') throw new Error('The linear frame id must be "main"');
+    if (frameType !== 'linear' && frameId === 'main') throw new Error('A non-linear frame needs its own id');
+    const str = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, 200) : null);
+    const parentReturnIndex = a.parentReturnIndex == null ? null : a.parentReturnIndex;
+    if (parentReturnIndex != null && (!Number.isInteger(parentReturnIndex) || parentReturnIndex < 0 || parentReturnIndex >= count)) throw new Error('Invalid frame return index');
+    return { paragraphIndex: i, frameType, frameId, relativeTime: str(a.relativeTime), rawTime: str(a.rawTime), parentReturnIndex };
+  });
 }
 export function memoryExtractionInstruction(text: string): string {
   return `ALSO return "section_memory": {"summary":{"writerView":[],"characterViews":{}},"dialogueCards":{"incidents":{},"people":{}},"sectionTime":{"date":null,"time":null}}.
