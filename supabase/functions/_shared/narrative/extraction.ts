@@ -2,6 +2,7 @@
 // The model call and the database are injected, so the model can be swapped in
 // Pass 3 without touching this module, and the whole flow is unit-testable.
 import { parseKnowledge, type ExtractedKnowledge } from "./knowledge.ts";
+import { memoryExtractionInstruction, parseSectionMemory } from "./sectionMemory.ts";
 import { normText, validateThreadTransition, type Authority, type StoryPosition } from "./rules.ts";
 
 export const EXTRACTION_AUTHORITY: Authority = "AI_INFERENCE"; // generated prose never gets USER/OUTLINE canon
@@ -43,7 +44,7 @@ export interface ExtractionPlan {
 export const ENTITY_TYPES = ["location", "organization", "object", "faction", "artifact", "framework", "definition", "other"];
 
 // ---------- Prompt ----------
-export function buildExtractionPrompt(args: { text: string; position: StoryPosition; characters: KnownCharacter[]; threads: KnownThread[]; knowledge?: boolean }): { system: string; user: string } {
+export function buildExtractionPrompt(args: { text: string; position: StoryPosition; characters: KnownCharacter[]; threads: KnownThread[]; knowledge?: boolean; paragraphMemory?: boolean }): { system: string; user: string } {
   const system = `You are a strict story-state extraction engine. You read ONE newly written section of a book and record ONLY what that text explicitly establishes.
 Rules:
 - Never invent, infer beyond the text, or use outside knowledge. If the text does not establish something, omit it.
@@ -82,7 +83,7 @@ SECTION TEXT:
 """
 ${args.text}
 """`;
-  return { system, user };
+  return { system: system + (args.paragraphMemory ? `\n${memoryExtractionInstruction(args.text)}` : ''), user };
 }
 
 // ---------- Parsing & validation ----------
@@ -255,7 +256,7 @@ export type ExtractionOutcome =
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 /** Never throws. Prose is only read, never written. */
-export async function processSectionExtraction(repo: NarrativeRepo, callModel: ModelCaller, bookId: string, pos: StoryPosition, opts: { now?: number; knowledge?: boolean } = {}): Promise<ExtractionOutcome> {
+export async function processSectionExtraction(repo: NarrativeRepo, callModel: ModelCaller, bookId: string, pos: StoryPosition, opts: { now?: number; knowledge?: boolean; paragraphMemory?: boolean } = {}): Promise<ExtractionOutcome> {
   let extractionId: string | undefined;
   try {
     const section = await repo.getSectionText(bookId, pos);
@@ -278,11 +279,13 @@ export async function processSectionExtraction(repo: NarrativeRepo, callModel: M
     await repo.seedFromOutline(bookId);
     const known = await repo.loadKnown(bookId);
     const openThreads = known.threads.filter((t) => t.status === "OPEN" || t.status === "DEVELOPING");
-    const { content, model } = await callModel(buildExtractionPrompt({ text: section.text, position: pos, characters: known.characters, threads: openThreads, knowledge: opts.knowledge }));
-    const plan = planExtraction(parseModelJson(content), { text: section.text, characters: known.characters, threads: openThreads, knowledge: opts.knowledge });
+    const { content, model } = await callModel(buildExtractionPrompt({ text: section.text, position: pos, characters: known.characters, threads: openThreads, knowledge: opts.knowledge, paragraphMemory: opts.paragraphMemory }));
+    const raw = parseModelJson(content);
+    const sectionMemory = opts.paragraphMemory ? parseSectionMemory(raw.section_memory, section.text, `chapter ${pos.chapterIndex + 1}, section ${pos.subsectionIndex + 1}`) : undefined;
+    const plan = planExtraction(raw, { text: section.text, characters: known.characters, threads: openThreads, knowledge: opts.knowledge });
     const applied = await repo.applyPlan(bookId, pos, rec.id, plan);
     await repo.saveSnapshot(bookId, pos, rec.id);
-    await repo.completeExtraction(rec.id, { ...applied, dropped: plan.dropped.slice(0, 40) }, model);
+    await repo.completeExtraction(rec.id, { ...applied, ...(sectionMemory ? { sectionMemory } : {}), dropped: plan.dropped.slice(0, 40) }, model);
     return {
       status: "completed", extractionId: rec.id, replacedPrevious,
       ...(opts.knowledge ? { knowledge: plan.knowledge ?? [], contentHash: hash, sectionDate: plan.events.find((e) => e.story_date)?.story_date ?? null, nonLinear: plan.events.some((e) => e.is_flashback) } : {}),
