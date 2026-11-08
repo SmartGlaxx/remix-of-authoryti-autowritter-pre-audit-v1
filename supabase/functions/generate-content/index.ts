@@ -29,6 +29,7 @@ import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/knowledgeRepo.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
+import { renderWholeBookMemory } from '../_shared/narrative/sectionMemory.ts';
 
 // ── Security Config ──
 const MAX_PAYLOAD_BYTES = 200_000;
@@ -627,7 +628,7 @@ serve(async (req) => {
     const effLevel = progressive && reqAutomationLevel === "guided" ? "assisted" : reqAutomationLevel;
     const plannedWords = Number(serverOutline?.chapters?.[absChapter]?.subsections?.[subsectionIndex]?.targetWords)
       || Number((progressive?.plan as any)?.section?.targetWords) || Number(subsection?.targetWords) || 0;
-    const effTarget = progressive && plannedWords > 0 ? Math.min(plannedWords, 3000) : targetWordsPerSubsection;
+    const effTarget = progressive && plannedWords > 0 ? plannedWords : targetWordsPerSubsection;
     const legacyPrompt = () => buildVariablePrompt(
       book, chapter, subsection,
       previousNovelText,
@@ -720,6 +721,15 @@ serve(async (req) => {
     } catch (e) { console.warn("[learning] overlays skipped:", e instanceof Error ? e.message : e); }
 
 
+
+    // Paragraph memory is read from completed extraction records and checked against current saved prose.
+    if (book.id && serverOutline?.chapters) {
+      const { data: memories, error: memoryError } = await adminSupabase.from('narrative_extractions')
+        .select('chapter_index,subsection_index,content_hash,status,applied').eq('book_id', book.id).eq('user_id', auth.user.id).eq('status', 'completed');
+      if (memoryError) throw new Error('Could not load accepted paragraph memory');
+      const memoryBlock = renderWholeBookMemory(memories ?? [], serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
+      if (memoryBlock) userPrompt += `\n\n${memoryBlock}`;
+    }
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.

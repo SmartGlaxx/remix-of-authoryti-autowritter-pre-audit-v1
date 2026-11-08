@@ -1,4 +1,6 @@
 - Narrative engine pure logic lives in `supabase/functions/_shared/narrative/` (rules, context, extraction) and is imported by both edge functions and `src/` — one source of truth for browser, backend and tests.
+- Paragraph/dialogue memory lives in pure `sectionMemory.ts`, persisted inside the existing extraction's `applied.sectionMemory`; writing and UI read only completed records whose hashes match current completed prose, before the writing position — avoids a second ledger and stale/future-text leaks.
+- Character references use `characterReference.ts` for pure lock/tell rules and the shared OpenAI image service with low quality and no failure fallback; exact biometrics are designed/author values, never claimed as image measurements.
 - Story-state extraction runs server-side (`extract-narrative-state`) from the saved section text, idempotent per section via `narrative_extractions` (content hash + undo log) — prevents duplicates and never trusts client prose.
 - All AI text calls go through `supabase/functions/_shared/ai/` (registry → `resolveModelForRole` → adapters → `streamAI`/`generateAIText`) — one place for models, pricing, providers, retries, fallbacks and usage records.
 - Initial actions use `ai/ideation.ts` call-local config and strict schemas; later planning keeps book routing to protect fixed profiles.
