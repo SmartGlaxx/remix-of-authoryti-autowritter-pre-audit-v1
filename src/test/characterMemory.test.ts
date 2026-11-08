@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseSectionMemory, renderWholeBookMemory, timeReferenceAssessment } from '../../supabase/functions/_shared/narrative/sectionMemory';
+import { parseSectionMemory, renderWholeBookMemory, timeMixAssessment, mixOf } from '../../supabase/functions/_shared/narrative/sectionMemory';
 import { applyLockedFeature, introductionCueCount, selectUnspentFeatures, validateCharacterLock, REFERENCE_VIEWS, type CharacterLock } from '../../supabase/functions/_shared/narrative/characterReference';
 const text = 'Mara opened the door.\n\n“Wait,” Nils said.';
-const memory = () => ({ summary: { writerView: ['Mara opened the door.', 'Nils asked her to wait.'], characterViews: { Mara: ['Mara saw the door open.', 'Mara heard Nils ask her to wait.'] } }, dialogueCards: { incidents: { hall: { id: 'hall', label: 'Hall', location: 'hall', time: null, source: '', participants: ['Mara','Nils'], addressedTo: ['Mara'], present: ['Jo'], turns: [{ n: 1, speaker: 'Nils', text: 'Wait,', delivery: null }] } }, people: {} }, sectionTime: { date: null, time: null } });
+const times = () => ([
+  { paragraphIndex: 0, frameType: 'linear', frameId: 'main', relativeTime: null, rawTime: null, parentReturnIndex: null },
+  { paragraphIndex: 1, frameType: 'linear', frameId: 'main', relativeTime: null, rawTime: null, parentReturnIndex: null },
+]);
+const memory = () => ({ summary: { writerView: ['Mara opened the door.', 'Nils asked her to wait.'], characterViews: { Mara: ['Mara saw the door open.', 'Mara heard Nils ask her to wait.'] } }, dialogueCards: { incidents: { hall: { id: 'hall', label: 'Hall', location: 'hall', time: null, source: '', participants: ['Mara','Nils'], addressedTo: ['Mara'], present: ['Jo'], turns: [{ n: 1, speaker: 'Nils', text: 'Wait,', delivery: null }] } }, people: {} }, sectionTime: { date: null, time: null }, paragraphTimes: times() });
 const card = (): CharacterLock => ({ referencePath: 'owner/ref.png', heightCm: 172, weightKg: 68, measurementSource: 'designed', features: { eyes: 'green' }, tells: ['at-ease','stress','defiance','fatigue'].map((state,i) => ({ state, cue: `cue ${i}`, purpose: 'reveal' })), desireLine: 'The reader wants Mara to prevail.', heldBackFeature: 'scar', locked: true });
 describe('Paragraph and dialogue memory', () => {
   it('requires exactly one writer sentence for each paragraph', () => { const m = memory(); m.summary.writerView.pop(); expect(() => parseSectionMemory(m,text,'1:1')).toThrow('exactly one'); });
