@@ -1,4 +1,6 @@
 // Accepted prose only. No invented summaries, quote normalization or future sections.
+import { FRAME_TYPES, validateTemporalFrames, type ParagraphTimeAnchor, type TemporalFrameType } from "./temporalFrames.ts";
+export type { ParagraphTimeAnchor };
 export interface DialogueIncident {
   id: string; label: string; location: string | null; time: string | null; source: string;
   participants: string[]; addressedTo: string[]; present: string[];
