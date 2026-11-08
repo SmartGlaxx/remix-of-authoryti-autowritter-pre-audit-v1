@@ -14,7 +14,8 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟧 [ ] | Accepted extraction and writer-memory integration: implemented, needs saved-data end-to-end verification |
 | 🟧 [ ] | Automatic emergent-character creation/resume, universe collision checks and durable appearance locks |
 | 🟧 [ ] | Introduction/re-entry exposure ledger and pre-acceptance appearance contradiction checks |
-| 🟧 [ ] | Section/paragraph chronology, chapter time-reference enforcement and event/thread deadlines |
+| 🟩 [x] | Section/paragraph chronology: per-paragraph relative/raw anchors, non-linear frames, deterministic clock checks, proportional 4–8 chapter time mix (784 tests) |
+| 🟧 [ ] | Event/thread deadlines and chronology end-to-end verification on a drafted section |
 | 🟧 [ ] | Title/theme invariance and remaining prose/section-length rules across every planning/writing path |
 | 🟧 [ ] | Deployment checks and paid image/vision verification (not performed; separate permission needed) |
 
