@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
-import { generateOpenAIImage } from "../_shared/ai/openaiImage.ts";
+import { createCharacterReference } from '../_shared/narrative/characterReferenceServer.ts';
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
@@ -77,17 +77,23 @@ serve(async (req) => {
     const validationError = validateInput(body);
     if (validationError) return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { book, outline, ieltsBand } = body;
+    const { ieltsBand } = body;
+    const ownerAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const { data: savedBook, error: bookError } = await ownerAdmin.from('books').select('id,user_id,title,theme,book_type,audience,outline').eq('id',body.book.id).eq('user_id',auth.user.id).maybeSingle();
+    if (bookError || !savedBook) return new Response(JSON.stringify({error:'Book not found'}),{status:404,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    const book = { ...savedBook, bookType:savedBook.book_type };
+    const outline = savedBook.outline;
+    if (!Array.isArray(outline?.chapters)) throw new Error('Save the outline before preparing references');
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     await auditLog(auth.user.id, "generate_characters", "book", book.id, { title: book.title });
 
-    const isChildrensBook = book.bookType === "children" || book.bookType === "comic";
     const band = ieltsBand || 7;
     const descriptionGuidelines = getDescriptionGuidelines(band);
     
-    const extractPrompt = `Analyze this book outline and extract EVERY character, person, or entity mentioned or implied.
+    const extractPrompt = `Analyze this book outline and extract EVERY named fictional character. Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.
+EXISTING CAST: ${JSON.stringify(outline.characters ?? [])}
 
 BOOK: "${book.title}"
 THEME: "${book.theme}"
@@ -109,6 +115,7 @@ IDENTITY, PHYSICAL APPEARANCE, HAIR, FASHION & STYLE, VOICE & MANNERISMS, PERSON
 Also provide:
 - A brief description (for quick reference)
 - A visualDescription for illustration consistency
+- reference: {heightCm: exact positive number, weightKg: exact positive number, measurementSource: "designed", tells:[{state,cue,purpose}], desireLine, heldBackFeature}. Design height and weight consistent with age/outline; these are design decisions NOT image measurements. 4–10 distinct functional tells with purpose betray/assist/reveal/endanger/mislead/comfort, including state "at-ease". Avoid duplicating cues across cast. Give 5–7 noticeability-ranked introduction features (introFeatures), top two most visible, one signature held back. Preserve explicit author facts.
 
 Return ONLY valid JSON:
 {
@@ -161,28 +168,23 @@ Return ONLY valid JSON:
       parsed = JSON.parse(jsonMatch[1].trim());
     } catch { throw new Error("Failed to parse character data"); }
 
-    const characters = parsed.characters || [];
+    const characters = parsed.characters;
+    if (!Array.isArray(characters) || characters.some((c: any) => typeof c.id !== 'string' || typeof c.name !== 'string' || !c.reference || !Array.isArray(c.reference.tells))) throw new Error('Invalid character card data');
     const visualStyleGuide = parsed.visualStyleGuide || "";
 
     const charactersWithPortraits = [];
     
     const imgAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    if (isChildrensBook) {
-      for (const character of characters.slice(0, 5)) {
-        try {
-          const portraitPrompt = `Create a character reference sheet portrait for a children's book character.\n\nCHARACTER: ${character.name}\nVISUAL DESCRIPTION: ${character.visualDescription}\nSTYLE: ${visualStyleGuide}\n\nRequirements:\n- Clean, clear character portrait\n- Soft watercolor style, warm colors\n- White background\n- No text`;
-
-          const portraitUrl = await generateOpenAIImage({ admin: imgAdmin, userId: auth.user.id, prompt: portraitPrompt, size: "1024x1024" }).catch((e) => { console.error("portrait failed", e); return null; });
-          charactersWithPortraits.push(portraitUrl ? { ...character, portraitUrl } : character);
-          await new Promise(r => setTimeout(r, 1000));
-        } catch (err) {
-          console.error(`Error generating portrait for ${character.name}:`, err);
-          charactersWithPortraits.push(character);
-        }
-      }
-      for (const character of characters.slice(5)) { charactersWithPortraits.push(character); }
-    } else {
-      charactersWithPortraits.push(...characters);
+    for (const character of characters) {
+      const existing = outline.characters?.find((c: any) => c.id === character.id && c.reference?.locked);
+      const prepared = existing ?? await createCharacterReference(imgAdmin,auth.user.id,book.id,character,charactersWithPortraits.map(c=>c.reference));
+      charactersWithPortraits.push(prepared);
+      // Checkpoint after each character; retry never discards completed references.
+      const { data: latest } = await imgAdmin.from('books').select('outline').eq('id',book.id).eq('user_id',auth.user.id).single();
+      if (!latest?.outline) throw new Error('Book outline unavailable');
+      const merged = [...(latest.outline.characters ?? []).filter((c: any)=>c.id!==prepared.id),prepared];
+      const { error } = await imgAdmin.from('books').update({outline:{...latest.outline,characters:merged,visualStyleGuide}}).eq('id',book.id).eq('user_id',auth.user.id);
+      if (error) throw error;
     }
 
     return new Response(JSON.stringify({ characters: charactersWithPortraits, visualStyleGuide }), {
@@ -190,6 +192,6 @@ Return ONLY valid JSON:
     });
   } catch (error) {
     console.error("generate-characters error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), { status: error instanceof AIProviderError ? statusForAIError(error) : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
