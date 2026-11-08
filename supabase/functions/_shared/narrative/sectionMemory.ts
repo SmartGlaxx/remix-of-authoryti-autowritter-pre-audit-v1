@@ -105,6 +105,8 @@ export function renderWholeBookMemory(rows: MemoryRow[], chapters: MemoryChapter
     .map(r => `Chapter ${r.chapter_index + 1}, section ${r.subsection_index + 1}:\n${chapters[r.chapter_index].subsections[r.subsection_index].content}`).join('\n\n');
   return `ACCEPTED WHOLE-BOOK MEMORY (past only; character views are knowledge-limited; dialogue is testimony, not automatically truth):\n${all}\n\nRECENT ACCEPTED CHAPTERS — FULL TEXT (continue, never reintroduce or repeat):\n${recent}`;
 }
-export function timeReferenceAssessment(relative: number, exactQualifiers: number) {
-  return { countOK: relative >= 4 && relative <= 8, qualifierRatioOK: relative > 0 && exactQualifiers / relative >= .6 && exactQualifiers / relative <= .7 };
-}
+// Chapter time mix: 4–8 temporal references per chapter, distributed by proportion of the
+// ACTUAL total (the per-10 figures are fractions, never a literal ten):
+// relative alone 40–60%, raw/exact alone 10–30%, both combined 20–40%.
+// See temporalFrames.ts (timeMixAssessment, mixOf).
+export { mixOf, timeMixAssessment } from "./temporalFrames.ts";
