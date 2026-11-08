@@ -9,6 +9,8 @@ const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').tri
 export function validateCharacterLock(card: CharacterLock, others: CharacterLock[] = []): string[] {
   const issues: string[] = [];
   if (!card.referencePath) issues.push('Five-view reference required');
+  if (!['author','designed'].includes(card.measurementSource)) issues.push('Measurement provenance required');
+  if (!card.features || Object.keys(card.features).length === 0) issues.push('Image-observed features required');
   if (!Number.isFinite(card.heightCm) || card.heightCm <= 0 || !Number.isFinite(card.weightKg) || card.weightKg <= 0) issues.push('Exact designed or author-provided height and weight required');
   if (card.tells.length < 4 || card.tells.length > 10) issues.push('Four to ten behavioural tells required');
   if (!card.tells.some(t => t.state === 'at-ease')) issues.push('At-ease tell required');

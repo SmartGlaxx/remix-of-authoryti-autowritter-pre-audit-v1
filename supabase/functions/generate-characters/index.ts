@@ -74,6 +74,8 @@ serve(async (req) => {
     if (!allowed) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body = await req.json();
+    // This endpoint has no image mock: tests must never reach a paid image or vision call.
+    if (body.testMode === true || req.headers.get('x-ai-test-mode') === '1') return new Response(JSON.stringify({error:'test_mode_blocked'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
     const validationError = validateInput(body);
     if (validationError) return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
