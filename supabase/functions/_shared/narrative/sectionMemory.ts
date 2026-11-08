@@ -13,9 +13,10 @@ export interface SectionMemory {
 export function paragraphsOf(text: string): string[] {
   return text.replace(/<br\s*\/?>(\s*<br\s*\/?>)+/gi, '\n\n').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 }
+// Runtime supports Segmenter; the browser TS library predates its declaration.
+const Segmenter = (Intl as unknown as { Segmenter: new (locale: string, options: { granularity: 'sentence' }) => { segment(text: string): Iterable<unknown> } }).Segmenter;
 const sentence = (s: unknown): s is string => typeof s === 'string' && s.trim().length > 0
-  && new Intl.Segmenter('en', { granularity: 'sentence' }).segment(s.trim())
-    && [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(s.trim())].length === 1;
+  && [...new Segmenter('en', { granularity: 'sentence' }).segment(s.trim())].length === 1;
 const names = (v: unknown): string[] => {
   if (!Array.isArray(v) || v.some(n => typeof n !== 'string' || !n.trim())) throw new Error('Invalid incident participants');
   return [...new Set(v as string[])];
