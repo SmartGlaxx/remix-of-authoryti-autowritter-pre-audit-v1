@@ -1,4 +1,23 @@
 # Roadmap — Closed-world writing
+
+## Character references and whole-book memory — progress
+Green checked boxes mean verified complete; orange unchecked boxes mean still open.
+
+| Progress | Work item |
+| --- | --- |
+| 🟩 [x] | Recover and save the approved character, timeline and paragraph-memory requirements |
+| 🟩 [x] | Pure character lock rules: 4–10 tells, exact designed biometrics, five views, re-entry cue counts |
+| 🟩 [x] | Pure paragraph/viewpoint parsing, verbatim/order checks, listener/witness index and hash/position filtering |
+| 🟩 [x] | Final local regression suite: 68 files / 764 tests passed; preview build OK |
+| 🟧 [ ] | Five-view private reference + vision extraction + planned-cast preparation: implemented, needs real image verification |
+| 🟧 [ ] | Story memory / character card screen: implemented, needs populated signed-in flow verification |
+| 🟧 [ ] | Accepted extraction and writer-memory integration: implemented, needs saved-data end-to-end verification |
+| 🟧 [ ] | Automatic emergent-character creation/resume, universe collision checks and durable appearance locks |
+| 🟧 [ ] | Introduction/re-entry exposure ledger and pre-acceptance appearance contradiction checks |
+| 🟧 [ ] | Section/paragraph chronology, chapter time-reference enforcement and event/thread deadlines |
+| 🟧 [ ] | Title/theme invariance and remaining prose/section-length rules across every planning/writing path |
+| 🟧 [ ] | Deployment checks and paid image/vision verification (not performed; separate permission needed) |
+
 - [x] Use Astra for initial ideation only; Professional default for writers; saved selections preserved; 733 tests passed; deployed plan-book and signed-in 3/5/7/10 dry-runs verified; no paid AI calls
 - [x] Carry selected Book Approach and full details into Master Plan; signed-in live dry-run verified, 721 tests passed, no paid AI or manuscript changes
 - [x] Restore Book Ideas in the library and saved-idea selection in book setup; verified signed-in with a temporary draft, no paid AI or manuscript changes

@@ -6,6 +6,8 @@ import type { ModelInfo, ProviderId } from "./registry.ts";
 export interface AIRequest {
   system?: string;
   user: string;
+  /** Owner-authorized image inputs, supported only on OpenAI Responses. */
+  images?: string[];
   json?: boolean;
   /** Opt-in strict shape for structured Responses calls; other callers remain unchanged. */
   jsonSchema?: Record<string, unknown>;
@@ -165,6 +167,10 @@ async function* responses(url: string, headers: Record<string, string>, modelId:
     stream: true,
     store: false,
   };
+  if (req.images?.length) body.input = [
+    ...(req.system ? [{ role: 'system', content: req.system }] : []),
+    { role: 'user', content: [{ type: 'input_text', text: req.user }, ...req.images.map(image_url => ({ type: 'input_image', image_url }))] },
+  ];
   if (ctx.model.reasoningControls) {
     body.reasoning = { effort: req.reasoning ?? "medium", summary: "auto" };
     body.include = ["reasoning.encrypted_content"];

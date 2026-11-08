@@ -41,18 +41,19 @@ async function toBlob(src: string): Promise<Blob> {
   return await r.blob();
 }
 
-async function call(base: string, key: string, model: string, prompt: string, size: ImageSize, refs: string[]): Promise<Response> {
+async function call(base: string, key: string, model: string, prompt: string, size: ImageSize, refs: string[], quality?: 'low'): Promise<Response> {
   if (refs.length === 0) {
     return fetch(`${base}/images/generations`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, size, n: 1 }),
+      body: JSON.stringify({ model, prompt, size, n: 1, ...(quality ? { quality } : {}) }),
     });
   }
   const form = new FormData();
   form.set("model", model);
   form.set("prompt", prompt);
   form.set("size", size);
+  if (quality) form.set('quality', quality);
   const blobs = await Promise.all(refs.map(toBlob));
   blobs.forEach((b, i) => form.append(refs.length > 1 ? "image[]" : "image", b, `ref${i}.png`));
   return fetch(`${base}/images/edits`, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
@@ -72,20 +73,21 @@ function isContentRefusal(status: number, text: string) {
 }
 
 /** Returns a data URL (or https URL) for one generated image. */
-export async function generateOpenAIImage(opts: { admin: any; userId: string; prompt: string; size: ImageSize; references?: string[] }): Promise<string> {
+export async function generateOpenAIImage(opts: { admin: any; userId: string; prompt: string; size: ImageSize; references?: string[]; quality?: 'low'; noFallback?: boolean }): Promise<string> {
   const refs = (opts.references || []).filter(Boolean).slice(0, 4);
   const userKey = await loadUserOpenAIKey(opts.admin, opts.userId);
   if (userKey) {
-    const res = await call(DIRECT, userKey, DIRECT_IMAGE_MODEL, opts.prompt, opts.size, refs);
+    const res = await call(DIRECT, userKey, DIRECT_IMAGE_MODEL, opts.prompt, opts.size, refs, opts.quality);
     if (res.ok) return readImage(res);
     const t = await res.text();
     console.error("openai direct image error", res.status, t.slice(0, 500));
     if (isContentRefusal(res.status, t)) throw new ImageError("This image request was declined by the image service's content rules.", 400);
+    if (opts.noFallback) throw new ImageError(`OpenAI image request failed (${res.status}); no replacement model was used.`, res.status);
     // otherwise fall through to the in-app gateway
   }
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) throw new ImageError("Image service is not configured", 500);
-  const res = await call(GATEWAY, lovableKey, GATEWAY_IMAGE_MODEL, opts.prompt, opts.size, refs);
+  const res = await call(GATEWAY, lovableKey, GATEWAY_IMAGE_MODEL, opts.prompt, opts.size, refs, opts.quality);
   if (res.ok) return readImage(res);
   const t = await res.text();
   console.error("gateway image error", res.status, t.slice(0, 500));

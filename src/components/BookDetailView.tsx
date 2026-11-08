@@ -22,6 +22,7 @@ import { TestimonialModal } from "@/components/TestimonialModal";
 import { BookSearchPanel } from "@/components/BookSearchPanel";
 import { NaturalnessPanel } from "@/components/NaturalnessPanel";
 import { ManuscriptAuditPanel } from "@/components/ManuscriptAuditPanel";
+import { StoryMemoryPanel } from './StoryMemoryPanel';
 import { ContradictionReviewCard } from "@/components/ContradictionReviewCard";
 import { exportBookToPdf } from "@/lib/exportPdf";
 import { exportBookToEpub } from "@/lib/exportEpub";
@@ -381,6 +382,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
                 <Sparkles className="w-4 h-4" />
                 <span className="hidden md:inline">Planning Studio</span>
               </Button>
+              {hasOutline && <StoryMemoryPanel book={book} onNavigate={setSearchNavigateChapter} />}
               <Button variant="ghost" size="sm" onClick={() => navigate("/personas")} className="gap-1" title="Persona Studio">
                 <Users className="w-4 h-4" />
                 <span className="hidden lg:inline">Personas</span>

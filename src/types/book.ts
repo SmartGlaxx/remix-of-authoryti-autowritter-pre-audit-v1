@@ -389,6 +389,8 @@ export interface CharacterReference {
   visualDescription: string;
   role: "protagonist" | "supporting" | "minor" | "background";
   portraitUrl?: string;
+  reference?: import('../../supabase/functions/_shared/narrative/characterReference').CharacterLock;
+  introFeatures?: string[];
   identity?: CharacterIdentity;
   appearance?: CharacterAppearance;
   hair?: CharacterHair;

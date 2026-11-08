@@ -2,7 +2,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { User, Star, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { CharacterReference } from "@/types/book";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CharacterGalleryProps {
@@ -32,6 +34,14 @@ function ProfileField({ label, value }: { label: string; value?: string | string
 
 function CharacterCard({ character, index, compact }: { character: CharacterReference; index: number; compact: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [portrait, setPortrait] = useState(character.reference ? undefined : character.portraitUrl);
+  useEffect(() => {
+    const path = character.reference?.referencePath;
+    if (!path) return;
+    let active = true;
+    void supabase.storage.from('persona-portraits').createSignedUrl(path,3600).then(({data})=>{if(active) setPortrait(data?.signedUrl);});
+    return ()=>{active=false;};
+  },[character.reference?.referencePath]);
 
   const roleConfig = {
     protagonist: { icon: Star, label: "Protagonist", color: "text-amber-500 bg-amber-500/10" },
@@ -63,9 +73,9 @@ function CharacterCard({ character, index, compact }: { character: CharacterRefe
           "shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10",
           compact ? "w-10 h-10" : "w-16 h-16"
         )}>
-          {character.portraitUrl ? (
+          {portrait ? (
             <img
-              src={character.portraitUrl}
+              src={portrait}
               alt={`${character.name}`}
               className="w-full h-full object-cover"
             />
@@ -91,13 +101,13 @@ function CharacterCard({ character, index, compact }: { character: CharacterRefe
       {/* Expand/collapse for full profile */}
       {!compact && hasDetails && (
         <>
-          <button
+          <Button variant="ghost"
             onClick={() => setExpanded(!expanded)}
             className="w-full flex items-center justify-center gap-1 py-1.5 text-xs text-muted-foreground hover:text-foreground border-t transition-colors"
           >
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {expanded ? "Collapse" : "Full Profile"}
-          </button>
+          </Button>
 
           <AnimatePresence>
             {expanded && (
@@ -109,6 +119,19 @@ function CharacterCard({ character, index, compact }: { character: CharacterRefe
                 className="overflow-hidden"
               >
                 <div className="p-3 pt-0 space-y-3 border-t">
+                  {character.reference && <>
+                    {portrait && <img src={portrait} alt={`${character.name} — five views`} className="w-full object-contain rounded-md" />}
+                    <ProfileSection title="Locked reference">
+                      <ProfileField label="Height" value={`${character.reference.heightCm} cm`} />
+                      <ProfileField label="Weight" value={`${character.reference.weightKg} kg (${character.reference.measurementSource})`} />
+                      {Object.entries(character.reference.features).map(([key,value])=><ProfileField key={key} label={key} value={value} />)}
+                    </ProfileSection>
+                    <ProfileSection title="Behavioural fingerprint">
+                      {character.reference.tells.map((t,i)=><ProfileField key={i} label={`${t.state} · ${t.purpose}`} value={t.cue} />)}
+                      <ProfileField label="Desire line" value={character.reference.desireLine} />
+                      <ProfileField label="Held-back signature" value={character.reference.heldBackFeature} />
+                    </ProfileSection>
+                  </>}
                   {identity && (
                     <ProfileSection title="Identity">
                       <ProfileField label="Full Name" value={identity.fullName} />

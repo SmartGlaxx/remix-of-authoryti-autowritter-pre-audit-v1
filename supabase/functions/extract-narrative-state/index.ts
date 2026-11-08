@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       const repo = createSupabaseNarrativeRepo(db, userId);
       const config = await loadBookModelConfig(db, bookId, userId);
       const caller: ModelCaller = testMode ? async () => ({ content: String(body.mockOutput), model: "test-mock" }) : makeExtractionCaller(db, userId, bookId, config);
-      outcome = await processSectionExtraction(repo, caller, bookId, { chapterIndex: ch, subsectionIndex: sub }, { knowledge: trackKnowledge });
+      outcome = await processSectionExtraction(repo, caller, bookId, { chapterIndex: ch, subsectionIndex: sub }, { knowledge: trackKnowledge, paragraphMemory: true });
     } catch (e) {
       await markSync("FAILED", e instanceof Error ? e.message : e);
       throw e;
