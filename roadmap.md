@@ -8,7 +8,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟩 [x] | Recover and save the approved character, timeline and paragraph-memory requirements |
 | 🟩 [x] | Pure character lock rules: 4–10 tells, exact designed biometrics, five views, re-entry cue counts |
 | 🟩 [x] | Pure paragraph/viewpoint parsing, verbatim/order checks, listener/witness index and hash/position filtering |
-| 🟩 [x] | Existing regression suite: 764 tests passed before final UI/gate additions |
+| 🟩 [x] | Final local regression suite: 68 files / 764 tests passed; preview build OK |
 | 🟧 [ ] | Five-view private reference + vision extraction + planned-cast preparation: implemented, needs real image verification |
 | 🟧 [ ] | Story memory / character card screen: implemented, needs populated signed-in flow verification |
 | 🟧 [ ] | Accepted extraction and writer-memory integration: implemented, needs saved-data end-to-end verification |
@@ -16,7 +16,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟧 [ ] | Introduction/re-entry exposure ledger and pre-acceptance appearance contradiction checks |
 | 🟧 [ ] | Section/paragraph chronology, chapter time-reference enforcement and event/thread deadlines |
 | 🟧 [ ] | Title/theme invariance and remaining prose/section-length rules across every planning/writing path |
-| 🟧 [ ] | Final regression suite, deployment checks and paid image/vision verification (not authorized in this turn) |
+| 🟧 [ ] | Deployment checks and paid image/vision verification (not performed; separate permission needed) |
 
 - [x] Use Astra for initial ideation only; Professional default for writers; saved selections preserved; 733 tests passed; deployed plan-book and signed-in 3/5/7/10 dry-runs verified; no paid AI calls
 - [x] Carry selected Book Approach and full details into Master Plan; signed-in live dry-run verified, 721 tests passed, no paid AI or manuscript changes
