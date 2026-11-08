@@ -85,7 +85,6 @@ export function parseRelativeShift(relative: string): RelativeShift | null {
     }
     return { minutes: null, dayAdvance: false, markerOnly: true }; // "a few hours later"
   }
-  if (/\b(half an hour|half a hour)\s+(later|on)\b/.test(t)) return { minutes: 30, dayAdvance: false, markerOnly: false };
   if (/\bthe (next|following) (day|morning|afternoon|evening|night)\b/.test(t) || /\bthat (night|evening)\b/.test(t) && /\b(next|following)\b/.test(t))
     return { minutes: null, dayAdvance: true, markerOnly: true };
   if (/\b(later that (day|night|afternoon|evening|morning)|that same (day|night|morning|afternoon|evening)|moments? later|shortly after|soon after|by (dusk|dawn|noon|midnight|sunset|sunrise)|earlier that (day|morning))\b/.test(t))
@@ -124,9 +123,11 @@ export function validateTemporalFrames(anchors: ParagraphTimeAnchor[]): Temporal
     if (!s) { s = { clock: null, seen: false }; frames.set(id, s); }
     return s;
   };
+  let prev: ParagraphTimeAnchor | null = null;
   for (const a of anchors) {
     const id = a.frameType === "linear" ? "main" : a.frameId;
     const frame = state(id);
+    const frameReturn = a.frameType === "linear" && prev != null && prev.frameType !== "linear";
     const raw = a.rawTime ? parseRawTimeOfDay(a.rawTime) : null;
     const shift = a.relativeTime ? parseRelativeShift(a.relativeTime) : null;
 
@@ -151,12 +152,13 @@ export function validateTemporalFrames(anchors: ParagraphTimeAnchor[]): Temporal
     }
 
     if (candidate != null && frame.clock != null && candidate < frame.clock) {
-      if (shift || a.frameType !== "linear")
+      if (shift || a.frameType !== "linear" || frameReturn)
         findings.push({ paragraphIndex: a.paragraphIndex, kind: "reverse_clock", detail: `Clock moves backwards inside frame "${id}": ${fmt(frame.clock)} then ${fmt(candidate)}.` });
       else
         findings.push({ paragraphIndex: a.paragraphIndex, kind: "unanchored_jump", detail: `Linear scene jumps from ${fmt(frame.clock)} to ${fmt(candidate)} with no transition marker ("the next day", "meanwhile", a flashback cue…).` });
     }
     if (candidate != null) frame.clock = candidate;
+    prev = a;
   }
   return findings;
 }
