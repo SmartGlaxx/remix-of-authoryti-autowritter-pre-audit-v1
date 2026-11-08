@@ -547,6 +547,10 @@ serve(async (req) => {
     }
 
     // ── Phase F: opt-in progressive pipeline (books.controls.planning_pipeline = "progressive"). ──
+    if (!dryRun && book.id && ['novel','fiction-serial','short-story','children','comic','drama'].includes(book.bookType)
+      && serverOutline?.characters?.some((c: any)=>!c.reference?.locked)) {
+      return new Response(JSON.stringify({error:'Preparing character references is required before writing.',code:'CHARACTER_REFERENCES_REQUIRED'}),{status:409,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    }
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
@@ -730,6 +734,8 @@ serve(async (req) => {
       const memoryBlock = renderWholeBookMemory(memories ?? [], serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
       if (memoryBlock) userPrompt += `\n\n${memoryBlock}`;
     }
+    const referenceCards = (serverOutline?.characters ?? []).filter((c: any)=>c.reference?.locked);
+    if (referenceCards.length) userPrompt += `\n\nLOCKED APPEARANCE AND BEHAVIOUR (designed facts, not acquired knowledge; do not introduce future cast):\n${JSON.stringify(referenceCards.map((c: any)=>({name:c.name,reference:c.reference,introFeatures:c.introFeatures,firstAppearance:c.firstAppearance})))}\nUse 5–7 noticeability-ranked features at first introduction; weave roughly two-thirds through action and one-third as a compact portrait. Show the at-ease tell and hold the signature until the first decisive act or dialogue. Re-entry: one cue after a recent appearance, two or three after chapters away. Never repeat a feature within a scene. Tells must betray, assist, reveal, endanger, mislead or comfort through behaviour, not explanatory labels. A contradiction requires a dated justified change, never silently override locked traits.`;
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.

@@ -265,7 +265,7 @@ export async function processSectionExtraction(repo: NarrativeRepo, callModel: M
     const hash = contentHash(section.text);
     const existing = await repo.getExtraction(bookId, pos);
     if (existing && existing.content_hash === hash) {
-      if (existing.status === "completed") return { status: "skipped", reason: "already_processed", extractionId: existing.id };
+      if (existing.status === "completed" && (!opts.paragraphMemory || existing.applied?.sectionMemory)) return { status: "skipped", reason: "already_processed", extractionId: existing.id };
       const age = (opts.now ?? Date.now()) - (existing.updated_at ? Date.parse(existing.updated_at) : 0);
       if (existing.status === "processing" && age < STALE_PROCESSING_MS) return { status: "skipped", reason: "in_progress", extractionId: existing.id };
     }

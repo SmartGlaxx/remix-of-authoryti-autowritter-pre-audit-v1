@@ -434,6 +434,16 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     // Just-in-time blueprint: the app builds and approves this chapter's blueprint itself, then retries.
     if (response.status === 409 && bookData.id) {
+      const problem = await response.clone().json().catch(()=>({}));
+      if (problem.code === 'CHARACTER_REFERENCES_REQUIRED') {
+        setState(st=>({...st,phase:'generating-characters'}));
+        const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
+        if(error || !data?.characters) throw new Error(data?.error ?? 'Character references could not be completed.');
+        setState(st=>({...st,phase:'writing'}));
+        response = await send();
+      }
+    }
+    if (response.status === 409 && bookData.id) {
       const errBody = await response.clone().json().catch(() => ({}));
       if (errBody?.code === "BLUEPRINT_REQUIRED") {
         const { ensureChapterBlueprint } = await import("@/lib/autoBlueprint");
