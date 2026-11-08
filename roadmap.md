@@ -1,4 +1,18 @@
 # Roadmap — Closed-world writing
+
+## Character references and whole-book memory — progress
+Green checked boxes mean verified complete; orange unchecked boxes mean still open.
+
+| Progress | Work item |
+| --- | --- |
+| 🟧 [ ] | Recover and implement the approved character, timeline and paragraph-memory rules |
+| 🟧 [ ] | OpenAI low-quality five-view character references and visible-feature extraction |
+| 🟧 [ ] | Locked character cards, distinct behavioral tells and introduction/re-entry rules |
+| 🟧 [ ] | One-sentence paragraph summaries plus verbatim dialogue and speaker/witness tracking |
+| 🟧 [ ] | Carry accepted whole-book memory forward without future knowledge leaks |
+| 🟧 [ ] | Section timestamps, chapter time-reference checks and deadline awareness |
+| 🟧 [ ] | Regression tests and end-to-end verification |
+
 - [x] Use Astra for initial ideation only; Professional default for writers; saved selections preserved; 733 tests passed; deployed plan-book and signed-in 3/5/7/10 dry-runs verified; no paid AI calls
 - [x] Carry selected Book Approach and full details into Master Plan; signed-in live dry-run verified, 721 tests passed, no paid AI or manuscript changes
 - [x] Restore Book Ideas in the library and saved-idea selection in book setup; verified signed-in with a temporary draft, no paid AI or manuscript changes
