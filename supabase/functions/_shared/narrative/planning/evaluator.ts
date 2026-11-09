@@ -1,3 +1,4 @@
+import { findUnplannedNames } from "./closedWorld.ts";
 // Phase G runtime — pre-acceptance AI evaluation (pure). One structured evaluator call covers
 // plan fulfillment, continuity/canon, epistemic integrity and writing quality, while every
 // finding keeps its own stage, severity and source reference. Stage 1 (free deterministic)
@@ -23,6 +24,8 @@ export interface EvalContext {
   approvedCanonKeys?: string[];
   /** Phase 3 (optional): narrator knowledge boundaries, life dates and the scene's story date. */
   narration?: EvalNarration; lifeRecords?: LifeRecord[]; sceneDate?: ApproximateDate | null;
+  /** Stage 4 closed world: every planned/established name; when set, unknown repeated names are flagged. */
+  knownNames?: string[];
 }
 export interface Prompt { system: string; user: string }
 export interface Usage { inputTokens?: number | null; outputTokens?: number | null; costUsd?: number | null }
@@ -160,6 +163,7 @@ export function parseEvaluation(raw: string, ctx: EvalContext, draft = ""): Stag
 export function stageOneFindings(draft: string, ctx: EvalContext): StagedFinding[] {
   return deterministicValidation(draft, { controls: ctx.controls, secrets: ctx.secrets, adapter: ctx.adapter, motifs: ctx.motifs, terminology: ctx.terminology })
     .concat(ctx.lifeRecords?.length ? [...ageFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null), ...postDeathFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null)] : [])
+    .concat(ctx.knownNames?.length ? findUnplannedNames(draft, ctx.knownNames) : [])
     .map((f) => ({ ...f, stage: (f.category === "writing_quality" ? 5 : 1) as Stage }));
 }
 
