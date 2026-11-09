@@ -437,8 +437,12 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       const problem = await response.clone().json().catch(()=>({}));
       if (problem.code === 'CHARACTER_REFERENCES_REQUIRED') {
         setState(st=>({...st,phase:'generating-characters'}));
-        const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
-        if(error || !data?.characters) throw new Error(data?.error ?? 'Character references could not be completed.');
+        // One cast member per call; repeat until the server reports none remaining.
+        for (let round = 0; round < 15; round++) {
+          const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
+          if(error || !data?.characters) throw new Error(data?.error ?? 'Character references could not be completed.');
+          if (!data.remaining) break;
+        }
         setState(st=>({...st,phase:'writing'}));
         response = await send();
       }
