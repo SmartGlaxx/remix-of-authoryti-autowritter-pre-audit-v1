@@ -10,16 +10,16 @@ describe("approved initial story and writer defaults", () => {
       const config: BookModelConfig = { mode: "profile", profileWriter: writer, profileTier: tier.value };
       for (const action of ["alternatives", "concepts", "adjust_premise", "twists"]) {
         const result = resolveModelForRole(configForPlanningAction(action, config), "planner");
-        expect(result.model).toBe("openai/gpt-6-astra");
+        expect(result.model).toBe("openai/gpt-6-sol");
         expect(result.fallback).toBeNull();
       }
     }
   });
   it("keeps later planning and explicit custom routing unchanged", () => {
-    const config: BookModelConfig = { mode: "custom", roleModels: { planner: "openai/gpt-6-luna" } };
+    const config: BookModelConfig = { mode: "custom", roleModels: { planner: "openai/gpt-6-sol" } };
     for (const action of ["master", "chapters", "sections", "beats", "blueprint"]) {
       expect(configForPlanningAction(action, config)).toBe(config);
-      expect(resolveModelForRole(configForPlanningAction(action, config), "planner").model).toBe("openai/gpt-6-luna");
+      expect(resolveModelForRole(configForPlanningAction(action, config), "planner").model).toBe("openai/gpt-6-sol");
       expect(schemaForIdeaAction(action)).toBeUndefined();
     }
   });
@@ -44,7 +44,7 @@ describe("approved initial story and writer defaults", () => {
         }) as typeof fetch,
       });
       expect(result.text).toBe("ok");
-      expect(captured.model).toBe("openai/gpt-6-astra");
+      expect(captured.model).toBe("openai/gpt-6-sol");
       expect(captured.stream).toBe(true);
       expect(captured.store).toBe(false);
       expect(captured.reasoning).toEqual({ effort: "low", summary: "auto" });

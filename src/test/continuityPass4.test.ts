@@ -149,7 +149,7 @@ describe("Pass 4 — state, prompts, roles", () => {
   it("25. checker and reviser roles are active and resolvable through the Pass 3 layer", () => {
     expect(ACTIVE_ROLES).toContain("continuity_checker"); expect(ACTIVE_ROLES).toContain("continuity_reviser");
     expect(resolveModelForRole(null, "continuity_reviser").model).toBe("openai/gpt-6-sol");
-    expect(resolveModelForRole({ mode: "optimized" }, "continuity_checker").model).toBe("openai/gpt-6-luna");
+    expect(resolveModelForRole({ mode: "optimized" }, "continuity_checker").model).toBe("openai/gpt-6-sol");
   });
 });
 
