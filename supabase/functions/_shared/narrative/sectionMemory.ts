@@ -105,6 +105,21 @@ export function renderWholeBookMemory(rows: MemoryRow[], chapters: MemoryChapter
     .map(r => `Chapter ${r.chapter_index + 1}, section ${r.subsection_index + 1}:\n${chapters[r.chapter_index].subsections[r.subsection_index].content}`).join('\n\n');
   return `ACCEPTED WHOLE-BOOK MEMORY (past only; character views are knowledge-limited; dialogue is testimony, not automatically truth):\n${all}\n\nRECENT ACCEPTED CHAPTERS — FULL TEXT (continue, never reintroduce or repeat):\n${recent}`;
 }
+/** Last accepted chapter where each character appeared, from paragraph views and dialogue
+ *  incidents. Accepted past sections only — drives re-entry appearance cue counts. */
+export function lastAppearanceChapters(rows: MemoryRow[], chapters: MemoryChapter[], before: { chapterIndex: number; subsectionIndex: number }, hash: (text: string) => string): Record<string, number> {
+  const last: Record<string, number> = {};
+  for (const r of acceptedMemoryEntries(rows, chapters, before, hash)) {
+    const mem = r.applied.sectionMemory;
+    if (!mem) continue;
+    const names = new Set([...Object.keys(mem.summary?.characterViews ?? {}), ...Object.keys(mem.dialogueCards?.people ?? {})]);
+    for (const n of names) {
+      const key = n.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+      if (key && (last[key] == null || r.chapter_index > last[key])) last[key] = r.chapter_index;
+    }
+  }
+  return last;
+}
 // Chapter time mix: 4–8 temporal references per chapter, distributed by proportion of the
 // ACTUAL total (the per-10 figures are fractions, never a literal ten):
 // relative alone 40–60%, raw/exact alone 10–30%, both combined 20–40%.
