@@ -38,7 +38,7 @@ export function reentryCuePlans(names: readonly string[], lastChapterByName: Rea
   return names.map(name => {
     const key = norm(name);
     const last = lastChapterByName[key];
-    if (last == null) return { name, range: previousBookNames.has(key) ? [5, 7] as [number, number] : [5, 7] as [number, number], kind: 'introduction' as const };
+    if (last == null) return { name, range: [5, 7] as [number, number], kind: 'introduction' as const };
     return { name, range: introductionCueCount(currentChapter - last, false), kind: 're-entry' as const };
   });
 }
