@@ -31,7 +31,7 @@ import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 import { renderWholeBookMemory, lastAppearanceChapters } from '../_shared/narrative/sectionMemory.ts';
-import { reentryCuePlans } from '../_shared/narrative/characterReference.ts';
+import { missingReferenceNames, reentryCuePlans } from '../_shared/narrative/characterReference.ts';
 import { plannedDebuts, castStatus, castKey } from '../_shared/narrative/cast.ts';
 
 // ── Security Config ──
