@@ -21,7 +21,7 @@ import {
   normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, buildTwistPrompt, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
-import { amendBlueprint, universeCollisions } from "../_shared/narrative/planning/closedWorld.ts";
+import { amendBlueprint, universeCollisions, titleThemeLock } from "../_shared/narrative/planning/closedWorld.ts";
 import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
@@ -325,6 +325,8 @@ async function handle(req: Request): Promise<Response> {
     if (banned.length) brief.guidance = [brief.guidance, `Never use these words or phrases anywhere (titles, summaries, plans): ${banned.join(", ")}.`].filter(Boolean).join("\n");
     const cur = (ex.curriculum && typeof ex.curriculum === "object") ? ex.curriculum as Record<string, unknown> : null;
     if (cur && ovType === "textbook") brief.guidance = [brief.guidance, `Textbook following the ${s(cur.country, 120)} curriculum at ${s(cur.level, 120)} level. Chapters are curriculum units; sections are topic lessons with learning objectives, explanations, worked examples, practice questions and a summary.`].filter(Boolean).join("\n");
+    // Title/theme invariance: once a title exists, every later planning step keeps it and the chosen premise exactly.
+    if (action !== "alternatives" && action !== "concepts" && action !== "adjust_premise" && (book as any).title) brief.guidance = [brief.guidance, titleThemeLock(String((book as any).title), s((book as any).premise ?? "", 1200))].filter(Boolean).join("\n");
     // Book Variants and idea rewrites are written in the selected writer's voice (request writer, else the book's, else best fit).
     if (action === "alternatives" || action === "concepts" || action === "adjust_premise") {
       const wid = getWriter(body.writerId)?.id ?? resolveWriter((book as any).controls ?? {}, ovType).id;
