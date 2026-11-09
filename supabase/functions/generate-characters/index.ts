@@ -180,7 +180,10 @@ Return ONLY valid JSON:
       parsed = JSON.parse(jsonMatch[1].trim());
     } catch { throw new Error("Failed to parse character data"); }
 
-    const characters = parsed.characters;
+    const characters = target && Array.isArray(parsed.characters)
+      ? parsed.characters.filter((c: any) => c?.id === target.id || String(c?.name ?? '').trim().toLowerCase() === target.name.trim().toLowerCase()).slice(0, 1).map((c: any) => ({ ...c, id: target.id, name: target.name }))
+      : parsed.characters;
+    if (target && !characters.length) throw new Error(`No reference card was returned for ${target.name}`);
     if (!Array.isArray(characters) || characters.some((c: any) => typeof c.id !== 'string' || typeof c.name !== 'string' || !c.reference || !Array.isArray(c.reference.tells))) throw new Error('Invalid character card data');
     const visualStyleGuide = parsed.visualStyleGuide || "";
 
