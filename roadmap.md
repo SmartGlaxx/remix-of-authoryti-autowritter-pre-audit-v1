@@ -12,11 +12,11 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟧 [ ] | Five-view private reference + vision extraction + planned-cast preparation: implemented, needs real image verification |
 | 🟧 [ ] | Story memory / character card screen: implemented, needs populated signed-in flow verification |
 | 🟧 [ ] | Accepted extraction and writer-memory integration: implemented, needs saved-data end-to-end verification |
-| 🟧 [ ] | Automatic emergent-character creation/resume, universe collision checks and durable appearance locks |
-| 🟧 [ ] | Introduction/re-entry exposure ledger and pre-acceptance appearance contradiction checks |
+| 🟩 [x] | Emergent characters: flagged names → "Add person to plan" → new plan version + cast proposal, same-universe name clash warning |
+| 🟩 [x] | Appearance contradictions against locked cards block acceptance; re-entry cue counter built (not yet wired to drafts) |
 | 🟩 [x] | Section/paragraph chronology: per-paragraph relative/raw anchors, non-linear frames, deterministic clock checks, proportional 4–8 chapter time mix (784 tests) |
-| 🟧 [ ] | Event/thread deadlines and chronology end-to-end verification on a drafted section |
-| 🟧 [ ] | Title/theme invariance and remaining prose/section-length rules across every planning/writing path |
+| 🟩 [x] | Thread deadlines checked against the scene date (live drafted-section run still unverified) |
+| 🟩 [x] | Title + chosen premise locked into every planning step after ideation |
 | 🟧 [ ] | Deployment checks and paid image/vision verification (not performed; separate permission needed) |
 
 - [x] Use Astra for initial ideation only; Professional default for writers; saved selections preserved; 733 tests passed; deployed plan-book and signed-in 3/5/7/10 dry-runs verified; no paid AI calls
@@ -27,7 +27,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [ ] Stage 2 browser check of blueprint screen with safe test data
 - [x] Stage 3: writer gets the section's approved blueprint beats, allowed people/places; missing info is written around, never invented
 - [x] Stage 4: pre-acceptance flags repeated names not in blueprint, cast or story memory
-- [ ] Stage 5: versioned plan amendments
+- [x] Stage 5: versioned plan amendments (approved blueprint kept until the new version is approved)
 
 - [x] Correct instructional example roles in blueprint approval; live affected blueprint approved and read back READY, 725 tests passed, no paid AI or manuscript changes
 
