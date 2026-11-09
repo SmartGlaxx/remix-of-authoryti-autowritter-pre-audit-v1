@@ -94,8 +94,12 @@ serve(async (req) => {
     const band = ieltsBand || 7;
     const descriptionGuidelines = getDescriptionGuidelines(band);
     
+    // Planned books: the author-approved cast is authoritative — one card per member, names copied exactly.
+    const { data: castRows } = await ownerAdmin.from('story_characters').select('id,name,role').eq('book_id',book.id).eq('user_id',auth.user.id).eq('is_active',true);
+    const approvedCast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, role: c.role ?? null }));
     const extractPrompt = `Analyze this book outline and extract EVERY named fictional character. Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.
-EXISTING CAST: ${JSON.stringify(outline.characters ?? [])}
+EXISTING CAST: ${JSON.stringify(outline.characters ?? [])}${approvedCast.length ? `
+APPROVED CAST (authoritative): return exactly one card for EACH of these, using the given id and the name exactly as written, and no other characters: ${JSON.stringify(approvedCast)}` : ''}
 
 BOOK: "${book.title}"
 THEME: "${book.theme}"
