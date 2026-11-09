@@ -50,3 +50,38 @@ export function findUnplannedNames(text: string, known: readonly string[], ignor
 /** Known vocabulary from a blueprint plus established names. */
 export const blueprintKnownNames = (bp: ChapterBlueprint | null | undefined, established: readonly string[] = []): string[] =>
   [...(bp?.cast.map((c) => c.name) ?? []), ...(bp?.locations.map((l) => l.name) ?? []), ...(bp?.events.map((e) => e.name) ?? []), ...established];
+
+// ── Stage 5: versioned plan amendments + emergent characters ──
+export interface BlueprintAmendment { kind: "person" | "place"; name: string; reason: string }
+export interface AmendmentLogEntry { at: string; fromVersion: number | null; changes: BlueprintAmendment[] }
+
+/** Returns a NEW blueprint (never mutates the approved one). People become cast proposals (author must
+ * approve them into the cast; reference images follow), places are added directly. Duplicates are skipped. */
+export function amendBlueprint(bp: ChapterBlueprint, changes: readonly BlueprintAmendment[], fromVersion: number | null, at = new Date().toISOString()): ChapterBlueprint & { amendments: AmendmentLogEntry[] } {
+  const next = JSON.parse(JSON.stringify(bp)) as ChapterBlueprint & { amendments?: AmendmentLogEntry[] };
+  const has = (list: { name: string }[], n: string) => list.some((x) => x.name.toLowerCase() === n.toLowerCase());
+  const applied: BlueprintAmendment[] = [];
+  for (const c of changes) {
+    const name = c.name.trim().slice(0, 200); if (!name) continue;
+    if (c.kind === "person") {
+      if (has(next.cast, name) || has(next.castProposals, name)) continue;
+      next.castProposals.push({ id: `amend-${next.castProposals.length + 1}`, name, role: "emergent", justification: c.reason.slice(0, 500) });
+    } else {
+      if (has(next.locations, name)) continue;
+      next.locations.push({ id: `amend-l${next.locations.length + 1}`, name, significance: c.reason.slice(0, 500) });
+    }
+    applied.push({ ...c, name });
+  }
+  next.amendments = [...(next.amendments ?? []), ...(applied.length ? [{ at, fromVersion, changes: applied }] : [])];
+  return next as ChapterBlueprint & { amendments: AmendmentLogEntry[] };
+}
+
+/** Emergent-character universe collision: an exact or first/last-name match in another book of the same universe. */
+export function universeCollisions(name: string, others: readonly { name: string; bookTitle?: string }[]): string[] {
+  const toks = name.toLowerCase().split(/\s+/).filter(Boolean);
+  return others.filter((o) => {
+    const ot = o.name.toLowerCase().split(/\s+/).filter(Boolean);
+    if (ot.join(" ") === toks.join(" ")) return true;
+    return toks.length === 1 && ot.includes(toks[0]);
+  }).map((o) => `${o.name}${o.bookTitle ? ` (${o.bookTitle})` : ""}`);
+}
