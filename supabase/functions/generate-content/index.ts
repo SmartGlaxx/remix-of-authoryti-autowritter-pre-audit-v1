@@ -550,8 +550,15 @@ serve(async (req) => {
     }
 
     // ── Phase F: opt-in progressive pipeline (books.controls.planning_pipeline = "progressive"). ──
-    if (!dryRun && book.id && ['novel','fiction-serial','short-story','children','comic','drama'].includes(book.bookType)
-      && serverOutline?.characters?.some((c: any)=>!c.reference?.locked)) {
+    // Planned books keep their cast in story_characters, so an approved cast member without a locked card also requires references.
+    const refFiction = ['novel','fiction-serial','short-story','children','comic','drama'].includes(book.bookType);
+    let castMissingRefs = false;
+    if (!dryRun && book.id && refFiction && pipeline === "progressive") {
+      const { data: castRows } = await adminSupabase.from("story_characters").select("name").eq("book_id", book.id).eq("user_id", auth.user.id).eq("is_active", true);
+      castMissingRefs = missingReferenceNames((castRows ?? []).map((c: any) => c.name), serverOutline?.characters ?? []).length > 0;
+    }
+    if (!dryRun && book.id && refFiction
+      && (castMissingRefs || serverOutline?.characters?.some((c: any)=>!c.reference?.locked))) {
       return new Response(JSON.stringify({error:'Preparing character references is required before writing.',code:'CHARACTER_REFERENCES_REQUIRED'}),{status:409,headers:{...corsHeaders,'Content-Type':'application/json'}});
     }
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
