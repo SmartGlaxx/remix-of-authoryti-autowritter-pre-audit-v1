@@ -738,7 +738,8 @@ serve(async (req) => {
       const { data: memories, error: memoryError } = await adminSupabase.from('narrative_extractions')
         .select('chapter_index,subsection_index,content_hash,status,applied').eq('book_id', book.id).eq('user_id', auth.user.id).eq('status', 'completed');
       if (memoryError) throw new Error('Could not load accepted paragraph memory');
-      const memoryBlock = renderWholeBookMemory(memories ?? [], serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
+      memoryRows = memories ?? [];
+      const memoryBlock = renderWholeBookMemory(memoryRows, serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
       if (memoryBlock) userPrompt += `\n\n${memoryBlock}`;
     }
     const cardDebuts = plannedDebuts(serverOutline?.characters ?? [],serverOutline?.chapters ?? []);
