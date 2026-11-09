@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PROVIDER_LABELS, type ProviderId } from "../../supabase/functions/_shared/ai/registry";
 
 type KeyRow = { provider: ProviderId; masked: string; status: "untested" | "valid" | "invalid" };
-const PROVIDERS: ProviderId[] = ["openai", "anthropic", "deepseek", "gemini"];
+const PROVIDERS: ProviderId[] = ["openai", "anthropic"];
 
 async function call(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("provider-keys", { body });

@@ -52,8 +52,7 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
       .then((d) => {
         // One-time carry-over of the old browser-only model picker.
         const old = localStorage.getItem("authoryti_ai_model");
-        const map: Record<string, string> = { "gpt-6-astra": "openai/gpt-6-astra", "gemini-3.1-pro": "google/gemini-3.1-pro-preview", "gemini-3.8-flash": "google/gemini-3.8-flash" };
-        if (!d.saved && old && map[old]) setConfig({ ...d.config, mode: "custom", roleModels: { writer: map[old] } });
+        if (old) localStorage.removeItem("authoryti_ai_model");
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
