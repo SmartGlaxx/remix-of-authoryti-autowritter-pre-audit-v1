@@ -42,5 +42,6 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 
 ## Live test (The Salt Ledger) — open
 - [x] Only Sonnet 5 + Sol; Sonnet/Sol toggle; cheapest image model
-- [ ] Make the 4 missing character pictures (needs spend OK, ~$0.50 total with the next item)
-- [ ] Finish Chapter 1 sections 2–4 on Sonnet 5 (budget cap $1 reached)
+- [x] Make the 4 missing character pictures
+- [x] Write Chapter 1 sections 2–4 on Sonnet 5
+- [ ] Save section 4 into story memory (~$0.05; paused at the $0.50 cap)
