@@ -20,7 +20,7 @@ export async function createCharacterReference(admin: any, userId: string, bookI
     const result = await admin.storage.from('persona-portraits').createSignedUrl(path,3600); signed = result.data;
   }
   if (!signed?.signedUrl) throw new Error('Private reference unavailable');
-  const result = await generateAIText({ role:'character_generator',config:{mode:'single',singleModel:'openai/gpt-6-astra'},userId,bookId,
+  const result = await generateAIText({ role:'character_generator',config:{mode:'single',singleModel:'openai/gpt-6-sol'},userId,bookId,
     request:{system:'Describe only visible features in this actual five-view reference. Unknown/obscured fields must say unknown. Do not infer gender, ethnicity, exact height/weight, strength, behaviour or voice from appearance.',user:'Return JSON features of this reference image.',images:[signed.signedUrl],jsonSchema:schema,reasoning:'low'} },createAIDeps(admin,userId));
   const visible = parseModelJson(result.text).features;
   if (!visible || typeof visible !== 'object' || Object.values(visible).some(v=>typeof v !== 'string')) throw new Error('Visible feature extraction failed');

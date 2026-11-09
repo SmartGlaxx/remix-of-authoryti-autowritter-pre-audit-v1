@@ -13,7 +13,7 @@ export const EXPERIMENT_CAP_USD = 0.10;
 export const EXPERIMENT_MODELS = {
   writer: "anthropic/claude-sonnet-5",
   rewriter: "openai/gpt-6-sol",
-  validator: "openai/gpt-6-luna",
+  validator: "openai/gpt-6-sol",
 } as const;
 // OpenAI output limits include hidden reasoning tokens, so rewriter/validator need headroom.
 export const MAX_OUTPUT_TOKENS = { writer: 1600, rewriter: 2500, validator: 1500 } as const;
@@ -166,7 +166,7 @@ export async function runRewriteOnly(input: { flawed: string; validatorPrompt: (
 // v2 (fair rerun): larger output ceiling for BOTH models, strict concise edit format, truncation reported.
 export const LITERARY_BENCHMARK_CAP_USD = 0.32;
 export const LITERARY_BENCHMARK_CONFIRM = "RUN_LITERARY_BENCHMARK_V2_0.32";
-export const LITERARY_BENCHMARK_MODELS = { astra: "openai/gpt-6-astra", fable: "anthropic/claude-fable-5-1", validator: "openai/gpt-6-luna" } as const;
+export const LITERARY_BENCHMARK_MODELS = { astra: "openai/gpt-6-sol", fable: "anthropic/claude-sonnet-5", validator: "openai/gpt-6-sol" } as const;
 export const LITERARY_BENCHMARK_MAX_OUT = { reviser: 2500, validator: 1200 } as const;
 
 /** Exact-model guarded call (same reservation/settlement rules as guardedCall). */

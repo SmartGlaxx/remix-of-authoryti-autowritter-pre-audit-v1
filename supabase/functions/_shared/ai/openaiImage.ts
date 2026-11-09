@@ -1,12 +1,13 @@
 // OpenAI image generation for covers and illustrations.
-// Order: the user's own OpenAI key (from app Settings) first; if absent or it
-// fails for a non-content reason, fall back to the in-app gateway's OpenAI model.
+// One model everywhere: the cheapest OpenAI image model at low quality. The user's own OpenAI key
+// is used first; without one, the in-app gateway serves the SAME model. A failure never switches models.
 import { decryptKey } from "./keyCrypto.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 const DIRECT = "https://api.openai.com/v1";
-export const GATEWAY_IMAGE_MODEL = "openai/gpt-image-2.5-sunburst";
-export const DIRECT_IMAGE_MODEL = "gpt-image-2";
+export const GATEWAY_IMAGE_MODEL = "openai/gpt-image-1-mini";
+export const DIRECT_IMAGE_MODEL = "gpt-image-1-mini";
+export const IMAGE_QUALITY = "low" as const;
 
 export type ImageSize = "1024x1536" | "1536x1024" | "1024x1024";
 
@@ -77,17 +78,16 @@ export async function generateOpenAIImage(opts: { admin: any; userId: string; pr
   const refs = (opts.references || []).filter(Boolean).slice(0, 4);
   const userKey = await loadUserOpenAIKey(opts.admin, opts.userId);
   if (userKey) {
-    const res = await call(DIRECT, userKey, DIRECT_IMAGE_MODEL, opts.prompt, opts.size, refs, opts.quality);
+    const res = await call(DIRECT, userKey, DIRECT_IMAGE_MODEL, opts.prompt, opts.size, refs, IMAGE_QUALITY);
     if (res.ok) return readImage(res);
     const t = await res.text();
     console.error("openai direct image error", res.status, t.slice(0, 500));
     if (isContentRefusal(res.status, t)) throw new ImageError("This image request was declined by the image service's content rules.", 400);
-    if (opts.noFallback) throw new ImageError(`OpenAI image request failed (${res.status}); no replacement model was used.`, res.status);
-    // otherwise fall through to the in-app gateway
+    throw new ImageError(`OpenAI image request failed (${res.status}); no replacement model was used.`, res.status >= 500 ? 502 : res.status);
   }
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) throw new ImageError("Image service is not configured", 500);
-  const res = await call(GATEWAY, lovableKey, GATEWAY_IMAGE_MODEL, opts.prompt, opts.size, refs, opts.quality);
+  const res = await call(GATEWAY, lovableKey, GATEWAY_IMAGE_MODEL, opts.prompt, opts.size, refs, IMAGE_QUALITY);
   if (res.ok) return readImage(res);
   const t = await res.text();
   console.error("gateway image error", res.status, t.slice(0, 500));

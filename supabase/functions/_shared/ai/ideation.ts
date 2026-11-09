@@ -1,6 +1,6 @@
 // Initial setup is independent of the writer chosen later; downstream planning keeps its config.
 import type { BookModelConfig } from "./roles.ts";
-export const INITIAL_IDEA_MODEL = "openai/gpt-6-astra";
+export const INITIAL_IDEA_MODEL = "openai/gpt-6-sol";
 const IDEA_ACTIONS = new Set(["alternatives", "concepts", "adjust_premise", "twists"]);
 export function configForPlanningAction(action: string, config: BookModelConfig | null | undefined): BookModelConfig | null | undefined {
   return IDEA_ACTIONS.has(action) ? { mode: "single", singleModel: INITIAL_IDEA_MODEL } : config;
