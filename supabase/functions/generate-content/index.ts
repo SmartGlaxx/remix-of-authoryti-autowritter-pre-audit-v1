@@ -744,7 +744,16 @@ serve(async (req) => {
     }
     const cardDebuts = plannedDebuts(serverOutline?.characters ?? [],serverOutline?.chapters ?? []);
     const referenceCards = (serverOutline?.characters ?? []).filter((c: any)=>c.reference?.locked && castStatus(cardDebuts.get(castKey(c)),{chapterIndex:absChapter,subsectionIndex}) !== 'future');
-    if (referenceCards.length) userPrompt += `\n\nLOCKED APPEARANCE AND BEHAVIOUR (designed facts, not acquired knowledge; do not introduce future cast):\n${JSON.stringify(referenceCards.map((c: any)=>({name:c.name,reference:c.reference,introFeatures:c.introFeatures,firstAppearance:c.firstAppearance})))}\nUse 5–7 noticeability-ranked features at first introduction; weave roughly two-thirds through action and one-third as a compact portrait. Show the at-ease tell and hold the signature until the first decisive act or dialogue. Re-entry: one cue after a recent appearance, two or three after chapters away. Never repeat a feature within a scene. Tells must betray, assist, reveal, endanger, mislead or comfort through behaviour, not explanatory labels. A contradiction requires a dated justified change, never silently override locked traits.`;
+    if (referenceCards.length) {
+      const lastByName = lastAppearanceChapters(memoryRows, serverOutline?.chapters ?? [], { chapterIndex: absChapter, subsectionIndex }, contentHash);
+      const cuePlans = reentryCuePlans(referenceCards.map((c: any)=>c.name), lastByName, absChapter);
+      const cueLines = cuePlans.map(p => p.kind === 'introduction'
+        ? `- ${p.name}: first introduction — 5–7 noticeability-ranked features.`
+        : p.range[0] === p.range[1]
+          ? `- ${p.name}: re-entry — exactly ${p.range[0]} appearance cue (seen recently).`
+          : `- ${p.name}: re-entry — ${p.range[0]}–${p.range[1]} appearance cues (chapters away).`).join('\n');
+      userPrompt += `\n\nLOCKED APPEARANCE AND BEHAVIOUR (designed facts, not acquired knowledge; do not introduce future cast):\n${JSON.stringify(referenceCards.map((c: any)=>({name:c.name,reference:c.reference,introFeatures:c.introFeatures,firstAppearance:c.firstAppearance})))}\nAt first introduction, weave roughly two-thirds of features through action and one-third as a compact portrait. Show the at-ease tell and hold the signature until the first decisive act or dialogue.\nAPPEARANCE CUES PER CHARACTER (from accepted past appearances; follow exactly):\n${cueLines}\nNever repeat a feature within a scene. Tells must betray, assist, reveal, endanger, mislead or comfort through behaviour, not explanatory labels. A contradiction requires a dated justified change, never silently override locked traits.`;
+    }
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.
