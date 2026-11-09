@@ -73,22 +73,6 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
     } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
   };
 
-  const save = async () => {
-    setSaving(true);
-    try { await call("save", config); toast.success("Model settings saved"); } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
-  };
-  const reset = async () => {
-    setSaving(true);
-    try { await call("reset"); toast.success("Restored defaults"); } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
-  };
-
-  const setRole = (role: Role, model: string) => setConfig((c) => ({ ...c, mode: "custom", roleModels: { ...(c.roleModels ?? {}), [role]: model } }));
-  const setFallback = (role: Role, model: string) => setConfig((c) => {
-    const f = { ...(c.fallbacks ?? {}) };
-    if (model === NONE) delete f[role]; else f[role] = model;
-    return { ...c, fallbacks: f };
-  });
-
   return (
     <Card>
       <CardHeader className="pb-3">

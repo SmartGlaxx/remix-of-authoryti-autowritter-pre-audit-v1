@@ -89,7 +89,7 @@ Generated: ${new Date().toISOString().split("T")[0]}
 ### generate-outline
 - **Input**: { title, theme, audience, bookType, genre, pov, controls, toneProfile, tonalAnchors, entities, concepts }
 - **Output**: JSON with { chapters: [{ id, chapterNumber, title, subsections: [{ id, title, goal, imageOpportunity, teaser }] }], characters: [...], visualStyleGuide, openPromises, resolvedPromises }
-- **Model**: Lovable AI (Gemini) with structured JSON output
+- **Model**: OpenAI Sol with structured JSON output
 - **Character extraction**: During outline generation, the AI is instructed to extract EVERY character mentioned — even background characters — and produce a full Character Index entry for each
 - **Rate limited**: Via check_rate_limit RPC
 
