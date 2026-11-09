@@ -39,3 +39,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [x] In-progress books switcher in Planning Studio header
 - [x] Tone in master plan, chapter, section, beat, blueprint prompts and paragraph rewrites
 - [x] Cache-aware cost estimator (cached context discount, no thinking surcharge on checks, optional audit excluded)
+
+## Live test (The Salt Ledger) — open
+- [ ] Character cards cost too much on Astra (~$0.15–0.27 each) — pick a cheaper model before making the other 4 references (needs author decision)
+- [ ] Finish Chapter 1 sections 2–4 on Sonnet 5 (budget cap $1 reached)

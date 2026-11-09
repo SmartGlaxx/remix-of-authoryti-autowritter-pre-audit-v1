@@ -50,3 +50,9 @@ export function applyLockedFeature(card: CharacterLock, key: string, value: stri
   if (card.locked && card.features[key] && norm(card.features[key]) !== norm(value)) return { card, conflict: true };
   return { card: { ...card, features: { ...card.features, [key]: value } }, conflict: false };
 }
+/** Cast names that still lack a locked reference card (case/space-insensitive name match). */
+export function missingReferenceNames(cast: readonly string[], cards: readonly { name?: string; reference?: { locked?: boolean } }[]): string[] {
+  const norm = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
+  const locked = new Set(cards.filter((c) => c?.reference?.locked && c.name).map((c) => norm(c.name!)));
+  return [...new Set(cast.map((n) => n?.trim()).filter(Boolean))].filter((n) => !locked.has(norm(n)));
+}

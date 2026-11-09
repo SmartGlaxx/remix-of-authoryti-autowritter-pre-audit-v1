@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
 import { createCharacterReference } from '../_shared/narrative/characterReferenceServer.ts';
+import { missingReferenceNames } from '../_shared/narrative/characterReference.ts';
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
@@ -94,8 +95,17 @@ serve(async (req) => {
     const band = ieltsBand || 7;
     const descriptionGuidelines = getDescriptionGuidelines(band);
     
+    // Planned books: the author-approved cast is authoritative — one card per member, names copied exactly.
+    const { data: castRows } = await ownerAdmin.from('story_characters').select('id,name,role').eq('book_id',book.id).eq('user_id',auth.user.id).eq('is_active',true);
+    const approvedCast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, role: c.role ?? null }));
+    // One cast member per request keeps each call well inside the function time limit; the app repeats until none remain.
+    const missing = missingReferenceNames(approvedCast.map((c) => c.name), outline.characters ?? []);
+    if (approvedCast.length && !missing.length) return new Response(JSON.stringify({ characters: outline.characters ?? [], visualStyleGuide: outline.visualStyleGuide ?? '', remaining: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const target = approvedCast.find((c) => c.name.trim() === missing[0]) ?? null;
+    const existingCards = (outline.characters ?? []).map((c: any) => ({ id: c.id, name: c.name, visualDescription: c.visualDescription, reference: c.reference ? { heightCm: c.reference.heightCm, tells: c.reference.tells } : undefined }));
     const extractPrompt = `Analyze this book outline and extract EVERY named fictional character. Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.
-EXISTING CAST: ${JSON.stringify(outline.characters ?? [])}
+EXISTING CAST: ${JSON.stringify(existingCards)}${target ? `
+APPROVED CAST MEMBER (authoritative): return exactly ONE card, for this person only, using the given id and the name exactly as written. Keep them visually distinct from the existing cast: ${JSON.stringify(target)}` : ''}
 
 BOOK: "${book.title}"
 THEME: "${book.theme}"
@@ -156,7 +166,7 @@ Return ONLY valid JSON:
     const __ctx = await aiBookContext(__admin, book.id, auth.user.id);
     let content: string;
     try {
-      const __r = await generateAIText({ role: "character_generator", config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { user: extractPrompt, temperature: 0.5 } }, createAIDeps(__admin, auth.user.id));
+      const __r = await generateAIText({ role: "character_generator", config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { user: extractPrompt, temperature: 0.5, reasoning: "low" } }, createAIDeps(__admin, auth.user.id));
       content = __r.text;
     } catch (e) {
       if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -170,7 +180,10 @@ Return ONLY valid JSON:
       parsed = JSON.parse(jsonMatch[1].trim());
     } catch { throw new Error("Failed to parse character data"); }
 
-    const characters = parsed.characters;
+    const characters = target && Array.isArray(parsed.characters)
+      ? parsed.characters.filter((c: any) => c?.id === target.id || String(c?.name ?? '').trim().toLowerCase() === target.name.trim().toLowerCase()).slice(0, 1).map((c: any) => ({ ...c, id: target.id, name: target.name }))
+      : parsed.characters;
+    if (target && !characters.length) throw new Error(`No reference card was returned for ${target.name}`);
     if (!Array.isArray(characters) || characters.some((c: any) => typeof c.id !== 'string' || typeof c.name !== 'string' || !c.reference || !Array.isArray(c.reference.tells))) throw new Error('Invalid character card data');
     const visualStyleGuide = parsed.visualStyleGuide || "";
 
@@ -189,7 +202,8 @@ Return ONLY valid JSON:
       if (error) throw error;
     }
 
-    return new Response(JSON.stringify({ characters: charactersWithPortraits, visualStyleGuide }), {
+    const remaining = target ? Math.max(0, missing.length - 1) : 0;
+    return new Response(JSON.stringify({ characters: charactersWithPortraits, visualStyleGuide, remaining }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

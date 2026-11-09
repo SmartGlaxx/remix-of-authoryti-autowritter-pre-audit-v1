@@ -1,7 +1,7 @@
 // Central role → model resolution. Edge functions call resolveModelForRole and nothing else;
 // no role conditionals live in individual functions.
 import { ALL_ROLES, getModel, type Role } from "./registry.ts";
-import { getProfile, isTier, reasoningFor, thinkingFor, slotForRole, type Tier } from "../writers/profiles.ts";
+import { DEFAULT_WRITER_TIER, getProfile, isTier, reasoningFor, thinkingFor, slotForRole, type Tier } from "../writers/profiles.ts";
 
 export type ConfigMode = "legacy" | "optimized" | "single" | "custom" | "profile";
 
@@ -100,6 +100,11 @@ export function normalizeConfig(raw: unknown): BookModelConfig {
   const profileWriter = typeof pw === "string" ? pw : null, profileTier = isTier(pt) ? pt : null;
   const finalMode = mode === "profile" && !getProfile(profileWriter, profileTier) ? "legacy" : mode;
   return { mode: finalMode, profileWriter, profileTier, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
+}
+
+/** A book with no saved model config writes through its writer's premium profile (never the legacy DeepSeek map). */
+export function defaultBookConfig(writerId: string | null | undefined): BookModelConfig {
+  return normalizeConfig({ mode: "profile", profileWriter: writerId ?? null, profileTier: DEFAULT_WRITER_TIER });
 }
 
 /** Script formats (dialogue mechanics, sluglines) draft on Sol; every prose book drafts on the profile's draft model. */
