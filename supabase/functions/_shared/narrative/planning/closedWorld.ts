@@ -50,3 +50,96 @@ export function findUnplannedNames(text: string, known: readonly string[], ignor
 /** Known vocabulary from a blueprint plus established names. */
 export const blueprintKnownNames = (bp: ChapterBlueprint | null | undefined, established: readonly string[] = []): string[] =>
   [...(bp?.cast.map((c) => c.name) ?? []), ...(bp?.locations.map((l) => l.name) ?? []), ...(bp?.events.map((e) => e.name) ?? []), ...established];
+
+// ── Stage 5: versioned plan amendments + emergent characters ──
+export interface BlueprintAmendment { kind: "person" | "place"; name: string; reason: string }
+export interface AmendmentLogEntry { at: string; fromVersion: number | null; changes: BlueprintAmendment[] }
+
+/** Returns a NEW blueprint (never mutates the approved one). People become cast proposals (author must
+ * approve them into the cast; reference images follow), places are added directly. Duplicates are skipped. */
+export function amendBlueprint(bp: ChapterBlueprint, changes: readonly BlueprintAmendment[], fromVersion: number | null, at = new Date().toISOString()): ChapterBlueprint & { amendments: AmendmentLogEntry[] } {
+  const next = JSON.parse(JSON.stringify(bp)) as ChapterBlueprint & { amendments?: AmendmentLogEntry[] };
+  const has = (list: { name: string }[], n: string) => list.some((x) => x.name.toLowerCase() === n.toLowerCase());
+  const applied: BlueprintAmendment[] = [];
+  for (const c of changes) {
+    const name = c.name.trim().slice(0, 200); if (!name) continue;
+    if (c.kind === "person") {
+      if (has(next.cast, name) || has(next.castProposals, name)) continue;
+      next.castProposals.push({ id: `amend-${next.castProposals.length + 1}`, name, role: "emergent", justification: c.reason.slice(0, 500) });
+    } else {
+      if (has(next.locations, name)) continue;
+      next.locations.push({ id: `amend-l${next.locations.length + 1}`, name, significance: c.reason.slice(0, 500) });
+    }
+    applied.push({ ...c, name });
+  }
+  next.amendments = [...(next.amendments ?? []), ...(applied.length ? [{ at, fromVersion, changes: applied }] : [])];
+  return next as ChapterBlueprint & { amendments: AmendmentLogEntry[] };
+}
+
+/** Emergent-character universe collision: an exact or first/last-name match in another book of the same universe. */
+export function universeCollisions(name: string, others: readonly { name: string; bookTitle?: string }[]): string[] {
+  const toks = name.toLowerCase().split(/\s+/).filter(Boolean);
+  return others.filter((o) => {
+    const ot = o.name.toLowerCase().split(/\s+/).filter(Boolean);
+    if (ot.join(" ") === toks.join(" ")) return true;
+    return toks.length === 1 && ot.includes(toks[0]);
+  }).map((o) => `${o.name}${o.bookTitle ? ` (${o.bookTitle})` : ""}`);
+}
+
+// ── Title / theme invariance ──
+export const titleThemeLock = (title: string, premise = ""): string =>
+  `The book's title is "${title.trim()}" and must not be renamed, retitled or reinterpreted.${premise ? ` Its central theme and premise stay exactly: ${premise.trim()}` : ""} Every chapter, section and beat must serve this theme.`;
+
+// ── Appearance contradictions against locked character cards ──
+const COLORS = ["black","brown","blue","green","grey","gray","hazel","amber","red","auburn","blonde","blond","golden","white","silver","copper","violet","dark","pale"];
+const PARTS = ["eyes","hair","beard","skin"];
+export interface LockedLook { name: string; features: Record<string, string>; locked: boolean }
+export function appearanceContradictions(text: string, cards: readonly LockedLook[]): Finding[] {
+  const out: Finding[] = [];
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  for (const c of cards) {
+    if (!c.locked) continue;
+    const first = c.name.split(/\s+/)[0];
+    for (const part of PARTS) {
+      const lockedVal = Object.entries(c.features).find(([k]) => k.toLowerCase().includes(part.replace(/s$/, "")))?.[1]?.toLowerCase();
+      if (!lockedVal) continue;
+      const lockedColors = COLORS.filter((col) => lockedVal.includes(col));
+      if (!lockedColors.length) continue;
+      for (const sen of sentences) {
+        if (!new RegExp(`\\b${first}\\b`).test(sen)) continue;
+        const others = sentences.length && cards.some((o) => o !== c && new RegExp(`\\b${o.name.split(/\s+/)[0]}\\b`).test(sen));
+        if (others) continue; // ambiguous sentence: skip rather than guess
+        const m = sen.toLowerCase().match(new RegExp(`\\b(${COLORS.join("|")})(?:[- ]\\w+)?\\s+${part}\\b`));
+        if (m && !lockedColors.includes(m[1]) && !(m[1] === "gray" && lockedColors.includes("grey")) && !(m[1] === "grey" && lockedColors.includes("gray"))) {
+          out.push({ code: "APPEARANCE_CONTRADICTION", category: "continuity", severity: "material", canonKind: "identity", repairable: true, excerpt: sen.trim().slice(0, 300),
+            message: `${c.name}'s locked ${part} are "${lockedVal}", but the draft says "${m[0]}".` });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Introduction/re-entry exposure: how many locked features a section shows for a character. */
+export function exposedFeatures(text: string, card: LockedLook): string[] {
+  const low = text.toLowerCase();
+  return Object.values(card.features).filter((v) => {
+    const words = v.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+    return words.length > 0 && words.filter((w) => low.includes(w)).length >= Math.ceil(words.length / 2);
+  });
+}
+export function reentryFinding(text: string, card: LockedLook, range: [number, number]): Finding[] {
+  if (!new RegExp(`\\b${card.name.split(/\s+/)[0]}\\b`).test(text)) return [];
+  const n = exposedFeatures(text, card).length;
+  return n < range[0] ? [{ code: "REENTRY_CUES_LOW", category: "writing_quality", severity: "minor", repairable: false,
+    message: `${card.name} returns with ${n} recognisable appearance cue(s); ${range[0]}–${range[1]} expected.` }] : [];
+}
+
+// ── Event / thread deadlines ──
+export interface ThreadDeadline { name: string; due: string; resolved?: boolean }
+export function deadlineFindings(deadlines: readonly ThreadDeadline[], sceneDate: string | null): Finding[] {
+  if (!sceneDate) return [];
+  return deadlines.filter((d) => !d.resolved && d.due < sceneDate).map((d) => ({
+    code: "THREAD_DEADLINE_PASSED", category: "continuity" as const, severity: "moderate" as const, repairable: false,
+    message: `"${d.name}" was due by ${d.due}, but the story is now at ${sceneDate} and it is not resolved.` }));
+}

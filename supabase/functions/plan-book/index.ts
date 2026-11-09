@@ -21,6 +21,7 @@ import {
   normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, buildTwistPrompt, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
+import { amendBlueprint, universeCollisions, titleThemeLock } from "../_shared/narrative/planning/closedWorld.ts";
 import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
@@ -107,6 +108,23 @@ async function handle(req: Request): Promise<Response> {
     if (!book) return json({ error: "Book not found" }, 404);
     try { adapterForBookType(book.book_type); } catch { return json({ error: "Unsupported book type" }, 400); }
 
+    if (action === "amend_blueprint") {
+      // Stage 5: a planned deviation becomes a NEW PLANNED blueprint version; the approved one stays until the author approves.
+      const ch = Number(body.chapter);
+      const changes = (Array.isArray(body.changes) ? body.changes : []).slice(0, 20)
+        .filter((c: any) => (c?.kind === "person" || c?.kind === "place") && typeof c?.name === "string" && c.name.trim())
+        .map((c: any) => ({ kind: c.kind, name: s(c.name, 200), reason: s(c.reason ?? "Appeared in a draft", 500) }));
+      if (!Number.isInteger(ch) || !changes.length) return json({ error: "Invalid amendment" }, 400);
+      const { data: rows } = await db.from("book_progressive_plans").select("id, master_plan_id, version, plan_status, content").eq("book_id", bookId).eq("user_id", userId).eq("plan_level", "BLUEPRINT").eq("chapter_index", ch).order("version", { ascending: false }).limit(1);
+      const row = rows?.[0]; if (!row?.content?.blueprint) return json({ error: "No blueprint for this chapter yet" }, 404);
+      const amended = amendBlueprint(row.content.blueprint, changes, row.version ?? null);
+      const { data: others } = book?.universe_id ? await db.from("story_characters").select("name, book_id, books!inner(title, universe_id)").eq("user_id", userId).eq("books.universe_id", book.universe_id).neq("book_id", bookId).limit(500) : { data: [] as any[] };
+      const collisions = changes.filter((c) => c.kind === "person").map((c) => ({ name: c.name, matches: universeCollisions(c.name, (others ?? []).map((o: any) => ({ name: o.name, bookTitle: o.books?.title }))) })).filter((c) => c.matches.length);
+      const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: row.master_plan_id, p_idem: planIdemKey(["amend", row.id, JSON.stringify(changes)]),
+        p_items: [{ plan_level: "BLUEPRINT", chapter_index: ch, content: { blueprint: amended }, dependencies: [] }] });
+      if (error) return json({ error: error.message }, 400);
+      return json({ saved: data, collisions });
+    }
     if (action === "status") {
       // The owner (author) sees the full plan, including planner-only synopsis and ending.
       const [{ data: masters }, { data: plans }] = await Promise.all([
@@ -307,6 +325,8 @@ async function handle(req: Request): Promise<Response> {
     if (banned.length) brief.guidance = [brief.guidance, `Never use these words or phrases anywhere (titles, summaries, plans): ${banned.join(", ")}.`].filter(Boolean).join("\n");
     const cur = (ex.curriculum && typeof ex.curriculum === "object") ? ex.curriculum as Record<string, unknown> : null;
     if (cur && ovType === "textbook") brief.guidance = [brief.guidance, `Textbook following the ${s(cur.country, 120)} curriculum at ${s(cur.level, 120)} level. Chapters are curriculum units; sections are topic lessons with learning objectives, explanations, worked examples, practice questions and a summary.`].filter(Boolean).join("\n");
+    // Title/theme invariance: once a title exists, every later planning step keeps it and the chosen premise exactly.
+    if (action !== "alternatives" && action !== "concepts" && action !== "adjust_premise" && (book as any).title) brief.guidance = [brief.guidance, titleThemeLock(String((book as any).title), s((book as any).premise ?? "", 1200))].filter(Boolean).join("\n");
     // Book Variants and idea rewrites are written in the selected writer's voice (request writer, else the book's, else best fit).
     if (action === "alternatives" || action === "concepts" || action === "adjust_premise") {
       const wid = getWriter(body.writerId)?.id ?? resolveWriter((book as any).controls ?? {}, ovType).id;

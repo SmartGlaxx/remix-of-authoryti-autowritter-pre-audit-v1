@@ -1,4 +1,4 @@
-import { findUnplannedNames } from "./closedWorld.ts";
+import { findUnplannedNames, appearanceContradictions, deadlineFindings, type LockedLook, type ThreadDeadline } from "./closedWorld.ts";
 // Phase G runtime — pre-acceptance AI evaluation (pure). One structured evaluator call covers
 // plan fulfillment, continuity/canon, epistemic integrity and writing quality, while every
 // finding keeps its own stage, severity and source reference. Stage 1 (free deterministic)
@@ -26,6 +26,7 @@ export interface EvalContext {
   narration?: EvalNarration; lifeRecords?: LifeRecord[]; sceneDate?: ApproximateDate | null;
   /** Stage 4 closed world: every planned/established name; when set, unknown repeated names are flagged. */
   knownNames?: string[];
+  lockedLooks?: LockedLook[]; deadlines?: ThreadDeadline[]; sceneIsoDate?: string | null;
 }
 export interface Prompt { system: string; user: string }
 export interface Usage { inputTokens?: number | null; outputTokens?: number | null; costUsd?: number | null }
@@ -164,6 +165,8 @@ export function stageOneFindings(draft: string, ctx: EvalContext): StagedFinding
   return deterministicValidation(draft, { controls: ctx.controls, secrets: ctx.secrets, adapter: ctx.adapter, motifs: ctx.motifs, terminology: ctx.terminology })
     .concat(ctx.lifeRecords?.length ? [...ageFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null), ...postDeathFindings(draft, ctx.lifeRecords, ctx.sceneDate ?? null)] : [])
     .concat(ctx.knownNames?.length ? findUnplannedNames(draft, ctx.knownNames) : [])
+    .concat(ctx.lockedLooks?.length ? appearanceContradictions(draft, ctx.lockedLooks) : [])
+    .concat(ctx.deadlines?.length ? deadlineFindings(ctx.deadlines, ctx.sceneIsoDate ?? null) : [])
     .map((f) => ({ ...f, stage: (f.category === "writing_quality" ? 5 : 1) as Stage }));
 }
 
