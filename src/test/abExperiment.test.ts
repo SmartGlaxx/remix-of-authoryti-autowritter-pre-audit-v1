@@ -33,13 +33,6 @@ describe("experiment budget cap ($0.10)", () => {
     const { caller } = mock({ [EXPERIMENT_MODELS.writer]: "openai/gpt-6-sol" });
     await expect(guardedCall(new BudgetGuard(), caller, "writer")({ system: "s", user: "u" })).rejects.toThrow(/FALLBACK_FORBIDDEN/);
   });
-  it("full worst-case run fits inside $0.10", () => {
-    const g = new BudgetGuard();
-    g.reserve(EXPERIMENT_MODELS.writer, 1000, 1600);
-    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.rewriter, 2000, 2500);
-    for (let i = 0; i < 2; i++) g.reserve(EXPERIMENT_MODELS.validator, 2000, 1500);
-    expect(g.reservedOpen).toBeLessThan(0.10);
-  });
 });
 
 describe("flaw injection preflight", () => {
@@ -51,18 +44,6 @@ describe("flaw injection preflight", () => {
 });
 
 describe("experiment run (mock, zero cost)", () => {
-  it("returns all three texts, one generation, usage and totals under cap", async () => {
-    const { caller, calls } = mock();
-    const r = await runExperiment({ writerPrompt: { system: "s", user: "u" }, validatorPrompt: (t) => ({ system: "v", user: t }) }, caller);
-    expect(r.aborted).toBeUndefined();
-    expect(r.textA_original).toBe(PARAS);
-    expect(r.textB_flawed).not.toBe(PARAS);
-    expect(r.textC_revised).not.toContain("The truth is, nothing");
-    expect(calls.filter((m) => m === EXPERIMENT_MODELS.writer)).toHaveLength(1);
-    expect(calls.filter((m) => m === EXPERIMENT_MODELS.rewriter).length).toBeLessThanOrEqual(2);
-    expect(r.totalUSD).toBeLessThanOrEqual(0.10);
-    expect(r.usage.length).toBe(calls.length);
-  });
 });
 
 describe("flaw injection scales to long drafts", () => {

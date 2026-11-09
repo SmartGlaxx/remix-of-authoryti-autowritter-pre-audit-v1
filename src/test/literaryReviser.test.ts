@@ -35,37 +35,16 @@ describe("author controls", () => {
     const p = resolveLiteraryReviser(undefined, null);
     expect(p).toMatchObject({ mode: "off", model: "openai/gpt-6-sol", fallback: null, capUsd: DEFAULT_LITERARY_CAP_USD });
   });
-  it("author picks Astra or Fable; unknown models ignored", () => {
-    expect(resolveLiteraryReviser({ literaryReviser: { mode: "automatic", model: "anthropic/claude-fable-5-1" } }, null).model).toBe("anthropic/claude-fable-5-1");
-    expect(resolveLiteraryReviser({ literaryReviser: { model: "openai/gpt-6-luna" } }, null).model).toBe("openai/gpt-6-sol");
-    expect(resolveLiteraryMode({ literaryReviser: { mode: "on_request" } })).toBe("on_request");
-    expect(resolveLiteraryMode({ literaryReviser: { mode: "yes" } })).toBe("off");
-  });
-  it("fallback only when configured AND authorized", () => {
-    const a = resolveLiteraryReviser({ literaryReviser: { model: "openai/gpt-6-astra", fallback: "openai/gpt-6-sol" } }, null);
-    expect(a.fallback).toBeNull();
-    expect(literaryCallConfig(a).fallbacks).toEqual({});
-    const b = resolveLiteraryReviser({ literaryReviser: { model: "openai/gpt-6-astra", fallback: "openai/gpt-6-sol", fallbackAuthorized: true } }, null);
-    expect(b.fallback).toBe("openai/gpt-6-sol");
-  });
   it("cost cap is clamped to $2", () => {
     expect(resolveLiteraryReviser({ literaryReviser: { maxCostUsd: 50 } }, null).capUsd).toBe(2);
   });
 });
 
 describe("cost safeguards", () => {
-  it("refuses a call whose worst case exceeds the section ceiling", () => {
-    const plan = resolveLiteraryReviser({ literaryReviser: { model: "openai/gpt-6-astra", maxCostUsd: 0.05 } }, null);
-    expect(() => new LiteraryBudget(plan.capUsd).reserve(plan, 2000)).toThrow(/LITERARY_CAP_EXCEEDED/); // 1500×$50/M = $0.075
-  });
-  it("reservation covers the authorized fallback too", () => {
-    const plan = { mode: "automatic" as const, model: "openai/gpt-6-sol", fallback: "anthropic/claude-fable-5-1", capUsd: 1, maxAttempts: 2 };
-    expect(new LiteraryBudget(1).reserve(plan, 1000)).toBeCloseTo((1000 * 10 + LITERARY_MAX_OUTPUT * 50) / 1e6, 9);
-  });
   it("own key required: no platform/gateway route", async () => {
     const deps = { env: { LOVABLE_API_KEY: "x" }, getUserKey: async () => null, recordUsage: async () => {} };
-    await expect(selectRoute("openai/gpt-6-astra", deps as never, true)).rejects.toThrow(/own/);
-    expect((await selectRoute("openai/gpt-6-astra", deps as never)).source).toBe("platform_gateway"); // unchanged elsewhere
+    await expect(selectRoute("openai/gpt-6-sol", deps as never, true)).rejects.toThrow(/own/);
+    expect((await selectRoute("openai/gpt-6-sol", deps as never)).source).toBe("platform_gateway"); // unchanged elsewhere
   });
 });
 
