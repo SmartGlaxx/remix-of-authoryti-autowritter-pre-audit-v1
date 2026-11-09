@@ -1,3 +1,4 @@
+import { renderBlueprintBrief, blueprintKnownNames } from "../_shared/narrative/planning/closedWorld.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildVoiceManifest } from "../_shared/writers/manifest.ts";
 import { renderExpressionBlock, resolveDivergence } from "../_shared/writers/sliders.ts";
@@ -555,6 +556,7 @@ serve(async (req) => {
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
     // then a generation lease. Books without the flag never reach this block.
     let progressive: ProgressiveState | null = null;
+    let bpGateResult: unknown = null;
     let lease: { lease_id: string; fencing_token: number; worker: string } | null = null;
     let heartbeat: Heartbeat | null = null;
     if (pipeline === "progressive" && book.id) {
@@ -568,7 +570,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: planReq.reason, code: planReq.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       // Stage 2 completion: required-blueprint books need an approved chapter blueprint with every person registered.
-      const bpGate = await loadBlueprintGate(adminSupabase, book.id, auth.user.id, bookControls, absChapter);
+      const bpGate = bpGateResult = await loadBlueprintGate(adminSupabase, book.id, auth.user.id, bookControls, absChapter);
       if (!bpGate.ok && !dryRun) {
         return new Response(JSON.stringify({ error: bpGate.reason, code: bpGate.code }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -704,6 +706,8 @@ serve(async (req) => {
     if (progressive && (engine === "legacy" || runMetrics.fell_back) && progressive.plan.usable) {
       userPrompt = `${userPrompt}\n\n${renderPlanBlock(progressive.plan, absChapter, progressive.anchors, progressive.required)}`;
       runMetrics.plan_mode = "planned";
+      const bpBrief = renderBlueprintBrief((bpGateResult as any)?.blueprint ?? null, subsectionIndex);
+      if (bpBrief) userPrompt = `${userPrompt}\n\n${bpBrief}`;
     } else if (progressive && !progressive.plan.usable) {
       runMetrics.plan_mode = "legacy"; runMetrics.plan_fallback = progressive.plan.reason;
     }
@@ -837,6 +841,8 @@ serve(async (req) => {
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
           const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes });
           if (isChildrensBook) ctx.adapter = "childrens";
+          const bpForCheck = (bpGateResult as any)?.blueprint ?? null;
+          if (bpForCheck) ctx.knownNames = blueprintKnownNames(bpForCheck, [...(serverOutline?.characters ?? []).map((c: any) => String(c?.name ?? "")), ...(factRows ?? []).map((f: any) => String(f.subject ?? "")), String(book.title ?? "")].filter(Boolean));
           if (!narratorCtx) { try { narratorCtx = await loadNarratorContext(adminSupabase, book.id, auth.user.id, { chapterIndex: absChapter, subsectionIndex }, progressive?.plan?.usable ? progressive.plan.section : null); } catch { narratorCtx = null; } }
           if (narratorCtx) Object.assign(ctx, { narration: narratorCtx.narration, lifeRecords: narratorCtx.lifeRecords, sceneDate: narratorCtx.sceneDate });
           const cfg = await loadBookModelConfig(adminSupabase, book.id, auth.user.id);
