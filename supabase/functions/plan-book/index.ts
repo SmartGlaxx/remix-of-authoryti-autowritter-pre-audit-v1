@@ -21,6 +21,7 @@ import {
   normalizeSetup, validateSetup, lockedChanges, setupPlannerGuidance, setupBookColumns, buildTwistPrompt, parseTwists, recommendCast,
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
+import { amendBlueprint, universeCollisions } from "../_shared/narrative/planning/closedWorld.ts";
 import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
