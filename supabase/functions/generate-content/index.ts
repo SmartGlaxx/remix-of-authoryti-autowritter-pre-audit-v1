@@ -733,6 +733,7 @@ serve(async (req) => {
 
 
     // Paragraph memory is read from completed extraction records and checked against current saved prose.
+    let memoryRows: any[] = [];
     if (book.id && serverOutline?.chapters) {
       const { data: memories, error: memoryError } = await adminSupabase.from('narrative_extractions')
         .select('chapter_index,subsection_index,content_hash,status,applied').eq('book_id', book.id).eq('user_id', auth.user.id).eq('status', 'completed');
