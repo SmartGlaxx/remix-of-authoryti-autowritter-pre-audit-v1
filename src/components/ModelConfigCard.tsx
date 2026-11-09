@@ -137,8 +137,6 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
             )}
 
              <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={save} disabled={saving} className="gap-1.5"><Save className="w-3.5 h-3.5" /> Save</Button>
-              <Button size="sm" variant="outline" onClick={reset} disabled={saving} className="gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Restore defaults</Button>
               <Button size="sm" variant="ghost" onClick={async () => { setSaving(true); try { await call("refresh_prices"); toast.success("Prices refreshed"); } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); } }} disabled={saving}>Refresh prices</Button>
             </div>
           </>
