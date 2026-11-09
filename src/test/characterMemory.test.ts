@@ -28,4 +28,32 @@ describe('Character lock rules', () => {
   it('does not overwrite locked appearance', () => { const c = card(); expect(applyLockedFeature(c,'eyes','blue')).toEqual({card:c,conflict:true}); });
   it('scales re-entry to 1, 2–3 or 5–7 cues', () => { expect(introductionCueCount(1)).toEqual([1,1]); expect(introductionCueCount(3)).toEqual([2,3]); expect(introductionCueCount(8,true)).toEqual([5,7]); });
   it('excludes spent and held-back features', () => expect(selectUnspentFeatures(['eyes','scar','gait'],['eyes'],'scar')).toEqual(['gait']));
+  it('plans re-entry cue counts from accepted past appearances only', () => {
+    const m = parseSectionMemory(memory(), text, '1:1');
+    const chapters = [{ subsections: [{ content: text, status: 'completed' }] }];
+    const rows = [{ chapter_index: 0, subsection_index: 0, content_hash: text, status: 'completed', applied: { sectionMemory: m } }];
+    const last = lastAppearanceChapters(rows, chapters, { chapterIndex: 4, subsectionIndex: 0 }, (t: string) => t);
+    expect(last['mara']).toBe(0); expect(last['nils']).toBe(0); expect(last['jo']).toBe(0);
+    const plans = reentryCuePlans(['Mara', 'Nils', 'Iris'], last, 4);
+    expect(plans.find(p => p.name === 'Mara')).toEqual({ name: 'Mara', range: [2, 3], kind: 're-entry' });
+    expect(plans.find(p => p.name === 'Iris')).toEqual({ name: 'Iris', range: [5, 7], kind: 'introduction' });
+  });
+  it('gives a single cue when the character appeared in the previous chapter', () => {
+    const m = parseSectionMemory(memory(), text, '3:1');
+    const chapters = [{ subsections: [] }, { subsections: [] }, { subsections: [{ content: text, status: 'completed' }] }];
+    const rows = [{ chapter_index: 2, subsection_index: 0, content_hash: text, status: 'completed', applied: { sectionMemory: m } }];
+    const last = lastAppearanceChapters(rows, chapters, { chapterIndex: 3, subsectionIndex: 0 }, (t: string) => t);
+    expect(reentryCuePlans(['Mara'], last, 3)).toEqual([{ name: 'Mara', range: [1, 1], kind: 're-entry' }]);
+  });
+  it('ignores future, rewritten and stale-hash appearances', () => {
+    const m = parseSectionMemory(memory(), text, '2:1');
+    const chapters = [{ subsections: [] }, { subsections: [{ content: text, status: 'completed' }, { content: 'Rewritten', status: 'completed' }] }];
+    const rows = [
+      { chapter_index: 1, subsection_index: 1, content_hash: 'old-hash', status: 'completed', applied: { sectionMemory: m } },
+      { chapter_index: 1, subsection_index: 0, content_hash: text, status: 'completed', applied: { sectionMemory: m } },
+    ];
+    const last = lastAppearanceChapters(rows, chapters, { chapterIndex: 1, subsectionIndex: 1 }, (t: string) => t);
+    expect(last['mara']).toBe(1);
+    expect(lastAppearanceChapters(rows, chapters, { chapterIndex: 1, subsectionIndex: 0 }, (t: string) => t)).toEqual({});
+  });
 });
