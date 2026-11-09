@@ -844,7 +844,7 @@ serve(async (req) => {
           const bpForCheck = (bpGateResult as any)?.blueprint ?? null;
           ctx.lockedLooks = (serverOutline?.characters ?? []).filter((c: any) => c?.reference?.locked && c?.reference?.features).map((c: any) => ({ name: String(c.name), features: c.reference.features, locked: true }));
           ctx.deadlines = Array.isArray((book.controls as any)?.threadDeadlines) ? (book.controls as any).threadDeadlines : [];
-          ctx.sceneIsoDate = typeof (narratorCtx as any)?.sceneDate?.iso === "string" ? (narratorCtx as any).sceneDate.iso : null;
+          { const d: any = narratorCtx?.sceneDate; ctx.sceneIsoDate = d?.year ? `${String(d.year).padStart(4, "0")}-${String(d.month ?? 1).padStart(2, "0")}-${String(d.day ?? 1).padStart(2, "0")}` : null; }
           if (bpForCheck) ctx.knownNames = blueprintKnownNames(bpForCheck, [...(serverOutline?.characters ?? []).map((c: any) => String(c?.name ?? "")), ...(factRows ?? []).map((f: any) => String(f.subject ?? "")), String(book.title ?? "")].filter(Boolean));
           if (!narratorCtx) { try { narratorCtx = await loadNarratorContext(adminSupabase, book.id, auth.user.id, { chapterIndex: absChapter, subsectionIndex }, progressive?.plan?.usable ? progressive.plan.section : null); } catch { narratorCtx = null; } }
           if (narratorCtx) Object.assign(ctx, { narration: narratorCtx.narration, lifeRecords: narratorCtx.lifeRecords, sceneDate: narratorCtx.sceneDate });
