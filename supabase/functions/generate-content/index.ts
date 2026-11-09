@@ -30,7 +30,8 @@ import { buildEvalContext } from "../_shared/narrative/planning/evalContext.ts";
 import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/knowledgeRepo.ts";
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
-import { renderWholeBookMemory } from '../_shared/narrative/sectionMemory.ts';
+import { renderWholeBookMemory, lastAppearanceChapters } from '../_shared/narrative/sectionMemory.ts';
+import { reentryCuePlans } from '../_shared/narrative/characterReference.ts';
 import { plannedDebuts, castStatus, castKey } from '../_shared/narrative/cast.ts';
 
 // ── Security Config ──
@@ -732,16 +733,27 @@ serve(async (req) => {
 
 
     // Paragraph memory is read from completed extraction records and checked against current saved prose.
+    let memoryRows: any[] = [];
     if (book.id && serverOutline?.chapters) {
       const { data: memories, error: memoryError } = await adminSupabase.from('narrative_extractions')
         .select('chapter_index,subsection_index,content_hash,status,applied').eq('book_id', book.id).eq('user_id', auth.user.id).eq('status', 'completed');
       if (memoryError) throw new Error('Could not load accepted paragraph memory');
-      const memoryBlock = renderWholeBookMemory(memories ?? [], serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
+      memoryRows = memories ?? [];
+      const memoryBlock = renderWholeBookMemory(memoryRows, serverOutline.chapters, { chapterIndex: absChapter, subsectionIndex }, contentHash);
       if (memoryBlock) userPrompt += `\n\n${memoryBlock}`;
     }
     const cardDebuts = plannedDebuts(serverOutline?.characters ?? [],serverOutline?.chapters ?? []);
     const referenceCards = (serverOutline?.characters ?? []).filter((c: any)=>c.reference?.locked && castStatus(cardDebuts.get(castKey(c)),{chapterIndex:absChapter,subsectionIndex}) !== 'future');
-    if (referenceCards.length) userPrompt += `\n\nLOCKED APPEARANCE AND BEHAVIOUR (designed facts, not acquired knowledge; do not introduce future cast):\n${JSON.stringify(referenceCards.map((c: any)=>({name:c.name,reference:c.reference,introFeatures:c.introFeatures,firstAppearance:c.firstAppearance})))}\nUse 5–7 noticeability-ranked features at first introduction; weave roughly two-thirds through action and one-third as a compact portrait. Show the at-ease tell and hold the signature until the first decisive act or dialogue. Re-entry: one cue after a recent appearance, two or three after chapters away. Never repeat a feature within a scene. Tells must betray, assist, reveal, endanger, mislead or comfort through behaviour, not explanatory labels. A contradiction requires a dated justified change, never silently override locked traits.`;
+    if (referenceCards.length) {
+      const lastByName = lastAppearanceChapters(memoryRows, serverOutline?.chapters ?? [], { chapterIndex: absChapter, subsectionIndex }, contentHash);
+      const cuePlans = reentryCuePlans(referenceCards.map((c: any)=>c.name), lastByName, absChapter);
+      const cueLines = cuePlans.map(p => p.kind === 'introduction'
+        ? `- ${p.name}: first introduction — 5–7 noticeability-ranked features.`
+        : p.range[0] === p.range[1]
+          ? `- ${p.name}: re-entry — exactly ${p.range[0]} appearance cue (seen recently).`
+          : `- ${p.name}: re-entry — ${p.range[0]}–${p.range[1]} appearance cues (chapters away).`).join('\n');
+      userPrompt += `\n\nLOCKED APPEARANCE AND BEHAVIOUR (designed facts, not acquired knowledge; do not introduce future cast):\n${JSON.stringify(referenceCards.map((c: any)=>({name:c.name,reference:c.reference,introFeatures:c.introFeatures,firstAppearance:c.firstAppearance})))}\nAt first introduction, weave roughly two-thirds of features through action and one-third as a compact portrait. Show the at-ease tell and hold the signature until the first decisive act or dialogue.\nAPPEARANCE CUES PER CHARACTER (from accepted past appearances; follow exactly):\n${cueLines}\nNever repeat a feature within a scene. Tells must betray, assist, reveal, endanger, mislead or comfort through behaviour, not explanatory labels. A contradiction requires a dated justified change, never silently override locked traits.`;
+    }
 
     if (dryRun) {
       // Routing is resolved, never called, in a dry run.

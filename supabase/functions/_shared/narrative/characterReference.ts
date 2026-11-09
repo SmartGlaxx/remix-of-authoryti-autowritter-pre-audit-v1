@@ -30,6 +30,18 @@ export function referencePrompt(name: string, role: string, direction: string) {
 export function introductionCueCount(absentChapters: number, previousBook = false): [number, number] {
   return previousBook ? [5,7] : absentChapters <= 1 ? [1,1] : [2,3];
 }
+/** Per-character re-entry cue plan for the section being drafted. `lastChapterByName`
+ *  maps a normalized character name to the last accepted chapter where they appeared.
+ *  Absent from the map = first introduction in this book ([5,7] via previousBook or the
+ *  full introduction handled by the intro rules). */
+export function reentryCuePlans(names: readonly string[], lastChapterByName: Readonly<Record<string, number>>, currentChapter: number): { name: string; range: [number, number]; kind: 'introduction' | 're-entry' }[] {
+  return names.map(name => {
+    const key = norm(name);
+    const last = lastChapterByName[key];
+    if (last == null) return { name, range: [5, 7] as [number, number], kind: 'introduction' as const };
+    return { name, range: introductionCueCount(currentChapter - last, false), kind: 're-entry' as const };
+  });
+}
 export function selectUnspentFeatures(features: string[], spentThisScene: string[], heldBack?: string): string[] {
   const spent = new Set(spentThisScene.map(norm));
   return features.filter(f => !spent.has(norm(f)) && (!heldBack || norm(f) !== norm(heldBack)));

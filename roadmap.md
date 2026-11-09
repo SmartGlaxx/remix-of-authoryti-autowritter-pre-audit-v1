@@ -13,7 +13,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟧 [ ] | Story memory / character card screen: implemented, needs populated signed-in flow verification |
 | 🟧 [ ] | Accepted extraction and writer-memory integration: implemented, needs saved-data end-to-end verification |
 | 🟩 [x] | Emergent characters: flagged names → "Add person to plan" → new plan version + cast proposal, same-universe name clash warning |
-| 🟩 [x] | Appearance contradictions against locked cards block acceptance; re-entry cue counter built (not yet wired to drafts) |
+| 🟩 [x] | Appearance contradictions against locked cards block acceptance; re-entry cue counter wired into draft prompts (per-character counts from accepted past appearances) |
 | 🟩 [x] | Section/paragraph chronology: per-paragraph relative/raw anchors, non-linear frames, deterministic clock checks, proportional 4–8 chapter time mix (784 tests) |
 | 🟩 [x] | Thread deadlines checked against the scene date (live drafted-section run still unverified) |
 | 🟩 [x] | Title + chosen premise locked into every planning step after ideation |
