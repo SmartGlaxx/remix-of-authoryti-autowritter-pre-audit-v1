@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseSectionMemory, renderWholeBookMemory, timeMixAssessment, mixOf } from '../../supabase/functions/_shared/narrative/sectionMemory';
-import { applyLockedFeature, introductionCueCount, selectUnspentFeatures, validateCharacterLock, REFERENCE_VIEWS, type CharacterLock } from '../../supabase/functions/_shared/narrative/characterReference';
+import { parseSectionMemory, renderWholeBookMemory, lastAppearanceChapters, timeMixAssessment, mixOf } from '../../supabase/functions/_shared/narrative/sectionMemory';
+import { applyLockedFeature, introductionCueCount, reentryCuePlans, selectUnspentFeatures, validateCharacterLock, REFERENCE_VIEWS, type CharacterLock } from '../../supabase/functions/_shared/narrative/characterReference';
 const text = 'Mara opened the door.\n\n“Wait,” Nils said.';
 const times = () => ([
   { paragraphIndex: 0, frameType: 'linear', frameId: 'main', relativeTime: null, rawTime: null, parentReturnIndex: null },
