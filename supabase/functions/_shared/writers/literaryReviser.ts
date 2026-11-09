@@ -12,7 +12,7 @@ import { resolveModelForRole, type BookModelConfig } from "../ai/roles.ts";
 import type { NaturalnessFinding } from "./naturalness.ts";
 import type { Prompt } from "./naturalnessRewrite.ts";
 
-export const LITERARY_MODELS = ["openai/gpt-6-sol", "openai/gpt-6-astra", "anthropic/claude-fable-5-1"] as const;
+export const LITERARY_MODELS = ["openai/gpt-6-sol"] as const;
 export type LiteraryModel = typeof LITERARY_MODELS[number];
 export type LiteraryMode = "off" | "on_request" | "automatic";
 export const DEFAULT_LITERARY_CAP_USD = 0.25;

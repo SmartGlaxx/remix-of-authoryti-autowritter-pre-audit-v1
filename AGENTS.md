@@ -24,3 +24,4 @@
 - Subdirectories have their own `AGENTS.md` (e.g. `supabase/functions/_shared/writers/`) — read it before changing files there.
 
 - Blueprint cast checks use the shared adapter-aware example-role classifier across parsing, approval, writing gates and UI; instructional roles stay plan-local while named people and narrative books still require cast approval.
+- All images go through `_shared/ai/openaiImage.ts` with one cheapest OpenAI model at low quality on both the user-key and gateway routes, and a failure never switches models — predictable image cost.

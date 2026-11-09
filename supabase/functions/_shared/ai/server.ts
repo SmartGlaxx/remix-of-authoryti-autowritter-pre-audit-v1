@@ -40,9 +40,10 @@ export function createAIDeps(admin: any, userId: string): AIDeps {
 export async function loadBookModelConfig(admin: any, bookId: string | null | undefined, userId: string): Promise<BookModelConfig> {
   if (!bookId) return normalizeConfig(null);
   const { data } = await admin.from("book_model_configs").select("mode, single_model, role_models, fallbacks, profile_writer, profile_tier").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
-  if (data) return normalizeConfig(data);
-  const { data: book } = await admin.from("books").select("book_type, genre, controls").eq("id", bookId).eq("user_id", userId).maybeSingle();
-  return book ? defaultBookConfig(resolveWriter(book.controls ?? {}, book.book_type, book.genre).id) : normalizeConfig(null);
+    const { data: book } = await admin.from("books").select("book_type, genre, controls").eq("id", bookId).eq("user_id", userId).maybeSingle();
+    const draftModel = book?.controls?.draftModel === "sol" || book?.controls?.draftModel === "sonnet" ? book.controls.draftModel : null;
+    if (data) return normalizeConfig({ ...data, draftModel });
+    return book ? defaultBookConfig(resolveWriter(book.controls ?? {}, book.book_type, book.genre).id, draftModel) : normalizeConfig(null);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -25,14 +25,13 @@ export const ROLE_MAP: Record<Role, ProfileRole> = {
 };
 
 const SO = "anthropic/claude-sonnet-5";
-const LU = "openai/gpt-6-luna", SOL = "openai/gpt-6-sol", AS = "openai/gpt-6-astra";
+const SOL = "openai/gpt-6-sol";
 const s = (model: string, mode: Mode = null): Slot => ({ model, mode });
 const p = (d: Slot, r: Slot, c: Slot, a: Slot): Profile => ({ draft: d, revision: r, continuity: c, auditor: a });
 
-/** One premier pipeline for every writer (tiers removed). Voice comes from persona, sliders and tone — never from weaker models.
- * Planning/ideation: Astra · Draft: Sonnet 5 · Revision/dialogue/continuity repair: Sol · Memory & checks: Luna.
- * Literary polish (Fable/Astra) is chosen per book via the literary_reviser control. No DeepSeek or Gemini. */
-export const PREMIER_PROFILE: Profile = p(s(SO), s(SOL), s(LU), s(AS, "high"));
+/** One pipeline for every writer (one tier). Draft: Sonnet 5 (writer toggle → Sol) · everything else: Sol.
+ * Writers differ only in persona, sliders and tone. No other models. */
+export const PREMIER_PROFILE: Profile = p(s(SO), s(SOL), s(SOL, "low"), s(SOL, "low"));
 const WRITER_IDS = ["elena", "maya", "claire", "nora", "sophia", "priya", "daniel", "marcus", "adrian", "ethan", "julian", "luca"];
 /** Legacy saved tiers still resolve — every tier maps to the premier profile. */
 export const PROFILES: Record<string, Record<Tier, Profile>> = Object.fromEntries(

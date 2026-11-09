@@ -11,13 +11,11 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const PROVIDERS: ProviderId[] = ["openai", "anthropic", "deepseek", "gemini"];
+const PROVIDERS: ProviderId[] = ["openai", "anthropic"];
 /** Smallest model per provider used only for the connection test. */
-const TEST_MODEL: Record<ProviderId, string> = {
-  openai: "openai/gpt-6-luna",
-  anthropic: "anthropic/claude-opus-5-5",
-  deepseek: "deepseek/deepseek-chat",
-  gemini: "google/gemini-2.5-flash-lite",
+const TEST_MODEL: Partial<Record<ProviderId, string>> = {
+  openai: "openai/gpt-6-sol",
+  anthropic: "anthropic/claude-sonnet-5",
 };
 
 Deno.serve(async (req) => {

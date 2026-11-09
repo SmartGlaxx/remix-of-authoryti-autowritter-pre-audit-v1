@@ -14,8 +14,8 @@ describe("premier writer pipeline (tiers removed)", () => {
       const c = { mode: "profile" as const, profileWriter: w.id, profileTier: tier };
       expect(resolveModelForRole(c, "writer").model).toBe("anthropic/claude-sonnet-5");
       expect(resolveModelForRole(c, "continuity_reviser").model).toBe("openai/gpt-6-sol");
-      expect(resolveModelForRole(c, "planner").model).toBe("openai/gpt-6-astra");
-      expect(resolveModelForRole(c, "narrative_extractor").model).toBe("openai/gpt-6-luna");
+      expect(resolveModelForRole(c, "planner").model).toBe("openai/gpt-6-sol");
+      expect(resolveModelForRole(c, "narrative_extractor").model).toBe("openai/gpt-6-sol");
     }
   });
   it("no DeepSeek or Gemini anywhere in writer profiles", () => {
@@ -26,12 +26,12 @@ describe("premier writer pipeline (tiers removed)", () => {
   });
   it("legacy defaults all resolve", () => { for (const k of Object.values(LEGACY_ROLE_MODELS)) expect(getModel(k), k).toBeTruthy(); });
   it("profile mode is locked: overrides and fallbacks ignored", () => {
-    const c = { mode: "profile" as const, profileWriter: "daniel", profileTier: "maximum" as const, roleModels: { writer: "openai/gpt-6-luna" }, fallbacks: { writer: "openai/gpt-6-luna" } };
+    const c = { mode: "profile" as const, profileWriter: "daniel", profileTier: "maximum" as const, roleModels: { writer: "openai/gpt-6-sol" }, fallbacks: { writer: "openai/gpt-6-sol" } };
     const r = resolveModelForRole(c, "writer");
     expect(r.model).toBe("anthropic/claude-sonnet-5"); expect(r.fallback).toBeNull();
-    expect(resolveModelForRole(c, "manuscript_auditor").model).toBe("openai/gpt-6-astra");
+    expect(resolveModelForRole(c, "manuscript_auditor").model).toBe("openai/gpt-6-sol");
   });
-  it("invalid profile falls back to legacy", () => expect(normalizeConfig({ mode: "profile", profile_writer: "nope", profile_tier: "balanced" }).mode).toBe("legacy"));
+  it("every saved config resolves to the single pipeline", () => expect(normalizeConfig({ mode: "custom", profile_writer: "nope" }).mode).toBe("profile"));
   it("parses gateway pricing", () => {
     const p = parseGatewayCatalog({ data: [{ id: "anthropic/claude-sonnet-5", pricing: { input: { text: { tiers: [{ cost: "0.000002" }], cache_read: { tiers: [{ cost: "0.0000002" }] } } }, output: { text: { tiers: [{ cost: "0.00001" }] } } } }] });
     expect(p["anthropic/claude-sonnet-5"]).toMatchObject({ inputPerM: 2, cachedInputPerM: 0.2, outputPerM: 10 });
