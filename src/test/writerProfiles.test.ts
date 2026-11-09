@@ -31,7 +31,7 @@ describe("premier writer pipeline (tiers removed)", () => {
     expect(r.model).toBe("anthropic/claude-sonnet-5"); expect(r.fallback).toBeNull();
     expect(resolveModelForRole(c, "manuscript_auditor").model).toBe("openai/gpt-6-sol");
   });
-  it("invalid profile falls back to legacy", () => expect(normalizeConfig({ mode: "profile", profile_writer: "nope", profile_tier: "balanced" }).mode).toBe("legacy"));
+  it("every saved config resolves to the single pipeline", () => expect(normalizeConfig({ mode: "custom", profile_writer: "nope" }).mode).toBe("profile"));
   it("parses gateway pricing", () => {
     const p = parseGatewayCatalog({ data: [{ id: "anthropic/claude-sonnet-5", pricing: { input: { text: { tiers: [{ cost: "0.000002" }], cache_read: { tiers: [{ cost: "0.0000002" }] } } }, output: { text: { tiers: [{ cost: "0.00001" }] } } } }] });
     expect(p["anthropic/claude-sonnet-5"]).toMatchObject({ inputPerM: 2, cachedInputPerM: 0.2, outputPerM: 10 });

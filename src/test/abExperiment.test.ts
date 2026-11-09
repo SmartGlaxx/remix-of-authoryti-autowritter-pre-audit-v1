@@ -43,8 +43,6 @@ describe("flaw injection preflight", () => {
   it("original is left unchanged", () => { const a = PARAS; injectFlaws(a); expect(a).toBe(PARAS); });
 });
 
-describe("experiment run (mock, zero cost)", () => {
-});
 
 describe("flaw injection scales to long drafts", () => {
   it("clears the 15% starter threshold on a 40-sentence draft", () => {

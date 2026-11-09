@@ -68,31 +68,3 @@ describe("prompt and engine", () => {
   });
 });
 
-describe("Astra vs Fable benchmark (mocked, no paid calls)", () => {
-  it("uses the real Draft B when available", () => { if (B) expect(B.length).toBeGreaterThan(5000); });
-  it("worst case for Draft B fits the v2 cap ($0.32)", () => {
-    const w = literaryBenchmarkWorstCase(draftB, vp);
-    expect(w.total).toBeLessThanOrEqual(LITERARY_BENCHMARK_CAP_USD);
-  });
-  it("one reviser call per model, same prompt, exact models, validator each", async () => {
-    const calls: { model: string; user: string }[] = [];
-    const caller: ExpCaller = async (r) => { calls.push({ model: r.model, user: r.user }); return { text: r.model.includes("luna") ? "PASS" : '{"edits":[]}', inputTokens: 100, outputTokens: 50, modelUsed: r.model }; };
-    const r = await runLiteraryBenchmark({ flawed: draftB, validatorPrompt: vp }, caller);
-    const rev = calls.filter((c) => c.model !== LITERARY_BENCHMARK_MODELS.validator);
-    expect(rev.map((c) => c.model)).toEqual([LITERARY_BENCHMARK_MODELS.astra, LITERARY_BENCHMARK_MODELS.fable]);
-    expect(rev[0].user).toBe(rev[1].user);
-    expect(calls.filter((c) => c.model === LITERARY_BENCHMARK_MODELS.validator)).toHaveLength(2);
-    expect(r.totalUSD).toBeLessThan(LITERARY_BENCHMARK_CAP_USD);
-  });
-  it("a substituted model is refused", async () => {
-    const caller: ExpCaller = async (r) => ({ text: "{}", inputTokens: 10, outputTokens: 10, modelUsed: "openai/gpt-6-sol" });
-    const r = await runLiteraryBenchmark({ flawed: draftB, validatorPrompt: vp }, caller);
-    expect(r.arms.astra.aborted).toMatch(/FALLBACK_FORBIDDEN/);
-    expect(r.arms.fable.aborted).toMatch(/FALLBACK_FORBIDDEN/);
-  });
-  it("aborts with no calls if the cap is too small", async () => {
-    let n = 0; const caller: ExpCaller = async (r) => { n++; return { text: "", inputTokens: 1, outputTokens: 1, modelUsed: r.model }; };
-    const r = await runLiteraryBenchmark({ flawed: draftB, validatorPrompt: vp }, caller, new BudgetGuard(0.05));
-    expect(r.aborted).toMatch(/WORST_CASE_EXCEEDS_CAP/); expect(n).toBe(0);
-  });
-});

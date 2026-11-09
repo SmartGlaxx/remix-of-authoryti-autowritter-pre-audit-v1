@@ -20,3 +20,18 @@ describe("cast members needing a reference picture", () => {
     expect(missingReferenceNames(["bell's successor"], [{ name: "Bell’s Successor", reference: { locked: true } }])).toEqual([]);
   });
 });
+
+describe("one model pair for every writer", () => {
+  it("prose defaults to Sonnet 5, drama to Sol", () => {
+    expect(resolveModelForRole(defaultBookConfig("elena"), "writer", { bookType: "novel" }).model).toBe("anthropic/claude-sonnet-5");
+    expect(resolveModelForRole(defaultBookConfig("elena"), "writer", { bookType: "drama" }).model).toBe("openai/gpt-6-sol");
+  });
+  it("the writer toggle switches drafting to Sol (or drama back to Sonnet)", () => {
+    expect(resolveModelForRole(defaultBookConfig("elena", "sol"), "writer", { bookType: "novel" }).model).toBe("openai/gpt-6-sol");
+    expect(resolveModelForRole(defaultBookConfig("elena", "sonnet"), "writer", { bookType: "drama" }).model).toBe("anthropic/claude-sonnet-5");
+  });
+  it("planning, checks, memory and character cards use Sol", () => {
+    for (const role of ["planner", "continuity_checker", "narrative_extractor", "summarizer", "character_generator", "manuscript_auditor"] as const)
+      expect(resolveModelForRole(defaultBookConfig("marcus"), role).model).toBe("openai/gpt-6-sol");
+  });
+});
