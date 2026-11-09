@@ -34,7 +34,7 @@ export function introductionCueCount(absentChapters: number, previousBook = fals
  *  maps a normalized character name to the last accepted chapter where they appeared.
  *  Absent from the map = first introduction in this book ([5,7] via previousBook or the
  *  full introduction handled by the intro rules). */
-export function reentryCuePlans(names: readonly string[], lastChapterByName: Readonly<Record<string, number>>, currentChapter: number, previousBookNames: ReadonlySet<string> = new Set()): { name: string; range: [number, number]; kind: 'introduction' | 're-entry' }[] {
+export function reentryCuePlans(names: readonly string[], lastChapterByName: Readonly<Record<string, number>>, currentChapter: number): { name: string; range: [number, number]; kind: 'introduction' | 're-entry' }[] {
   return names.map(name => {
     const key = norm(name);
     const last = lastChapterByName[key];
