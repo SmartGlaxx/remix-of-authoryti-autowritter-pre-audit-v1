@@ -423,7 +423,10 @@ export function parseChapter(raw: string, m: MasterContext, ch: number, expanded
       if (refs.length && !mix.rawShareOK) issues.push("time mix: 10–30% must be raw/exact-only");
       if (refs.length && !mix.combinedShareOK) issues.push("time mix: 20–40% must be combined");
       const covered = new Set(refs.map((t) => t.sectionIndex));
-      chapter.sections.forEach((s, i) => { if (!covered.has(i)) issues.push(`section ${s.id} carries no time reference`); });
+      // Scatter across the sections: every section carries one when there are few enough;
+      // a long chapter (more sections than the 4–8 budget) must still spread refs widely.
+      const need = Math.min(chapter.sections.length, 8);
+      if (covered.size < need) issues.push(`scatter time references across at least ${need} sections (covered ${covered.size})`);
       chapter.timeRefs = refs;
     }
     if (!str(o?.stakes)) issues.push("stakes is required");
