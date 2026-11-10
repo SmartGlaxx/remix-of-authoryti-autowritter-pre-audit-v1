@@ -45,3 +45,5 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [x] Make the 4 missing character pictures
 - [x] Write Chapter 1 sections 2–4 on Sonnet 5
 - [ ] Save section 4 into story memory (~$0.05; paused at the $0.50 cap)
+
+- [x] Chapter/section with no stored status renders as Pending instead of crashing the page (ChapterView + BookCard guarded; 777 tests passed; Clockwork Rose loads signed-in)
