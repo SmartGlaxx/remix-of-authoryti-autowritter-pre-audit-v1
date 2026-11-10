@@ -20,4 +20,9 @@ describe("resolved review display", () => {
     expect(displayWritingStatus("writing", "writing")).toBe("writing");
     expect(displayWritingStatus("completed", "paused")).toBe("completed");
   });
+  it("treats a missing or unknown chapter status as pending instead of crashing", () => {
+    expect(displayWritingStatus(undefined, "writing")).toBe("pending");
+    expect(displayWritingStatus(null, "paused")).toBe("pending");
+    expect(displayWritingStatus("drafting" as never, "writing")).toBe("pending");
+  });
 });
