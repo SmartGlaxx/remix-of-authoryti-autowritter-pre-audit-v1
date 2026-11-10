@@ -151,8 +151,8 @@ const BookCard = ({ book, onSelect, onDelete, onUpdateCover, index }: BookCardPr
 
               {/* Badges */}
               <div className="flex flex-wrap gap-1 mb-2">
-                <Badge variant={statusColors[book.status]} className="text-[10px] px-1.5 py-0">
-                  {statusLabels[book.status]}
+                <Badge variant={badgeVariant(book.status)} className="text-[10px] px-1.5 py-0">
+                  {badgeLabel(book.status)}
                 </Badge>
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                   {typeInfo.label}

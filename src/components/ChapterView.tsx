@@ -520,14 +520,14 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
       <ScrollArea className="w-full overflow-x-hidden" style={{ height: "calc(100vh - 64px - 1rem)" }}>
         <div className="py-2 space-y-2">
           {chapters.map((chapter, idx) => {
-            const StatusIcon = statusConfig[chapter.status].icon;
+            const StatusIcon = statusOf(chapter.status).icon;
             const isExpanded = expandedChapter === idx;
             return (
               <Collapsible key={chapter.id} open={isExpanded} onOpenChange={open => setExpandedChapter(open ? idx : null)}>
                 <Card className={cn("overflow-hidden transition-colors rounded-none border-x-0", isExpanded && "ring-1 ring-primary/20")}>
                   <CollapsibleTrigger className="w-full">
                     <div className="p-4 flex items-center gap-3">
-                      <StatusIcon className={cn("w-5 h-5 shrink-0", statusConfig[chapter.status].color, statusConfig[chapter.status].animate && "animate-spin")} />
+                      <StatusIcon className={cn("w-5 h-5 shrink-0", statusOf(chapter.status).color, statusOf(chapter.status).animate && "animate-spin")} />
                       <div className="flex-1 min-w-0 text-left overflow-hidden">
                         <div className="text-xs text-muted-foreground">Chapter {chapter.chapterNumber}</div>
                         <div className="font-medium text-sm break-words">{chapter.title}</div>
@@ -565,12 +565,12 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
         <ScrollArea className="w-48 shrink-0 border-r">
           <div className="p-2 space-y-1">
             {chapters.map((chapter, idx) => {
-              const StatusIcon = statusConfig[chapter.status].icon;
+              const StatusIcon = statusOf(chapter.status).icon;
               const isActive = idx === selectedChapter;
               return (
                 <button key={chapter.id} onClick={() => setSelectedChapter(idx)} className={cn("w-full text-left p-2 rounded-md transition-colors text-xs", isActive ? "bg-primary/10" : "hover:bg-muted")}>
                   <div className="flex items-center gap-2">
-                    <StatusIcon className={cn("w-3 h-3 shrink-0", statusConfig[chapter.status].color, statusConfig[chapter.status].animate && "animate-spin")} />
+                    <StatusIcon className={cn("w-3 h-3 shrink-0", statusOf(chapter.status).color, statusOf(chapter.status).animate && "animate-spin")} />
                     <span className="truncate font-medium">{chapter.chapterNumber}. {chapter.title}</span>
                   </div>
                 </button>
@@ -689,7 +689,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
           ) : sidebarTab !== "characters" ? (
             <div className="p-3 space-y-1">
               {chapters.map((chapter, idx) => {
-                const StatusIcon = statusConfig[chapter.status].icon;
+                const StatusIcon = statusOf(chapter.status).icon;
                 const isActive = idx === selectedChapter && !selectedCharacterId;
                 return (
                   <motion.button
@@ -700,7 +700,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
                     whileTap={{ scale: 0.99 }}
                   >
                     <div className="flex items-start gap-2">
-                      <StatusIcon className={cn("w-4 h-4 mt-0.5 shrink-0", statusConfig[chapter.status].color, statusConfig[chapter.status].animate && "animate-spin")} />
+                      <StatusIcon className={cn("w-4 h-4 mt-0.5 shrink-0", statusOf(chapter.status).color, statusOf(chapter.status).animate && "animate-spin")} />
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-muted-foreground mb-0.5">Chapter {chapter.chapterNumber}</div>
                         <div className="font-medium text-sm truncate" title={chapter.title}>{chapter.title}</div>
@@ -797,7 +797,7 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <Badge variant={currentChapter.status === "completed" ? "success" : "secondary"} className="text-xs">
-                    {statusConfig[currentChapter.status].label}
+                    {statusOf(currentChapter.status).label}
                   </Badge>
                   <div className="text-xs text-muted-foreground mt-1">
                     {completedSubsections}/{totalSubsections} sections · {chapterProgress}%
