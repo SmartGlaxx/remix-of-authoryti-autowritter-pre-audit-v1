@@ -169,7 +169,8 @@ describe("Phase D chapter, section and beat parsing", () => {
       { id: "c1s1", entry: "The bell rings", focus: "b", outcome: "it ends" }] });
     const bad = parseSections(dropped, m, ch);
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.issues.join()).toMatch(/ten past four/);
+    if (bad.ok) throw new Error("expected rejection");
+    expect(bad.issues.join()).toMatch(/ten past four/);
   });
   it("true-story sections need evidence tiers, sources for documented claims, and no verification claims", () => {
     const sk = shapeSkeleton({ bookType: "memoir", targetWords: 9000, genreData: { subject: "x", historical_scope: "y", primary_sources: "letters 1961", epistemic_boundaries: "z" }, reveals: [], chapters: [{ objectiveKind: "context_origins", objective: "o", sectionCount: 1 }] });
