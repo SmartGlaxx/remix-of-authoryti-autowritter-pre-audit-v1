@@ -14,9 +14,15 @@ export interface SectionPlan {
   id: string; chapterIndex: number; sectionIndex: number; unit: string;
   objective: string; targetWords: number; dependsOn: string[]; beats: PlanBeat[];
 }
+/** One planned time reference for a chapter: the exact phrase the prose must carry,
+ * its mix bucket (relative-only, raw-only, combined) and the section it belongs to. */
+export interface ChapterTimeRef { sectionIndex: number; kind: "relative" | "raw" | "combined"; phrase: string }
 export interface ChapterPlan {
   id: string; chapterIndex: number; objectiveKind: string; objective: string;
   targetWords: number; dependsOn: string[]; sections: SectionPlan[];
+  /** Planned time references (4–8 per chapter, proportional mix). Flows: chapter plan → section
+   * details → blueprint → writer brief. Never optional, never a side mention. */
+  timeRefs?: ChapterTimeRef[];
 }
 /** Fiction-only reveal schedule; nonfiction plans keep it empty. */
 export interface PlannedReveal {
