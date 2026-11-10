@@ -320,6 +320,7 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
       genreData.series_books = sb;
     }
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");
+    if (a.isFiction && !str(genreData.timeframe)) issues.push("genre_data.timeframe is required: pin the book's era, setting clock and total elapsed span");
     const premise = str(o?.premise), synopsis = str(o?.synopsis), ending = str(o?.ending);
     if (!premise || !synopsis || !ending) issues.push("premise, synopsis and ending are required");
     let skeleton: MasterPlanSkeleton;
