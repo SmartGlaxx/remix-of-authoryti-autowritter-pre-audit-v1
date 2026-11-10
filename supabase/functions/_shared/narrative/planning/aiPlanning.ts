@@ -5,8 +5,9 @@
 import { adapterForBookType, getAdapter, type GenreAdapter } from "./adapters.ts";
 import {
   allocate, buildPlanSkeleton, revealsVisibleAt, validatePlan,
-  type ChapterPlan, type MasterPlanSkeleton, type PlannedReveal, type SectionPlan, type SeriesRef,
+  type ChapterPlan, type ChapterTimeRef, type MasterPlanSkeleton, type PlannedReveal, type SectionPlan, type SeriesRef,
 } from "./engine.ts";
+import { timeMixAssessment } from "../temporalFrames.ts";
 
 export const STORY_ALTERNATIVE_COUNTS = [3, 5, 7, 10] as const;
 export type AlternativeCount = typeof STORY_ALTERNATIVE_COUNTS[number];
@@ -258,7 +259,7 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `This book belongs to a planned series of ${b.seriesPlan.books} books. Also give "seriesBooks": one entry per book in the series, each with its own inciting incident, climax and hook into the next; the synopsis is the whole series arc.\n` : "") +
-      `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
+      `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}${a.isFiction ? `,"timeframe":"the book's temporal frame: when the story happens and its total elapsed span (e.g. 'late autumn 1893, one harbour town, nine days from the discovery to the confrontation')"` : ""}}` +
       (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `,"seriesBooks":[{"bookNumber":1,"title":"","summary":"(${bandText(SERIES_BOOK_BAND)})"}]` : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
