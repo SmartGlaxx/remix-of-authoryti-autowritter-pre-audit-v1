@@ -29,7 +29,8 @@ import { callReview, isProgressiveBook } from "@/lib/candidateReview";
 import { allIssuesDismissed, displayWritingStatus, type ReviewLog } from "@/lib/reviewDisplay";
 import { RECONCILIATION_EVENT } from "@/components/ContradictionReviewCard";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2, Circle, Loader2, FileText, ChevronDown, Play, Check, X, Users, User, Pencil, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2, Circle, Loader2, FileText, ChevronDown, Play, Check, X, Users, User, Pencil, Target, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 interface ChapterViewProps {
   book: Book;
