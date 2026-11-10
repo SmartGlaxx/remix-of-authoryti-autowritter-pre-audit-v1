@@ -10,6 +10,12 @@ export function allIssuesDismissed(issues: unknown, logs: ReviewLog[], chapter: 
 export function hasUnfinishedRepair(log: { decision: string; candidate: unknown; application_status: string }): boolean {
   return log.decision !== "PENDING" && log.decision !== "DISMISS" && Boolean(log.candidate || ["PENDING_APPLICATION", "AWAITING_SYNC"].includes(log.application_status));
 }
-export function displayWritingStatus(status: "pending" | "writing" | "completed", bookStatus: string) {
+// Older or hand-edited books can omit a chapter/section status entirely; treat anything
+// unknown as pending so the writing UI never indexes a missing status.
+export function displayWritingStatus(
+  status: "pending" | "writing" | "completed" | null | undefined,
+  bookStatus: string,
+): "pending" | "writing" | "completed" {
+  if (status !== "writing" && status !== "completed") return "pending";
   return status === "writing" && bookStatus !== "writing" ? "pending" : status;
 }
