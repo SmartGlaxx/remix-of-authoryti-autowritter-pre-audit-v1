@@ -441,9 +441,16 @@ export interface SectionDetail { id: string; entry: string; focus: string; outco
 export function buildSectionPrompt(m: MasterContext, chapter: ChapterPlan, expanded: Record<number, ChapterPlan>): Prompt {
   const a = getAdapter(m.skeleton.adapter);
   const ev = a.factual ? `,"evidence":[{"claim":"","tier":"${EVIDENCE_TIERS.join("|")}","source":""}]` : "";
+  const timeLines = (chapter.timeRefs ?? []).length
+    ? "\nApproved time references (binding — quote each phrase verbatim in its section's entry, focus or outcome; never drop, never reword, never move to another section):\n" +
+      chapter.sections.map((s) => {
+        const refs = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === s.sectionIndex).map((t) => `"${t.phrase}" (${t.kind})`);
+        return refs.length ? `- ${s.id}: ${refs.join(", ")}` : null;
+      }).filter(Boolean).join("\n") + "\n"
+    : "";
   return {
     system: system(a, `You detail every ${a.sectionUnit} of one chapter of an approved whole-book plan.`),
-    user: `${renderWholeBook(m, { ...expanded, [chapter.chapterIndex]: chapter })}\n\nDetail each ${a.sectionUnit} of chapter ${chapter.chapterIndex + 1}: where it starts, what it turns on, how it ends and what it hands to what comes next.\n` +
+    user: `${renderWholeBook(m, { ...expanded, [chapter.chapterIndex]: chapter })}\n\nDetail each ${a.sectionUnit} of chapter ${chapter.chapterIndex + 1}: where it starts, what it turns on, how it ends and what it hands to what comes next.${timeLines}\n` +
       `JSON: {"sections":[{"id":"${chapter.sections[0]?.id}","entry":"","focus":"","outcome":""${ev}}]} — one entry per id: ${chapter.sections.map((s) => s.id).join(", ")}`,
   };
 }
