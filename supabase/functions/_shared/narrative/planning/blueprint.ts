@@ -69,7 +69,8 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
   const est = expectedMicrobeats(chapter.targetWords);
   const sec = i.details.map((d) => {
     const beats = i.notes.filter((n) => n.id.startsWith(`${d.id}b`)).map((n) => `${n.kind}: ${n.note}`).join("; ");
-    const time = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === i.details.find((x) => x.id === d.id)?.sectionIndex || t.sectionIndex === Number(d.id.split("s")[1])).map((t) => `"${t.phrase}" (${t.kind})`);
+    const si = chapter.sections.find((s) => s.id === d.id)?.sectionIndex;
+    const time = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === si).map((t) => `"${t.phrase}" (${t.kind})`);
     return `- ${d.id}: opens ${d.entry} | turns on ${d.focus} | ends ${d.outcome}${beats ? ` | beats: ${beats}` : ""}${time.length ? ` | time: ${time.join(", ")}` : ""}`;
   }).join("\n");
   const timeRule = (chapter.timeRefs ?? []).length
