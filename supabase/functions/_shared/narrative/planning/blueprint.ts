@@ -69,8 +69,12 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
   const est = expectedMicrobeats(chapter.targetWords);
   const sec = i.details.map((d) => {
     const beats = i.notes.filter((n) => n.id.startsWith(`${d.id}b`)).map((n) => `${n.kind}: ${n.note}`).join("; ");
-    return `- ${d.id}: opens ${d.entry} | turns on ${d.focus} | ends ${d.outcome}${beats ? ` | beats: ${beats}` : ""}`;
+    const time = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === i.details.find((x) => x.id === d.id)?.sectionIndex || t.sectionIndex === Number(d.id.split("s")[1])).map((t) => `"${t.phrase}" (${t.kind})`);
+    return `- ${d.id}: opens ${d.entry} | turns on ${d.focus} | ends ${d.outcome}${beats ? ` | beats: ${beats}` : ""}${time.length ? ` | time: ${time.join(", ")}` : ""}`;
   }).join("\n");
+  const timeRule = (chapter.timeRefs ?? []).length
+    ? `\n6. Time references are binding: each microbeat covering a moment with an approved time phrase must quote that phrase verbatim in its text. Spread them so the reader always knows how much time has passed; never drop, reword or relocate one.\n`
+    : "";
   const cast = i.cast.map((c) => `- ${c.id}: ${c.name}${c.aliases?.length ? ` (also ${c.aliases.join(", ")})` : ""}`).join("\n") || "- (no cast recorded yet)";
   return {
     system: "You are a book planner. You expand ONE approved chapter into a detailed narrative blueprint. You never invent developments outside the approved plan. Output JSON only.",
