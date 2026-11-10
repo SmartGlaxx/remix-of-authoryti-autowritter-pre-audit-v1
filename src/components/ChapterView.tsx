@@ -52,6 +52,10 @@ const statusConfig: Record<"pending" | "writing" | "completed", {
   completed: { icon: CheckCircle2, color: "text-success", label: "Completed" },
 };
 
+// A chapter or section with a missing/unknown status renders as pending instead of crashing the page.
+const statusOf = (status?: string | null) =>
+  statusConfig[(status ?? "pending") as keyof typeof statusConfig] ?? statusConfig.pending;
+
 export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationLevel = "guided", searchQuery, navigateToChapter, onNavigateHandled }: ChapterViewProps) {
   const [selectedChapter, setSelectedChapter] = useState(0);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);

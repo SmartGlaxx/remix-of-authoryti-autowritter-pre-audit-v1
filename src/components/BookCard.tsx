@@ -29,13 +29,11 @@ const statusColors = {
   paused: "warning",
 } as const;
 
-const statusLabels = {
-  planning: "Planning",
-  ready_to_write: "Ready",
-  writing: "Writing",
-  completed: "Completed",
-  paused: "Paused",
-};
+const badgeVariant = (status?: string | null) =>
+  statusColors[status as keyof typeof statusColors] ?? "secondary";
+
+const badgeLabel = (status?: string | null) =>
+  statusLabels[status as keyof typeof statusLabels] ?? "Planning";
 
 const BookCard = ({ book, onSelect, onDelete, onUpdateCover, index }: BookCardProps) => {
   const [coverModalOpen, setCoverModalOpen] = useState(false);
