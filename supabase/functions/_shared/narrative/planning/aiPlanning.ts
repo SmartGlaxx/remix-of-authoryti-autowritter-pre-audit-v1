@@ -402,6 +402,30 @@ export function parseChapter(raw: string, m: MasterContext, ch: number, expanded
     const weights = secs.map((s: any) => clamp(Number(s?.weight) || 1, 0.25, 4));
     const chapter: ChapterPlan = { ...base, objective: str(o?.objective) || base.objective,
       sections: buildSections(a, ch, allocate(base.targetWords, weights), false, objectives, deps) };
+    if (a.isFiction || a.factual) {
+      const refs: ChapterTimeRef[] = (Array.isArray(o?.timeRefs) ? o.timeRefs : []).map((t: any) => ({
+        sectionIndex: Number(t?.section), kind: str(t?.kind) as ChapterTimeRef["kind"], phrase: str(t?.phrase),
+      }));
+      if (!refs.length) issues.push("timeRefs is required: plan 4–8 time references for the chapter");
+      for (const t of refs) {
+        if (!t.phrase) issues.push("every timeRef needs the exact phrase the prose will carry");
+        if (!["relative", "raw", "combined"].includes(t.kind)) issues.push(`timeRef "${t.phrase || "?"}": kind must be relative, raw or combined`);
+        if (!Number.isInteger(t.sectionIndex) || t.sectionIndex < 0 || t.sectionIndex >= chapter.sections.length)
+          issues.push(`timeRef "${t.phrase || "?"}": section ${t.sectionIndex} is not a section of this chapter`);
+      }
+      const mix = timeMixAssessment({
+        relativeOnly: refs.filter((t) => t.kind === "relative").length,
+        rawOnly: refs.filter((t) => t.kind === "raw").length,
+        combined: refs.filter((t) => t.kind === "combined").length,
+      });
+      if (refs.length && !mix.totalOK) issues.push(`plan 4–8 time references per chapter (got ${mix.total})`);
+      if (refs.length && !mix.relativeShareOK) issues.push("time mix: 40–60% must be relative-only");
+      if (refs.length && !mix.rawShareOK) issues.push("time mix: 10–30% must be raw/exact-only");
+      if (refs.length && !mix.combinedShareOK) issues.push("time mix: 20–40% must be combined");
+      const covered = new Set(refs.map((t) => t.sectionIndex));
+      chapter.sections.forEach((s, i) => { if (!covered.has(i)) issues.push(`section ${s.id} carries no time reference`); });
+      chapter.timeRefs = refs;
+    }
     if (!str(o?.stakes)) issues.push("stakes is required");
     return { chapter, stakes: str(o?.stakes), focus: str(o?.focus) };
   });
