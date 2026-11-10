@@ -89,6 +89,7 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
       `3. cast / locations / events: every participating character, consequential place and significant event, each with a stable id (locations l0.., events e0..). Every event names its source in the approved plan: "master", "chapter" or a section id.\n` +
       `4. microbeats: about ${est} ordered units (roughly one per planned paragraph; more or fewer where the story needs it), covering every section in order. Each: id (m0..), sectionId, text (one explanatory sentence starting with a named character, not a pronoun), characterIds, locationId, eventIds, purpose (why it happens), transition (how it leads to the next beat).\n` +
       `5. knowledge: author (what only the author knows — twists, concealed identities), reader (what the reader learns by chapter end), characters (per character: knows / doesNotKnow at chapter end). Later reveals never appear in reader or character layers.\n` +
+      timeRule +
       `JSON: {"objective":"","keyPoints":[""],"conclusion":"","synopsis":"","cast":[{"id":"","name":"","role":"","pov":false}],"locations":[{"id":"l0","name":"","significance":""}],"events":[{"id":"e0","name":"","consequence":"","source":"chapter"}],"microbeats":[{"id":"m0","sectionId":"${i.details[0]?.id ?? `c${ch}s0`}","text":"","characterIds":[],"locationId":"l0","eventIds":[],"purpose":"","transition":""}],"knowledge":{"author":[],"reader":[],"characters":[{"characterId":"","knows":[],"doesNotKnow":[]}]},"castProposals":[{"id":"p0","name":"","role":"","justification":""}]}`,
   };
 }
@@ -144,6 +145,14 @@ export function validateBlueprint(bp: ChapterBlueprint, i: Pick<BlueprintInput, 
   if (bp.microbeats.length < Math.ceil(est * 0.4)) issues.push(`only ${bp.microbeats.length} microbeats for ~${est} planned paragraphs; coverage is too thin`);
   if (bp.microbeats.length > est * 3) issues.push(`${bp.microbeats.length} microbeats is far more than ~${est} planned paragraphs`);
   for (const k of bp.knowledge.characters) if (!charIds.has(k.characterId)) issues.push(`knowledge for unknown character ${k.characterId}`);
+  // Approved time references must survive into the microbeats verbatim — never dropped, reworded or moved.
+  for (const t of i.chapter.timeRefs ?? []) {
+    const secId = i.details.find((d, di) => (i.chapter.sections[di]?.sectionIndex ?? di) === t.sectionIndex)?.id;
+    const beats = bp.microbeats.filter((b) => b.sectionId === secId);
+    const hay = beats.map((b) => b.text).join(" ").toLowerCase();
+    if (!hay.includes(t.phrase.toLowerCase()))
+      issues.push(`time reference "${t.phrase}" must appear verbatim in a microbeat of section ${secId ?? t.sectionIndex}`);
+  }
   const secrets = futureSecrets(i.m.skeleton, ch);
   const writerFacing = [...bp.knowledge.reader, ...bp.knowledge.characters.flatMap((k) => k.knows), ...bp.microbeats.map((b) => b.text)].join("\n");
   for (const t of leaks(writerFacing, secrets)) issues.push(`a later reveal ("${t}") leaks into reader, character or microbeat text`);
