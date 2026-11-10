@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { validatePlan } from "../../supabase/functions/_shared/narrative/planning/engine";
 import {
-  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, buildAlternativesPrompt, buildChapterPrompt, buildMasterPrompt, parseAlternatives,
+  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, buildAlternativesPrompt, buildChapterPrompt, buildMasterPrompt, buildSectionPrompt, parseAlternatives,
   parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, proseWriterPlanView, runChapterBatch, runWithRepair, shapeSkeleton,
   type BookBrief, type MasterContext,
 } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
@@ -145,7 +145,7 @@ describe("Phase D chapter, section and beat parsing", () => {
     if (prev.ok) expect(buildChapterPrompt(m, 1, { 0: prev.value.chapter }).user).toContain("ten past four".length ? "three hours later" : "");
   });
   it("master plan requires a fiction timeframe", () => {
-    const noTime = fictionMaster.replace(`"timeframe": "October 1961, one lighthouse, three weeks"`, `"protagonist2": "x"`);
+    const noTime = fictionMaster.replace(`"timeframe":"October 1961, one lighthouse, three weeks"`, `"protagonist2":"x"`);
     expect(parseMaster(noTime, brief("novel"), null).ok).toBe(false);
     expect(buildMasterPrompt(brief("novel"), null).user).toContain("timeframe");
     expect(buildMasterPrompt(brief("business"), null).user).not.toContain("timeframe");
