@@ -6,6 +6,7 @@ import { effectiveSlidersFor } from "../_shared/writers/manifest.ts";
 import { renderWriterPrompt, resolveWriter } from "../_shared/writers/personas.ts";
 import { lensFor } from "../_shared/writers/toneMatch.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
+import { dramaticActionDirective } from "../_shared/writers/dramaticAction.ts";
 import { analyzeSection } from "../_shared/writers/naturalnessMetrics.ts";
 import { loadProtectedMotifs } from "../_shared/writers/learningRepo.ts";
 import { resolveNaturalnessMode } from "../_shared/writers/naturalness.ts";
@@ -338,6 +339,8 @@ ${comicEngineRules}
 ${pacingRules}
 
 ${openingDirective(book.bookType)}
+
+${dramaticActionDirective(book.bookType)}
 
 ANTI-REPETITION RULE (STRICTLY ENFORCED):
 - NEVER rewrite, paraphrase, or revisit scenes, dialogue, descriptions, or events that already appeared in the previous section.
