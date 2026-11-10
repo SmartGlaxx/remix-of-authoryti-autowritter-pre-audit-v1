@@ -302,6 +302,26 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
             Not checked
           </Badge>
         )}
+        {sub.content && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1 shrink-0"
+            title="Copy this section's text"
+            onClick={async () => {
+              const plain = String(sub.content).replace(/<[^>]+>/g, "");
+              try {
+                await navigator.clipboard.writeText(plain);
+                toast.success("Section copied");
+              } catch {
+                toast.error("Couldn't copy — select the text and copy manually");
+              }
+            }}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copy
+          </Button>
+        )}
         {sub.status === "completed" && <CheckCircle2 className="w-5 h-5 text-success shrink-0" />}
         {sub.status === "writing" && <Loader2 className="w-5 h-5 text-primary shrink-0 animate-spin" />}
       </div>
