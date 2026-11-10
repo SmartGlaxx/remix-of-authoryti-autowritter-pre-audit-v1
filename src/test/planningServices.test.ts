@@ -16,7 +16,7 @@ const alt = (i: number) => ({ title: `Story ${i}`, logline: "l", summary: words(
 
 const fictionMaster = JSON.stringify({
   premise: "p", synopsis: "s", ending: "The keeper burns the ledger.",
-  genre_data: { protagonist: "Ana", central_conflict: "c", stakes: "s" },
+  genre_data: { protagonist: "Ana", central_conflict: "c", stakes: "s", timeframe: "October 1961, one lighthouse, three weeks" },
   reveals: [{ summary: "The ledger is in Ana's own handwriting", revealChapter: 2, setupChapters: [0, 1] }],
   chapters: [
     { objectiveKind: "setup", objective: "Ana finds the ledger", sectionCount: 2, weight: 0.8 },
@@ -99,9 +99,12 @@ describe("Phase D knowledge boundaries", () => {
 describe("Phase D chapter, section and beat parsing", () => {
   it("chapter expansion picks its own section count and rejects forward deps", () => {
     const m = master();
-    const ok = parseChapter(JSON.stringify({ objective: "o", stakes: "s", focus: "f", sections: [{ objective: "a" }, { objective: "b", dependsOn: ["c1s0"] }, { objective: "c", weight: 2 }] }), m, 1, {});
+    const ok = parseChapter(JSON.stringify({ objective: "o", stakes: "s", focus: "f", sections: [{ objective: "a" }, { objective: "b", dependsOn: ["c1s0"] }, { objective: "c", weight: 2 }], timeRefs: [
+      { section: 0, kind: "relative", phrase: "three hours later" }, { section: 1, kind: "relative", phrase: "the next morning" },
+      { section: 1, kind: "raw", phrase: "ten past four" }, { section: 2, kind: "combined", phrase: "two hours later, at 5:00 PM" },
+    ] }), m, 1, {});
     expect(ok.ok).toBe(true);
-    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); }
+    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); expect(ok.value.chapter.timeRefs).toHaveLength(4); }
     expect(parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a", dependsOn: ["c2s0"] }] }), m, 1, {}).ok).toBe(false);
   });
   it("beats vary per section and are restricted to the genre palette", () => {
