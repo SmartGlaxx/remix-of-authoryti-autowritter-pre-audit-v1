@@ -4,7 +4,7 @@
 // them. It is a PLANNED progressive plan row (level BLUEPRINT) until the author approves it (READY).
 // Not wired to prose generation (Stage 3). Planner sees the whole book; writer-facing layers
 // (reader knowledge, character knowledge) must never carry later reveal secrets.
-import type { ChapterPlan, MasterPlanSkeleton } from "./engine.ts";
+import type { ChapterPlan, ChapterTimeRef, MasterPlanSkeleton } from "./engine.ts";
 import type { MasterContext, ParseResult, Prompt, SectionDetail, BeatNote } from "./aiPlanning.ts";
 import { extractJson, renderWholeBook } from "./aiPlanning.ts";
 
@@ -45,6 +45,8 @@ export interface ChapterBlueprint {
   objective: string; keyPoints: string[]; conclusion: string; synopsis: string;
   cast: BlueprintCharacter[]; locations: BlueprintLocation[]; events: BlueprintEvent[];
   microbeats: Microbeat[]; knowledge: KnowledgeLayers; castProposals: CastProposal[];
+  /** Approved chapter time references, copied from the chapter plan (never model output). */
+  timeRefs?: ChapterTimeRef[];
 }
 
 export interface BlueprintInput {
@@ -175,6 +177,7 @@ export function parseBlueprint(raw: string, i: BlueprintInput): ParseResult<Chap
     knowledge: { author: arr(o.knowledge?.author).map(str).filter(Boolean), reader: arr(o.knowledge?.reader).map(str).filter(Boolean),
       characters: arr(o.knowledge?.characters).map((k) => ({ characterId: str(k?.characterId), knows: arr(k?.knows).map(str).filter(Boolean), doesNotKnow: arr(k?.doesNotKnow).map(str).filter(Boolean) })) },
     castProposals: arr(o.castProposals).map((p) => ({ id: str(p?.id), name: str(p?.name), role: str(p?.role), justification: str(p?.justification) })).filter((p) => p.id || p.name),
+    timeRefs: i.chapter.timeRefs,
   };
   const issues = validateBlueprint(bp, i);
   return issues.length ? { ok: false, issues } : { ok: true, value: bp };
