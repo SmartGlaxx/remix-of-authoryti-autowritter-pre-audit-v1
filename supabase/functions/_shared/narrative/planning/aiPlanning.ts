@@ -466,6 +466,11 @@ export function parseSections(raw: string, m: MasterContext, chapter: ChapterPla
       if (!x) { issues.push(`Missing ${s.id}`); return { id: s.id, entry: "", focus: "", outcome: "" }; }
       const d: SectionDetail = { id: s.id, entry: str(x.entry), focus: str(x.focus), outcome: str(x.outcome) };
       if (!d.entry || !d.focus || !d.outcome) issues.push(`${s.id} needs entry, focus and outcome`);
+      for (const t of (chapter.timeRefs ?? []).filter((r) => r.sectionIndex === s.sectionIndex)) {
+        const hay = `${d.entry} ${d.focus} ${d.outcome}`.toLowerCase();
+        if (!hay.includes(t.phrase.toLowerCase()))
+          issues.push(`${s.id} must quote its approved time reference "${t.phrase}" verbatim`);
+      }
       if (a.factual) {
         const ev: EvidenceItem[] = (Array.isArray(x.evidence) ? x.evidence : []).map((e: any) => ({ claim: str(e?.claim), tier: str(e?.tier) as EvidenceTier, source: str(e?.source) || undefined }));
         if (!ev.length) issues.push(`${s.id} must tag its claims with evidence tiers`);
