@@ -359,16 +359,28 @@ export function proseWriterPlanView(m: MasterContext, ch: number) {
 // ── Service 3: chapter expansion (adaptive section structure) ───────────────
 export interface ChapterExpansion { chapter: ChapterPlan; stakes: string; focus: string }
 
+/** The chapter time plan: 4–8 references, scattered so every section carries at least one,
+ * in the proportional mix — 40–60% relative-only, 10–30% raw/exact-only, 20–40% combined. */
+export const TIME_PLAN_RULE =
+  "Time plan (required): choose 4 to 8 time references for this chapter — the exact phrases the prose will carry, e.g. \"three hours later\", \"by dusk\", \"ten past four\", \"the next morning at 7:00\". " +
+  "Every section must carry at least one. Keep the mix proportional: 40–60% relative-only (elapsed or sequenced: \"two hours later\", \"the next morning\"), " +
+  "10–30% raw-only (a bare clock or calendar stamp: \"noon\", \"14 October\"), 20–40% combined (a stamp tied to elapsed time: \"two hours later, at 5:00 PM\"). " +
+  "They must fit the book's timeframe and follow earlier chapters' clocks without contradiction. " +
+  "These phrases are binding: section summaries must quote them, and the drafted prose must state them — never dropped, never altered.";
+
 export function buildChapterPrompt(m: MasterContext, ch: number, expanded: Record<number, ChapterPlan>): Prompt {
   const a = getAdapter(m.skeleton.adapter);
   const c = m.skeleton.chapters[ch];
   const earlier = m.skeleton.chapters.slice(0, ch).flatMap((x) => (expanded[x.chapterIndex]?.sections ?? []).map((s) => s.id));
+  const priorTime = m.skeleton.chapters.slice(0, ch).flatMap((x) => (expanded[x.chapterIndex]?.timeRefs ?? []).map((t) => t.phrase));
   return {
     system: system(a, "You expand one chapter of an approved whole-book plan."),
     user: `${renderWholeBook(m, expanded)}\n\nExpand chapter ${ch + 1} ([${c.objectiveKind}] ${c.objective}, about ${c.targetWords} words) in relation to the whole book — what it must set up for later chapters, what it pays off from earlier ones.\n` +
       `Choose the number of ${a.sectionUnit}s this chapter genuinely needs (guideline ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}). ` +
       `Section ids are c${ch}s0, c${ch}s1, ... dependsOn may list earlier section ids in this chapter or these earlier ones: ${earlier.slice(-40).join(", ") || "none"}.\n` +
-      `JSON: {"objective":"","stakes":"","focus":"","sections":[{"objective":"","weight":1,"dependsOn":[]}]}`,
+      (a.isFiction || a.factual ? `${TIME_PLAN_RULE}${priorTime.length ? `\nTime already established in earlier chapters (continue this clock): ${priorTime.join(" | ")}` : ""}\n` : "") +
+      `JSON: {"objective":"","stakes":"","focus":"","sections":[{"objective":"","weight":1,"dependsOn":[]}]` +
+      (a.isFiction || a.factual ? `,"timeRefs":[{"section":0,"kind":"relative|raw|combined","phrase":""}]` : "") + `}`,
   };
 }
 
