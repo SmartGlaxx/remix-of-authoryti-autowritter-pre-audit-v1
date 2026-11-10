@@ -14,6 +14,14 @@ describe("closed-world writing", () => {
     expect(t).toContain("Tom arrives");
     expect(t).not.toContain("Mara waits");
   });
+  it("brief carries the section's approved time references verbatim", () => {
+    const timed = { ...bp, timeRefs: [{ sectionIndex: 1, kind: "raw", phrase: "ten past four" }, { sectionIndex: 0, kind: "relative", phrase: "the next morning" }] };
+    const t = renderBlueprintBrief(timed, 1);
+    expect(t).toContain('"ten past four" (raw)');
+    expect(t).toContain("never as an opening timestamp");
+    expect(t).not.toContain("the next morning");
+    expect(renderBlueprintBrief(bp, 1)).not.toContain("Approved time references");
+  });
   it("flags a repeated unplanned name", () => {
     const f = findUnplannedNames("Mara saw that Kiera was late. Then she called for Kiera again.", blueprintKnownNames(bp));
     expect(f.map((x) => x.excerpt)).toEqual(["Kiera"]);
