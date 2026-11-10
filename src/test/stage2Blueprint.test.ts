@@ -43,6 +43,22 @@ describe("Stage 2 chapter blueprints", () => {
   it("a later reveal cannot leak into reader/character layers", () => { const o = good(); o.knowledge.reader.push("Jax is a traitor"); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
   it("the author layer may hold the twist", () => { const o = good(); o.knowledge.author.push("Jax is the traitor"); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(true); });
   it("too-thin coverage is rejected", () => { const o = good(); o.microbeats = o.microbeats.filter((_: any, i: number) => i === 0 || i === o.microbeats.length - 1); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
+  it("approved time references must appear verbatim in the section's microbeats", () => {
+    const timed = { ...input, chapter: { ...chapter, timeRefs: [{ sectionIndex: 0, kind: "raw", phrase: "ten past four" }, { sectionIndex: 1, kind: "relative", phrase: "the next morning" }] } } as BlueprintInput;
+    const o = JSON.parse(mockBlueprintOutput(timed));
+    // mock beats don't quote the phrases → rejected
+    expect(parseBlueprint(JSON.stringify(o), timed).ok).toBe(false);
+    // quote them in the right sections → accepted, and the phrases ride into the saved blueprint
+    o.microbeats.find((b: any) => b.sectionId === "c0s0").text += " At ten past four.";
+    o.microbeats.find((b: any) => b.sectionId === "c0s1").text += " The next morning.";
+    const r = parseBlueprint(JSON.stringify(o), timed);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.timeRefs).toHaveLength(2);
+    // prompt lists the binding phrases
+    expect(buildBlueprintPrompt(timed).user).toContain('"ten past four" (raw)');
+    // a book with no time plan is unaffected
+    expect(parseBlueprint(JSON.stringify(good()), input).ok).toBe(true);
+  });
   it("unknown location/event references are rejected", () => { const o = good(); o.microbeats[0].locationId = "l9"; expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
   it("prompt carries cast ids and has no word limit on the synopsis", () => { const p = buildBlueprintPrompt(input).user; expect(p).toContain("k: Kiera Vance"); expect(p).toContain("no word limit"); });
   it("validator is deterministic", () => { const b = (parseBlueprint(JSON.stringify(good()), input) as any).value; expect(validateBlueprint(b, input)).toEqual([]); });

@@ -12,11 +12,17 @@ export function renderBlueprintBrief(bp: ChapterBlueprint | null | undefined, se
   const loc = new Map(bp.locations.map((l) => [l.id, l.name]));
   const lines = [...use].sort((a, b) => a.order - b.order).map((b, i) =>
     `${i + 1}. ${b.text} [with: ${b.characterIds.map((id) => name.get(id) ?? id).join(", ") || "none"}; at: ${loc.get(b.locationId) ?? "unspecified"}]`);
+  const timeRefs = (bp.timeRefs ?? []).filter((t) => t.sectionIndex === sectionIndex);
+  const timeLines = timeRefs.length
+    ? ["Approved time references for this section (weave each phrase in verbatim, at natural moments — sensory shifts, action beats — never as an opening timestamp; keep every stated time consistent with earlier sections):",
+      ...timeRefs.map((t) => `- "${t.phrase}" (${t.kind})`)]
+    : [];
   return [
     "APPROVED CHAPTER BLUEPRINT (closed world):",
     `Objective: ${bp.objective}`,
     `Allowed people: ${bp.cast.map((c) => c.name).join(", ") || "none"}`,
     `Allowed places: ${bp.locations.map((l) => l.name).join(", ") || "none"}`,
+    ...timeLines,
     "Microbeats for this section, in order:",
     ...lines,
     "Do not introduce any named person, place or event not listed above or already established. If a beat cannot be written without missing information, write around it and do not invent the missing fact.",

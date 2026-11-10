@@ -45,5 +45,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [x] Make the 4 missing character pictures
 - [x] Write Chapter 1 sections 2–4 on Sonnet 5
 - [ ] Save section 4 into story memory (~$0.05; paused at the $0.50 cap)
+- [x] Time plan cascade: book timeframe in fiction master plans; 4–8 chapter time refs (40–60% relative / 10–30% raw / 20–40% combined, scattered across sections); section summaries must quote assigned phrases verbatim; blueprint microbeats must carry them; writer brief lists the section's approved refs; 783 tests passed; plan-book + generate-content deployed; signed-in chapter dry-run verified (no AI cost)
+- [ ] Generate a new chapter with the time plan live (paid AI — awaiting explicit go-ahead)
 
 - [x] Chapter/section with no stored status renders as Pending instead of crashing the page (ChapterView + BookCard guarded; 777 tests passed; Clockwork Rose loads signed-in)

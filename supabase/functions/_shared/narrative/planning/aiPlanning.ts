@@ -5,8 +5,9 @@
 import { adapterForBookType, getAdapter, type GenreAdapter } from "./adapters.ts";
 import {
   allocate, buildPlanSkeleton, revealsVisibleAt, validatePlan,
-  type ChapterPlan, type MasterPlanSkeleton, type PlannedReveal, type SectionPlan, type SeriesRef,
+  type ChapterPlan, type ChapterTimeRef, type MasterPlanSkeleton, type PlannedReveal, type SectionPlan, type SeriesRef,
 } from "./engine.ts";
+import { timeMixAssessment } from "../temporalFrames.ts";
 
 export const STORY_ALTERNATIVE_COUNTS = [3, 5, 7, 10] as const;
 export type AlternativeCount = typeof STORY_ALTERNATIVE_COUNTS[number];
@@ -257,8 +258,9 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       `\nPlan the whole book. Chapter objective kinds must come from: ${a.chapterObjectives.join(", ")}. ` +
       `Each chapter is made of ${a.sectionUnit}s; suggest a section count per chapter that fits its job (typical ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}, a guideline only), ` +
       "and a relative weight (1 = average length) where a chapter needs more or less room.\n" +
+      (a.isFiction ? "The genre_data timeframe pins the whole book in time: the era or date, the setting's clock, and the total elapsed span. Every later chapter plan, section summary and draft must stay inside it.\n" : "") +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `This book belongs to a planned series of ${b.seriesPlan.books} books. Also give "seriesBooks": one entry per book in the series, each with its own inciting incident, climax and hook into the next; the synopsis is the whole series arc.\n` : "") +
-      `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}}` +
+      `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}${a.isFiction ? `,"timeframe":"the book's temporal frame: when the story happens and its total elapsed span (e.g. 'late autumn 1893, one harbour town, nine days from the discovery to the confrontation')"` : ""}}` +
       (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `,"seriesBooks":[{"bookNumber":1,"title":"","summary":"(${bandText(SERIES_BOOK_BAND)})"}]` : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
@@ -319,6 +321,7 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
       genreData.series_books = sb;
     }
     if (!a.isFiction && Array.isArray(o?.reveals) && o.reveals.length) issues.push("Nonfiction plans cannot contain reveals");
+    if (a.isFiction && !str(genreData.timeframe)) issues.push("genre_data.timeframe is required: pin the book's era, setting clock and total elapsed span");
     const premise = str(o?.premise), synopsis = str(o?.synopsis), ending = str(o?.ending);
     if (!premise || !synopsis || !ending) issues.push("premise, synopsis and ending are required");
     let skeleton: MasterPlanSkeleton;
@@ -356,16 +359,28 @@ export function proseWriterPlanView(m: MasterContext, ch: number) {
 // ── Service 3: chapter expansion (adaptive section structure) ───────────────
 export interface ChapterExpansion { chapter: ChapterPlan; stakes: string; focus: string }
 
+/** The chapter time plan: 4–8 references, scattered so every section carries at least one,
+ * in the proportional mix — 40–60% relative-only, 10–30% raw/exact-only, 20–40% combined. */
+export const TIME_PLAN_RULE =
+  "Time plan (required): choose 4 to 8 time references for this chapter — the exact phrases the prose will carry, e.g. \"three hours later\", \"by dusk\", \"ten past four\", \"the next morning at 7:00\". " +
+  "Every section must carry at least one. Keep the mix proportional: 40–60% relative-only (elapsed or sequenced: \"two hours later\", \"the next morning\"), " +
+  "10–30% raw-only (a bare clock or calendar stamp: \"noon\", \"14 October\"), 20–40% combined (a stamp tied to elapsed time: \"two hours later, at 5:00 PM\"). " +
+  "They must fit the book's timeframe and follow earlier chapters' clocks without contradiction. " +
+  "These phrases are binding: section summaries must quote them, and the drafted prose must state them — never dropped, never altered.";
+
 export function buildChapterPrompt(m: MasterContext, ch: number, expanded: Record<number, ChapterPlan>): Prompt {
   const a = getAdapter(m.skeleton.adapter);
   const c = m.skeleton.chapters[ch];
   const earlier = m.skeleton.chapters.slice(0, ch).flatMap((x) => (expanded[x.chapterIndex]?.sections ?? []).map((s) => s.id));
+  const priorTime = m.skeleton.chapters.slice(0, ch).flatMap((x) => (expanded[x.chapterIndex]?.timeRefs ?? []).map((t) => t.phrase));
   return {
     system: system(a, "You expand one chapter of an approved whole-book plan."),
     user: `${renderWholeBook(m, expanded)}\n\nExpand chapter ${ch + 1} ([${c.objectiveKind}] ${c.objective}, about ${c.targetWords} words) in relation to the whole book — what it must set up for later chapters, what it pays off from earlier ones.\n` +
       `Choose the number of ${a.sectionUnit}s this chapter genuinely needs (guideline ${a.sectionsPerChapter.min}–${a.sectionsPerChapter.max}). ` +
       `Section ids are c${ch}s0, c${ch}s1, ... dependsOn may list earlier section ids in this chapter or these earlier ones: ${earlier.slice(-40).join(", ") || "none"}.\n` +
-      `JSON: {"objective":"","stakes":"","focus":"","sections":[{"objective":"","weight":1,"dependsOn":[]}]}`,
+      (a.isFiction || a.factual ? `${TIME_PLAN_RULE}${priorTime.length ? `\nTime already established in earlier chapters (continue this clock): ${priorTime.join(" | ")}` : ""}\n` : "") +
+      `JSON: {"objective":"","stakes":"","focus":"","sections":[{"objective":"","weight":1,"dependsOn":[]}]` +
+      (a.isFiction || a.factual ? `,"timeRefs":[{"section":0,"kind":"relative|raw|combined","phrase":""}]` : "") + `}`,
   };
 }
 
@@ -387,6 +402,33 @@ export function parseChapter(raw: string, m: MasterContext, ch: number, expanded
     const weights = secs.map((s: any) => clamp(Number(s?.weight) || 1, 0.25, 4));
     const chapter: ChapterPlan = { ...base, objective: str(o?.objective) || base.objective,
       sections: buildSections(a, ch, allocate(base.targetWords, weights), false, objectives, deps) };
+    if (a.isFiction || a.factual) {
+      const refs: ChapterTimeRef[] = (Array.isArray(o?.timeRefs) ? o.timeRefs : []).map((t: any) => ({
+        sectionIndex: Number(t?.section), kind: str(t?.kind) as ChapterTimeRef["kind"], phrase: str(t?.phrase),
+      }));
+      if (!refs.length) issues.push("timeRefs is required: plan 4–8 time references for the chapter");
+      for (const t of refs) {
+        if (!t.phrase) issues.push("every timeRef needs the exact phrase the prose will carry");
+        if (!["relative", "raw", "combined"].includes(t.kind)) issues.push(`timeRef "${t.phrase || "?"}": kind must be relative, raw or combined`);
+        if (!Number.isInteger(t.sectionIndex) || t.sectionIndex < 0 || t.sectionIndex >= chapter.sections.length)
+          issues.push(`timeRef "${t.phrase || "?"}": section ${t.sectionIndex} is not a section of this chapter`);
+      }
+      const mix = timeMixAssessment({
+        relativeOnly: refs.filter((t) => t.kind === "relative").length,
+        rawOnly: refs.filter((t) => t.kind === "raw").length,
+        combined: refs.filter((t) => t.kind === "combined").length,
+      });
+      if (refs.length && !mix.totalOK) issues.push(`plan 4–8 time references per chapter (got ${mix.total})`);
+      if (refs.length && !mix.relativeShareOK) issues.push("time mix: 40–60% must be relative-only");
+      if (refs.length && !mix.rawShareOK) issues.push("time mix: 10–30% must be raw/exact-only");
+      if (refs.length && !mix.combinedShareOK) issues.push("time mix: 20–40% must be combined");
+      const covered = new Set(refs.map((t) => t.sectionIndex));
+      // Scatter across the sections: every section carries one when there are few enough;
+      // a long chapter (more sections than the 4–8 budget) must still spread refs widely.
+      const need = Math.min(chapter.sections.length, 8);
+      if (covered.size < need) issues.push(`scatter time references across at least ${need} sections (covered ${covered.size})`);
+      chapter.timeRefs = refs;
+    }
     if (!str(o?.stakes)) issues.push("stakes is required");
     return { chapter, stakes: str(o?.stakes), focus: str(o?.focus) };
   });
@@ -399,9 +441,16 @@ export interface SectionDetail { id: string; entry: string; focus: string; outco
 export function buildSectionPrompt(m: MasterContext, chapter: ChapterPlan, expanded: Record<number, ChapterPlan>): Prompt {
   const a = getAdapter(m.skeleton.adapter);
   const ev = a.factual ? `,"evidence":[{"claim":"","tier":"${EVIDENCE_TIERS.join("|")}","source":""}]` : "";
+  const timeLines = (chapter.timeRefs ?? []).length
+    ? "\nApproved time references (binding — quote each phrase verbatim in its section's entry, focus or outcome; never drop, never reword, never move to another section):\n" +
+      chapter.sections.map((s) => {
+        const refs = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === s.sectionIndex).map((t) => `"${t.phrase}" (${t.kind})`);
+        return refs.length ? `- ${s.id}: ${refs.join(", ")}` : null;
+      }).filter(Boolean).join("\n") + "\n"
+    : "";
   return {
     system: system(a, `You detail every ${a.sectionUnit} of one chapter of an approved whole-book plan.`),
-    user: `${renderWholeBook(m, { ...expanded, [chapter.chapterIndex]: chapter })}\n\nDetail each ${a.sectionUnit} of chapter ${chapter.chapterIndex + 1}: where it starts, what it turns on, how it ends and what it hands to what comes next.\n` +
+    user: `${renderWholeBook(m, { ...expanded, [chapter.chapterIndex]: chapter })}\n\nDetail each ${a.sectionUnit} of chapter ${chapter.chapterIndex + 1}: where it starts, what it turns on, how it ends and what it hands to what comes next.${timeLines}\n` +
       `JSON: {"sections":[{"id":"${chapter.sections[0]?.id}","entry":"","focus":"","outcome":""${ev}}]} — one entry per id: ${chapter.sections.map((s) => s.id).join(", ")}`,
   };
 }
@@ -417,6 +466,11 @@ export function parseSections(raw: string, m: MasterContext, chapter: ChapterPla
       if (!x) { issues.push(`Missing ${s.id}`); return { id: s.id, entry: "", focus: "", outcome: "" }; }
       const d: SectionDetail = { id: s.id, entry: str(x.entry), focus: str(x.focus), outcome: str(x.outcome) };
       if (!d.entry || !d.focus || !d.outcome) issues.push(`${s.id} needs entry, focus and outcome`);
+      for (const t of (chapter.timeRefs ?? []).filter((r) => r.sectionIndex === s.sectionIndex)) {
+        const hay = `${d.entry} ${d.focus} ${d.outcome}`.toLowerCase();
+        if (!hay.includes(t.phrase.toLowerCase()))
+          issues.push(`${s.id} must quote its approved time reference "${t.phrase}" verbatim`);
+      }
       if (a.factual) {
         const ev: EvidenceItem[] = (Array.isArray(x.evidence) ? x.evidence : []).map((e: any) => ({ claim: str(e?.claim), tier: str(e?.tier) as EvidenceTier, source: str(e?.source) || undefined }));
         if (!ev.length) issues.push(`${s.id} must tag its claims with evidence tiers`);

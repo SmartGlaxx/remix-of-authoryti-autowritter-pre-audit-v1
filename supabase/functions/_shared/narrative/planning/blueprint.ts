@@ -4,7 +4,7 @@
 // them. It is a PLANNED progressive plan row (level BLUEPRINT) until the author approves it (READY).
 // Not wired to prose generation (Stage 3). Planner sees the whole book; writer-facing layers
 // (reader knowledge, character knowledge) must never carry later reveal secrets.
-import type { ChapterPlan, MasterPlanSkeleton } from "./engine.ts";
+import type { ChapterPlan, ChapterTimeRef, MasterPlanSkeleton } from "./engine.ts";
 import type { MasterContext, ParseResult, Prompt, SectionDetail, BeatNote } from "./aiPlanning.ts";
 import { extractJson, renderWholeBook } from "./aiPlanning.ts";
 
@@ -45,6 +45,8 @@ export interface ChapterBlueprint {
   objective: string; keyPoints: string[]; conclusion: string; synopsis: string;
   cast: BlueprintCharacter[]; locations: BlueprintLocation[]; events: BlueprintEvent[];
   microbeats: Microbeat[]; knowledge: KnowledgeLayers; castProposals: CastProposal[];
+  /** Approved chapter time references, copied from the chapter plan (never model output). */
+  timeRefs?: ChapterTimeRef[];
 }
 
 export interface BlueprintInput {
@@ -69,8 +71,13 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
   const est = expectedMicrobeats(chapter.targetWords);
   const sec = i.details.map((d) => {
     const beats = i.notes.filter((n) => n.id.startsWith(`${d.id}b`)).map((n) => `${n.kind}: ${n.note}`).join("; ");
-    return `- ${d.id}: opens ${d.entry} | turns on ${d.focus} | ends ${d.outcome}${beats ? ` | beats: ${beats}` : ""}`;
+    const si = chapter.sections.find((s) => s.id === d.id)?.sectionIndex;
+    const time = (chapter.timeRefs ?? []).filter((t) => t.sectionIndex === si).map((t) => `"${t.phrase}" (${t.kind})`);
+    return `- ${d.id}: opens ${d.entry} | turns on ${d.focus} | ends ${d.outcome}${beats ? ` | beats: ${beats}` : ""}${time.length ? ` | time: ${time.join(", ")}` : ""}`;
   }).join("\n");
+  const timeRule = (chapter.timeRefs ?? []).length
+    ? `\n6. Time references are binding: each microbeat covering a moment with an approved time phrase must quote that phrase verbatim in its text. Spread them so the reader always knows how much time has passed; never drop, reword or relocate one.\n`
+    : "";
   const cast = i.cast.map((c) => `- ${c.id}: ${c.name}${c.aliases?.length ? ` (also ${c.aliases.join(", ")})` : ""}`).join("\n") || "- (no cast recorded yet)";
   return {
     system: "You are a book planner. You expand ONE approved chapter into a detailed narrative blueprint. You never invent developments outside the approved plan. Output JSON only.",
@@ -84,6 +91,7 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
       `3. cast / locations / events: every participating character, consequential place and significant event, each with a stable id (locations l0.., events e0..). Every event names its source in the approved plan: "master", "chapter" or a section id.\n` +
       `4. microbeats: about ${est} ordered units (roughly one per planned paragraph; more or fewer where the story needs it), covering every section in order. Each: id (m0..), sectionId, text (one explanatory sentence starting with a named character, not a pronoun), characterIds, locationId, eventIds, purpose (why it happens), transition (how it leads to the next beat).\n` +
       `5. knowledge: author (what only the author knows — twists, concealed identities), reader (what the reader learns by chapter end), characters (per character: knows / doesNotKnow at chapter end). Later reveals never appear in reader or character layers.\n` +
+      timeRule +
       `JSON: {"objective":"","keyPoints":[""],"conclusion":"","synopsis":"","cast":[{"id":"","name":"","role":"","pov":false}],"locations":[{"id":"l0","name":"","significance":""}],"events":[{"id":"e0","name":"","consequence":"","source":"chapter"}],"microbeats":[{"id":"m0","sectionId":"${i.details[0]?.id ?? `c${ch}s0`}","text":"","characterIds":[],"locationId":"l0","eventIds":[],"purpose":"","transition":""}],"knowledge":{"author":[],"reader":[],"characters":[{"characterId":"","knows":[],"doesNotKnow":[]}]},"castProposals":[{"id":"p0","name":"","role":"","justification":""}]}`,
   };
 }
@@ -139,6 +147,14 @@ export function validateBlueprint(bp: ChapterBlueprint, i: Pick<BlueprintInput, 
   if (bp.microbeats.length < Math.ceil(est * 0.4)) issues.push(`only ${bp.microbeats.length} microbeats for ~${est} planned paragraphs; coverage is too thin`);
   if (bp.microbeats.length > est * 3) issues.push(`${bp.microbeats.length} microbeats is far more than ~${est} planned paragraphs`);
   for (const k of bp.knowledge.characters) if (!charIds.has(k.characterId)) issues.push(`knowledge for unknown character ${k.characterId}`);
+  // Approved time references must survive into the microbeats verbatim — never dropped, reworded or moved.
+  for (const t of i.chapter.timeRefs ?? []) {
+    const secId = i.details.find((d, di) => (i.chapter.sections[di]?.sectionIndex ?? di) === t.sectionIndex)?.id;
+    const beats = bp.microbeats.filter((b) => b.sectionId === secId);
+    const hay = beats.map((b) => b.text).join(" ").toLowerCase();
+    if (!hay.includes(t.phrase.toLowerCase()))
+      issues.push(`time reference "${t.phrase}" must appear verbatim in a microbeat of section ${secId ?? t.sectionIndex}`);
+  }
   const secrets = futureSecrets(i.m.skeleton, ch);
   const writerFacing = [...bp.knowledge.reader, ...bp.knowledge.characters.flatMap((k) => k.knows), ...bp.microbeats.map((b) => b.text)].join("\n");
   for (const t of leaks(writerFacing, secrets)) issues.push(`a later reveal ("${t}") leaks into reader, character or microbeat text`);
@@ -161,6 +177,7 @@ export function parseBlueprint(raw: string, i: BlueprintInput): ParseResult<Chap
     knowledge: { author: arr(o.knowledge?.author).map(str).filter(Boolean), reader: arr(o.knowledge?.reader).map(str).filter(Boolean),
       characters: arr(o.knowledge?.characters).map((k) => ({ characterId: str(k?.characterId), knows: arr(k?.knows).map(str).filter(Boolean), doesNotKnow: arr(k?.doesNotKnow).map(str).filter(Boolean) })) },
     castProposals: arr(o.castProposals).map((p) => ({ id: str(p?.id), name: str(p?.name), role: str(p?.role), justification: str(p?.justification) })).filter((p) => p.id || p.name),
+    timeRefs: i.chapter.timeRefs,
   };
   const issues = validateBlueprint(bp, i);
   return issues.length ? { ok: false, issues } : { ok: true, value: bp };

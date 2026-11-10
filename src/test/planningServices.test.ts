@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { validatePlan } from "../../supabase/functions/_shared/narrative/planning/engine";
 import {
-  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, buildAlternativesPrompt, buildChapterPrompt, buildMasterPrompt, parseAlternatives,
+  STORY_ALTERNATIVE_COUNTS, assertAlternativesEligible, buildAlternativesPrompt, buildChapterPrompt, buildMasterPrompt, buildSectionPrompt, parseAlternatives,
   parseBeats, parseChapter, parseMaster, parseSections, planIdemKey, proseWriterPlanView, runChapterBatch, runWithRepair, shapeSkeleton,
   type BookBrief, type MasterContext,
 } from "../../supabase/functions/_shared/narrative/planning/aiPlanning";
@@ -16,7 +16,7 @@ const alt = (i: number) => ({ title: `Story ${i}`, logline: "l", summary: words(
 
 const fictionMaster = JSON.stringify({
   premise: "p", synopsis: "s", ending: "The keeper burns the ledger.",
-  genre_data: { protagonist: "Ana", central_conflict: "c", stakes: "s" },
+  genre_data: { protagonist: "Ana", central_conflict: "c", stakes: "s", timeframe: "October 1961, one lighthouse, three weeks" },
   reveals: [{ summary: "The ledger is in Ana's own handwriting", revealChapter: 2, setupChapters: [0, 1] }],
   chapters: [
     { objectiveKind: "setup", objective: "Ana finds the ledger", sectionCount: 2, weight: 0.8 },
@@ -99,9 +99,12 @@ describe("Phase D knowledge boundaries", () => {
 describe("Phase D chapter, section and beat parsing", () => {
   it("chapter expansion picks its own section count and rejects forward deps", () => {
     const m = master();
-    const ok = parseChapter(JSON.stringify({ objective: "o", stakes: "s", focus: "f", sections: [{ objective: "a" }, { objective: "b", dependsOn: ["c1s0"] }, { objective: "c", weight: 2 }] }), m, 1, {});
+    const ok = parseChapter(JSON.stringify({ objective: "o", stakes: "s", focus: "f", sections: [{ objective: "a" }, { objective: "b", dependsOn: ["c1s0"] }, { objective: "c", weight: 2 }], timeRefs: [
+      { section: 0, kind: "relative", phrase: "three hours later" }, { section: 1, kind: "relative", phrase: "the next morning" },
+      { section: 1, kind: "raw", phrase: "ten past four" }, { section: 2, kind: "combined", phrase: "two hours later, at 5:00 PM" },
+    ] }), m, 1, {});
     expect(ok.ok).toBe(true);
-    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); }
+    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); expect(ok.value.chapter.timeRefs).toHaveLength(4); }
     expect(parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a", dependsOn: ["c2s0"] }] }), m, 1, {}).ok).toBe(false);
   });
   it("beats vary per section and are restricted to the genre palette", () => {
@@ -110,6 +113,64 @@ describe("Phase D chapter, section and beat parsing", () => {
     expect(good.ok).toBe(true);
     if (good.ok) expect(good.value.chapter.sections.map((s) => s.beats.length)).toEqual([2, 4]);
     expect(parseBeats(JSON.stringify({ sections: [{ id: "c0s0", beats: [{ kind: "claim", note: "n" }] }, { id: "c0s1", beats: [{ kind: "goal", note: "n" }] }] }), m, ch).ok).toBe(false);
+  });
+  it("chapter time plan: 4–8 refs, proportional mix, scattered, valid sections", () => {
+    const m = master();
+    const base = { objective: "o", stakes: "s", sections: [{ objective: "a" }, { objective: "b" }, { objective: "c" }] };
+    const refs = (r: unknown[]) => JSON.stringify({ ...base, timeRefs: r });
+    // valid: 2 relative (50%), 1 raw (25%), 1 combined (25%), all 3 sections covered
+    const good = [{ section: 0, kind: "relative", phrase: "three hours later" }, { section: 1, kind: "relative", phrase: "the next morning" },
+      { section: 1, kind: "raw", phrase: "noon" }, { section: 2, kind: "combined", phrase: "two hours later, at 5:00 PM" }];
+    expect(parseChapter(refs(good), m, 1, {}).ok).toBe(true);
+    // missing entirely
+    expect(parseChapter(JSON.stringify(base), m, 1, {}).ok).toBe(false);
+    // too few
+    expect(parseChapter(refs(good.slice(0, 3)), m, 1, {}).ok).toBe(false);
+    // all raw → mix violated
+    expect(parseChapter(refs([0, 1, 2, 0].map((s) => ({ section: s, kind: "raw", phrase: "noon" }))), m, 1, {}).ok).toBe(false);
+    // all in one section → not scattered
+    expect(parseChapter(refs(good.map((r) => ({ ...r, section: 0 }))), m, 1, {}).ok).toBe(false);
+    // unknown section
+    expect(parseChapter(refs([...good.slice(0, 3), { section: 9, kind: "combined", phrase: "later at 5 PM" }]), m, 1, {}).ok).toBe(false);
+    // bad kind
+    expect(parseChapter(refs([...good.slice(0, 3), { section: 2, kind: "vague", phrase: "later at 5 PM" }]), m, 1, {}).ok).toBe(false);
+  });
+  it("chapter prompt carries the time rules and prior chapters' established clock", () => {
+    const m = master();
+    expect(buildChapterPrompt(m, 0, {}).user).toMatch(/40–60% relative-only/);
+    const prev = parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a" }], timeRefs: [
+      { section: 0, kind: "relative", phrase: "three hours later" }, { section: 0, kind: "relative", phrase: "the next morning" },
+      { section: 0, kind: "raw", phrase: "noon" }, { section: 0, kind: "combined", phrase: "two hours later, at 5:00 PM" }] }), m, 0, {});
+    expect(prev.ok).toBe(true);
+    if (prev.ok) expect(buildChapterPrompt(m, 1, { 0: prev.value.chapter }).user).toContain("ten past four".length ? "three hours later" : "");
+  });
+  it("master plan requires a fiction timeframe", () => {
+    const noTime = fictionMaster.replace(`"timeframe":"October 1961, one lighthouse, three weeks"`, `"protagonist2":"x"`);
+    expect(parseMaster(noTime, brief("novel"), null).ok).toBe(false);
+    expect(buildMasterPrompt(brief("novel"), null).user).toContain("timeframe");
+    expect(buildMasterPrompt(brief("business"), null).user).not.toContain("timeframe");
+  });
+  it("section summaries must quote their assigned time phrases verbatim", () => {
+    const m = master();
+    const prev = parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a" }, { objective: "b" }], timeRefs: [
+      { section: 0, kind: "relative", phrase: "three hours later" }, { section: 0, kind: "relative", phrase: "the next morning" },
+      { section: 1, kind: "raw", phrase: "ten past four" }, { section: 1, kind: "combined", phrase: "two hours later, at 5:00 PM" }] }), m, 1, {});
+    expect(prev.ok).toBe(true);
+    if (!prev.ok) return;
+    const ch = prev.value.chapter;
+    const prompt = buildSectionPrompt(m, ch, {});
+    expect(prompt.user).toContain('"ten past four" (raw)');
+    const withTime = JSON.stringify({ sections: [
+      { id: "c1s0", entry: "Three hours later she returns", focus: "the next morning brings news", outcome: "c" },
+      { id: "c1s1", entry: "At ten past four the bell rings", focus: "b", outcome: "two hours later, at 5:00 PM it ends" }] });
+    expect(parseSections(withTime, m, ch).ok).toBe(true);
+    const dropped = JSON.stringify({ sections: [
+      { id: "c1s0", entry: "She returns", focus: "news arrives", outcome: "c" },
+      { id: "c1s1", entry: "The bell rings", focus: "b", outcome: "it ends" }] });
+    const bad = parseSections(dropped, m, ch);
+    expect(bad.ok).toBe(false);
+    if (bad.ok) throw new Error("expected rejection");
+    expect((bad as { issues: string[] }).issues.join()).toMatch(/ten past four/);
   });
   it("true-story sections need evidence tiers, sources for documented claims, and no verification claims", () => {
     const sk = shapeSkeleton({ bookType: "memoir", targetWords: 9000, genreData: { subject: "x", historical_scope: "y", primary_sources: "letters 1961", epistemic_boundaries: "z" }, reveals: [], chapters: [{ objectiveKind: "context_origins", objective: "o", sectionCount: 1 }] });
