@@ -100,7 +100,8 @@ serve(async (req) => {
     const approvedCast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, role: c.role ?? null }));
     // One cast member per request keeps each call well inside the function time limit; the app repeats until none remain.
     const missing = missingReferenceNames(approvedCast.map((c) => c.name), outline.characters ?? []);
-    if (approvedCast.length && !missing.length) return new Response(JSON.stringify({ characters: outline.characters ?? [], visualStyleGuide: outline.visualStyleGuide ?? '', remaining: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const allLocked = (outline.characters ?? []).every((c: any) => c?.reference?.locked);
+    if ((approvedCast.length && !missing.length) || (!approvedCast.length && allLocked)) return new Response(JSON.stringify({ characters: outline.characters ?? [], visualStyleGuide: outline.visualStyleGuide ?? '', remaining: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const target = approvedCast.find((c) => c.name.trim() === missing[0]) ?? null;
     const existingCards = (outline.characters ?? []).map((c: any) => ({ id: c.id, name: c.name, visualDescription: c.visualDescription, reference: c.reference ? { heightCm: c.reference.heightCm, tells: c.reference.tells } : undefined }));
     const extractPrompt = `${target ? `Write a reference card for ONE approved cast member only (named below). The "characters" array must contain exactly one entry. Do not write cards for anyone else.` : 'Analyze this book outline and extract EVERY named fictional character.'} Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.

@@ -413,6 +413,22 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     const alreadySaved = await waitForExistingWrite();
     if (alreadySaved) return alreadySaved;
 
+    // Fiction books need a locked card for every cast member before writing. Prepare them first so the
+    // write request is never refused (the server returns immediately, at no AI cost, once all are ready).
+    const prepareReferences = async () => {
+        setState(st=>({...st,phase:'generating-characters'}));
+      // One cast member per call; repeat until the server reports none remaining.
+      for (let round = 0; round < 15; round++) {
+        const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
+        if(error || !data?.characters) { let m = data?.error as string|undefined; if(!m && error){ const ctx=(error as {context?:Response}).context; const body=ctx && typeof ctx.json==='function' ? await ctx.clone().json().catch(()=>null) : null; m = body?.error ?? (ctx?.status===429 ? "You've reached the hourly limit for character references. Wait a few minutes, then press Write again — nothing has been lost." : undefined); } m = m ?? 'Character references could not be completed.'; throw isTerminalMessage(m) ? new TerminalGenerationError(m) : new Error(m); }
+        if (!data.remaining) break;
+      }
+    };
+    if (bookData.id && ['novel','fiction-serial','short-story','children','comic','drama'].includes(String(bookData.bookType ?? ''))) {
+      await prepareReferences();
+      setState(st=>({...st,phase:'writing'}));
+    }
+
     let response = await send();
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry.
@@ -441,13 +457,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
     if (response.status === 409 && bookData.id) {
       const problem = await response.clone().json().catch(()=>({}));
       if (problem.code === 'CHARACTER_REFERENCES_REQUIRED') {
-        setState(st=>({...st,phase:'generating-characters'}));
-        // One cast member per call; repeat until the server reports none remaining.
-        for (let round = 0; round < 15; round++) {
-          const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
-          if(error || !data?.characters) { let m = data?.error as string|undefined; if(!m && error){ const ctx=(error as {context?:Response}).context; const body=ctx && typeof ctx.json==='function' ? await ctx.clone().json().catch(()=>null) : null; m = body?.error ?? (ctx?.status===429 ? "You've reached the hourly limit for character references. Wait a few minutes, then press Write again — nothing has been lost." : undefined); } m = m ?? 'Character references could not be completed.'; throw isTerminalMessage(m) ? new TerminalGenerationError(m) : new Error(m); }
-          if (!data.remaining) break;
-        }
+        await prepareReferences();
         setState(st=>({...st,phase:'writing'}));
         response = await send();
       }
