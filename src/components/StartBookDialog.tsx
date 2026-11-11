@@ -7,6 +7,8 @@ import { WRITER_PERSONAS, type WriterPersona } from "../../supabase/functions/_s
 import { resolveAuthor } from "../../supabase/functions/_shared/writers/authorDna";
 import { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, type BookType } from "@/types/book";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdminEmail } from "@/lib/admin";
 import { writersForType, typesForWriter, sampleTemplate } from "@/lib/startPaths";
 
 type Pick = { bookType: BookType; genre?: string; writerId: string };
@@ -16,14 +18,15 @@ type View = "choose" | "type" | "writers" | "browse" | "writerTypes";
 const label = (t: string) => BOOK_TYPE_INFO[t as BookType]?.label ?? t;
 
 function WriterCard({ w, onPick }: { w: WriterPersona; onPick: () => void }) {
-  const author = resolveAuthor(w.id);
+  const { user } = useAuth();
+  const author = isAdminEmail(user?.email) ? resolveAuthor(w.id) : null;
   return (
     <div className="grid gap-4 sm:grid-cols-[160px_1fr] rounded-2xl border border-border bg-card p-4">
       <img src={WRITER_PORTRAITS[w.id]} alt={w.name} className="h-40 w-40 rounded-xl object-cover" />
       <div className="space-y-2 min-w-0">
         <div>
           <h3 className="font-serif text-xl font-bold text-foreground">{w.name}</h3>
-          <p className="text-sm text-muted-foreground">{w.tagline}{author ? ` · writes like ${author.name}` : ""}</p>
+          <p className="text-sm text-muted-foreground">{w.tagline}{author ? ` · admin: maps to ${author.name}` : ""}</p>
         </div>
         <div className="flex flex-wrap gap-1">{w.bookTypes.map((t) => <Badge key={t} variant="secondary">{label(t)}</Badge>)}</div>
         <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">{sampleTemplate(w)}</p>

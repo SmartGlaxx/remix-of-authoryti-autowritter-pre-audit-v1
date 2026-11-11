@@ -19,3 +19,14 @@ describe("two-path start", () => {
     expect(sampleTemplate(WRITER_PERSONAS[0])).toContain(WRITER_PERSONAS[0].name);
   });
 });
+import { isAdminEmail } from "@/lib/admin";
+describe("author mapping visibility", () => {
+  it("only the admin email sees mappings", () => {
+    expect(isAdminEmail("mailsmartcodes@gmail.com")).toBe(true);
+    expect(isAdminEmail("someone@example.com")).toBe(false);
+    expect(isAdminEmail(null)).toBe(false);
+  });
+  it("placeholder sample never names the real author", () => {
+    expect(sampleTemplate(WRITER_PERSONAS.find((w) => w.id === "marcus")!)).not.toContain("Chase");
+  });
+});

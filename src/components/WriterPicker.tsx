@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { WriterStudio } from "@/components/WriterStudio";
 import { WRITER_PORTRAITS } from "@/components/WriterPortraits";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdminEmail } from "@/lib/admin";
 import { resolveAuthor } from "../../supabase/functions/_shared/writers/authorDna";
 export { WRITER_PORTRAITS } from "@/components/WriterPortraits";
 
@@ -12,6 +14,8 @@ const FAV_KEY = "favoriteWriters";
 const loadFavs = (): string[] => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; } };
 
 export function WriterPicker({ bookType, genre, value, onChange }: { bookType: string; genre?: string; value?: string; onChange: (id: string) => void }) {
+  const { user } = useAuth();
+  const admin = isAdminEmail(user?.email);
   const best = bestWriterFor(bookType, genre);
   const selected = value ?? best.id;
   const [favs, setFavs] = useState<string[]>(loadFavs);
@@ -40,7 +44,7 @@ export function WriterPicker({ bookType, genre, value, onChange }: { bookType: s
                   <div className="truncate text-[10px] text-muted-foreground">{w.tagline}</div>
                 </div>
               </div>
-              {active && <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">{resolveAuthor(w.id) ? <>Writes in the style of <span className="text-primary">{resolveAuthor(w.id)!.name}</span>: {resolveAuthor(w.id)!.dna}.</> : <>{w.personality} {w.signature}.</>}</p>}
+              {active && <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">{admin && resolveAuthor(w.id) ? <>Writes in the style of <span className="text-primary">{resolveAuthor(w.id)!.name}</span>: {resolveAuthor(w.id)!.dna}.</> : <>{w.personality} {w.signature}.</>}</p>}
               <button type="button" onClick={(e) => { e.stopPropagation(); setTesting(w.id); }}
                 className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-full border border-border py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary">
                 <Mic className="h-3 w-3" />Test voice
