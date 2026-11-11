@@ -33,7 +33,7 @@ export interface Usage {
 
 export type AIEvent = { type: "text"; text: string } | { type: "usage"; usage: Partial<Usage> };
 
-export type AIErrorCode = "test_mode_blocked" | "missing_key" | "auth" | "rate_limit" | "payment" | "forbidden" | "bad_request" | "unavailable" | "network" | "inactive_role" | "unknown";
+export type AIErrorCode = "test_mode_blocked" | "missing_key" | "auth" | "rate_limit" | "payment" | "forbidden" | "bad_request" | "unavailable" | "network" | "inactive_role" | "content_filter" | "unknown";
 
 export class AIProviderError extends Error {
   constructor(public code: AIErrorCode, message: string, public status: number | null = null, public retryable = false) {
@@ -186,7 +186,10 @@ async function* responses(url: string, headers: Record<string, string>, modelId:
     try { p = JSON.parse(data); } catch { continue; }
     const type = p.type ?? event;
     if (type === "response.output_text.delta" && p.delta) yield { type: "text", text: p.delta };
-    else if (type === "response.completed" || type === "response.incomplete") {
+    else if (type === "response.incomplete" && p.response?.incomplete_details?.reason === "content_filter") {
+      // The provider's safety filter refused the request; say so plainly instead of returning empty text.
+      throw new AIProviderError("content_filter", `${provider}: the AI provider's safety filter refused this request (it flagged violent content)`, null, false);
+    } else if (type === "response.completed" || type === "response.incomplete") {
       const u = p.response?.usage;
       const why = type === "response.completed" ? "complete" : (p.response?.incomplete_details?.reason === "max_output_tokens" ? "max_tokens" : String(p.response?.incomplete_details?.reason ?? "incomplete"));
       yield { type: "usage", usage: { inputTokens: u?.input_tokens ?? null, outputTokens: u?.output_tokens ?? null, cachedInputTokens: u?.input_tokens_details?.cached_tokens ?? null, requestId: p.response?.id ?? null, stopReason: why } };
