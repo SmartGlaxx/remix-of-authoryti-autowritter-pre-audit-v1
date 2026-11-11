@@ -29,6 +29,8 @@ export interface PlannedReveal {
   id: string; summary: string; revealChapter: number; setupChapters: number[];
   /** Planner-only words that would give the reveal away; never reach the writer early. */
   secretTerms?: string[];
+  /** One sentence (≥10 words) describing the secret itself; keyword hits are judged against it. */
+  concept?: string;
   /** Writer-safe, concrete setup instructions per chapter (Phase F). */
   setupDirectives?: { chapterIndex: number; writerInstruction: string; viewpointKnows?: string; readerSees?: string }[];
 }

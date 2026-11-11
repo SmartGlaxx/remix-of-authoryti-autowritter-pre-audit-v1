@@ -63,7 +63,11 @@ export const expectedMicrobeats = (targetWords: number) => Math.max(3, Math.roun
 export function futureSecrets(s: MasterPlanSkeleton, ch: number): string[] {
   return (s.reveals ?? []).filter((r) => r.revealChapter > ch).flatMap((r) => r.secretTerms ?? []).filter((t) => t && (t.trim().includes(" ") || t.trim().length >= 4)); // 3-letter single words ("box") are ordinary vocabulary, not spoilers
 }
-const leaks = (text: string, secrets: string[]) => secrets.filter((t) => new RegExp(`(^|[^a-z0-9])${norm(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(norm(text)));
+/** Reader-, character- and writer-facing blueprint text (what a spoiler could reach). */
+export const blueprintWriterFacing = (bp: Pick<ChapterBlueprint, "knowledge" | "microbeats">) =>
+  [...bp.knowledge.reader, ...bp.knowledge.characters.flatMap((k) => k.knows), ...bp.microbeats.map((b) => b.text)].join("\n");
+/** The chapter's own approved plan text: anything it names is planned, not a spoiler. */
+export const approvedChapterPlanText = (i: Pick<BlueprintInput, "chapter" | "details" | "notes">) => JSON.stringify([i.chapter, i.details, i.notes]);
 
 export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
   const { m, chapter } = i;
@@ -155,9 +159,7 @@ export function validateBlueprint(bp: ChapterBlueprint, i: Pick<BlueprintInput, 
     if (!hay.includes(t.phrase.toLowerCase()))
       issues.push(`time reference "${t.phrase}" must appear verbatim in a microbeat of section ${secId ?? t.sectionIndex}`);
   }
-  const secrets = futureSecrets(i.m.skeleton, ch);
-  const writerFacing = [...bp.knowledge.reader, ...bp.knowledge.characters.flatMap((k) => k.knows), ...bp.microbeats.map((b) => b.text)].join("\n");
-  for (const t of leaks(writerFacing, secrets)) issues.push(`a later reveal ("${t}") leaks into reader, character or microbeat text`);
+  // Spoilers are judged as concepts after parsing (spoilerConcepts.ts), never by a bare word match here.
   return issues;
 }
 

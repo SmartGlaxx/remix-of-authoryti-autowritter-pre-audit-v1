@@ -113,7 +113,9 @@ export function buildPlanningAwareContext(input: PlanningContextInput): Planning
   const plan = resolvePlanForSection(input.master, input.position, input.bookType, input.readyPlans);
   const planC = plan.usable ? planCandidates(plan, input.position) : [];
   const anchorC = anchorCandidates(input.anchors ?? [], input.position);
-  const secrets = plan.usable ? futureSecrets(plan.master, input.position.chapterIndex) : [];
+  // Keywords the current chapter's approved plan already uses are planned, not spoilers.
+  const chapterPlan = plan.usable ? JSON.stringify(plan.master.chapters?.find((c) => c.chapterIndex === input.position.chapterIndex) ?? plan.section).toLowerCase() : "";
+  const secrets = plan.usable ? futureSecrets(plan.master, input.position.chapterIndex).filter((t) => !chapterPlan.includes(t.toLowerCase())) : [];
   const all = [...planC, ...anchorC, ...(input.extraCandidates ?? []), ...base.candidates];
   const safe = all.filter((c) => !leaksSecret(c.text, secrets));
   const objective = plan.usable ? `${plan.section.objective}${input.objective ? ` | ${input.objective}` : ""}` : input.objective;

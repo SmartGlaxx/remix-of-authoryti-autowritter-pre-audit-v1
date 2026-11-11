@@ -40,7 +40,7 @@ describe("Stage 2 chapter blueprints", () => {
     const o2 = good(); o2.microbeats.reverse(); expect(parseBlueprint(JSON.stringify(o2), input).ok).toBe(false);
   });
   it("beats starting with a pronoun are flagged", () => { const o = good(); o.microbeats[0].text = "She runs."; expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
-  it("a later reveal cannot leak into reader/character layers", () => { const o = good(); o.knowledge.reader.push("Jax is a traitor"); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
+  it("a keyword alone no longer rejects a blueprint (concept judge decides later)", () => { const o = good(); o.knowledge.reader.push("Jax is a traitor"); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(true); });
   it("the author layer may hold the twist", () => { const o = good(); o.knowledge.author.push("Jax is the traitor"); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(true); });
   it("too-thin coverage is rejected", () => { const o = good(); o.microbeats = o.microbeats.filter((_: any, i: number) => i === 0 || i === o.microbeats.length - 1); expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
   it("approved time references must appear verbatim in the section's microbeats", () => {

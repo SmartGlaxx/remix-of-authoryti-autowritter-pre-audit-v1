@@ -261,7 +261,7 @@ export function buildMasterPrompt(b: BookBrief, alternative: StoryAlternative | 
       (a.isFiction && TIME_PLAN_ENABLED ? "The genre_data timeframe pins the whole book in time: the era or date, the setting's clock, and the total elapsed span. Every later chapter plan, section summary and draft must stay inside it.\n" : "") +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `This book belongs to a planned series of ${b.seriesPlan.books} books. Also give "seriesBooks": one entry per book in the series, each with its own inciting incident, climax and hook into the next; the synopsis is the whole series arc.\n` : "") +
       `JSON: {"premise":"","synopsis":"(whole book, ${bandText(summaryBand(b.bookType, b.genre))})","ending":"","genre_data":{${fields.map((f) => `"${f}":""`).join(",")}${a.isFiction && TIME_PLAN_ENABLED ? `,"timeframe":"the book's temporal frame: when the story happens and its total elapsed span (e.g. 'late autumn 1893, one harbour town, nine days from the discovery to the confrontation')"` : ""}}` +
-      (a.isFiction ? ',"reveals":[{"summary":"","secretTerms":["words that would give it away"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
+      (a.isFiction ? ',"reveals":[{"summary":"","concept":"one sentence of at least 10 words stating the secret itself","secretTerms":["1-2 keywords that touch the secret"],"revealChapter":0,"setupChapters":[0],"setupDirectives":[{"chapterIndex":0,"writerInstruction":"concrete on-page behaviour or clue, never the explanation","viewpointKnows":"","readerSees":""}]}]' : "") +
       (b.seriesPlan && b.seriesPlan.books > 1 ? `,"seriesBooks":[{"bookNumber":1,"title":"","summary":"(${bandText(SERIES_BOOK_BAND)})"}]` : "") +
       `,"chapters":[{"objectiveKind":"","objective":"","sectionCount":${a.sectionsPerChapter.default},"weight":1}]}`,
   };
@@ -311,6 +311,7 @@ export function parseMaster(raw: string, b: BookBrief, alternative: StoryAlterna
     const reveals: PlannedReveal[] = a.isFiction ? (Array.isArray(o?.reveals) ? o.reveals : []).map((r: any, i: number) => ({
       id: `r${i + 1}`, summary: str(r?.summary), revealChapter: Number(r?.revealChapter), setupChapters: (Array.isArray(r?.setupChapters) ? r.setupChapters : []).map(Number),
       secretTerms: (Array.isArray(r?.secretTerms) ? r.secretTerms : []).map(str).filter(Boolean),
+      concept: str(r?.concept),
       setupDirectives: (Array.isArray(r?.setupDirectives) ? r.setupDirectives : []).map((d: any) => ({ chapterIndex: Number(d?.chapterIndex), writerInstruction: str(d?.writerInstruction), viewpointKnows: str(d?.viewpointKnows) || undefined, readerSees: str(d?.readerSees) || undefined })).filter((d: any) => Number.isInteger(d.chapterIndex) && d.writerInstruction),
     })) : [];
     if (a.isFiction) genreData.reveals = reveals;

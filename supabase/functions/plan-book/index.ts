@@ -3,6 +3,7 @@
 // Never writes prose, books, story memory or canon. dryRun returns prompts with no AI call or write.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText } from "../_shared/ai/client.ts";
+import { futureSpoilerConcepts, spoilerCandidates, buildSpoilerJudgePrompt, parseSpoilerJudge } from "../_shared/narrative/planning/spoilerConcepts.ts";
 import { configForPlanningAction, schemaForIdeaAction } from "../_shared/ai/ideation.ts";
 import { getWriter, resolveWriter } from "../_shared/writers/personas.ts";
 import { ideationVoiceBlock, bookToneDirective } from "../_shared/writers/toneMatch.ts";
@@ -23,7 +24,7 @@ import {
   mockAlternativesOutput, mockConceptsOutput, mockTwistsOutput, checkReviewDecision, type ReviewDecision,
 } from "../_shared/narrative/planning/bookSetup.ts";
 import { amendBlueprint, universeCollisions, titleThemeLock } from "../_shared/narrative/planning/closedWorld.ts";
-import { buildBlueprintPrompt, parseBlueprint, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
+import { buildBlueprintPrompt, parseBlueprint, blueprintWriterFacing, approvedChapterPlanText, mockBlueprintOutput, blueprintApprovalIssues, pendingCastProposals, isBlueprintExampleRole, type BlueprintInput, type CastRef } from "../_shared/narrative/planning/blueprint.ts";
 import { planKnowledgeWrites, type ExtractedKnowledge } from "../_shared/narrative/knowledge.ts";
 import { loadIdentitiesFor, ensureCastIdentities, loadKnowledgeScreen } from "../_shared/narrative/knowledgeRepo.ts";
 
@@ -495,6 +496,14 @@ async function handle(req: Request): Promise<Response> {
         const caller = mockPlanner === null && testMode ? storyCall(mockBlueprintOutput(input)) : call;
         const r = await runWithRepair(caller, toned(buildBlueprintPrompt(input)), (t) => parseBlueprint(t, input));
         if (!r.ok) return json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
+        // Concept spoiler check: keyword hit (not already in this chapter's approved plan) → AI judge with the concept sentence.
+        const cands = spoilerCandidates(blueprintWriterFacing(r.value), futureSpoilerConcepts(m.skeleton, ch), approvedChapterPlanText(input));
+        if (cands.length && !testMode) {
+          const jp = buildSpoilerJudgePrompt(cands);
+          const { text: jt } = await generateAIText({ role: "planner", config: callConfig, userId, bookId, bookType: book?.book_type ?? null, request: { system: jp.system, user: jp.user, json: true, maxOutputTokens: 4000 } }, deps);
+          const spoiled = parseSpoilerJudge(jt, cands);
+          if (spoiled.length) return json({ error: "PLAN_INVALID", issues: spoiled.map((x) => `scene plan gives away a later secret (${x.revealId}): ${x.why}`), attempts: r.attempts }, 422);
+        }
         const { data, error } = await db.rpc("save_progressive_plan_batch", { p_book_id: bookId, p_user_id: userId, p_master_plan_id: mp.id, p_idem: planIdemKey(["blueprint", mp.id, ch, runId]),
           p_items: [{ plan_level: "BLUEPRINT", chapter_index: ch, content: { blueprint: r.value }, dependencies: [] }] });
         if (error) throw new Error(error.message);
