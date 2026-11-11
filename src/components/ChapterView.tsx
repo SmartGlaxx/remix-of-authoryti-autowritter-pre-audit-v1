@@ -102,9 +102,14 @@ export function ChapterView({ book, onGenerateChapter, onUpdateBook, automationL
   }, [book.id, book.outline, progressive]);
   // Stale persisted writing flags must not animate when the book is paused.
   // This is a view of saved state, not a manuscript update.
-  const chapters = (book.outline?.chapters || []).map((ch) => ({
+  const chapters = (book.outline?.chapters || []).map((ch, ci) => ({
     ...ch, status: displayWritingStatus(ch.status, book.status),
-    subsections: ch.subsections.map((sub) => ({ ...sub, status: displayWritingStatus(sub.status, book.status) })),
+    subsections: ch.subsections.map((sub, si) => {
+      const st = displayWritingStatus(sub.status, book.status);
+      // Only the section at the live writing position may show the spinner.
+      const atPosition = ci === book.currentChapterIndex && si === book.currentSubsectionIndex;
+      return { ...sub, status: st === "writing" && !atPosition ? "pending" as const : st };
+    }),
   }));
 
   // Auto-open the chapter currently being written so new text is visible.
