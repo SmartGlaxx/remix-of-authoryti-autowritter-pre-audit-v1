@@ -103,7 +103,7 @@ serve(async (req) => {
     if (approvedCast.length && !missing.length) return new Response(JSON.stringify({ characters: outline.characters ?? [], visualStyleGuide: outline.visualStyleGuide ?? '', remaining: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const target = approvedCast.find((c) => c.name.trim() === missing[0]) ?? null;
     const existingCards = (outline.characters ?? []).map((c: any) => ({ id: c.id, name: c.name, visualDescription: c.visualDescription, reference: c.reference ? { heightCm: c.reference.heightCm, tells: c.reference.tells } : undefined }));
-    const extractPrompt = `Analyze this book outline and extract EVERY named fictional character. Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.
+    const extractPrompt = `${target ? `Write a reference card for ONE approved cast member only (named below). The "characters" array must contain exactly one entry. Do not write cards for anyone else.` : 'Analyze this book outline and extract EVERY named fictional character.'} Do not create characters from implied people, real public figures, objects, or instructional roles such as Reader, Colleague and Bill payer. Use existing cast ids and profiles when available; do not invent extra cast.
 EXISTING CAST: ${JSON.stringify(existingCards)}${target ? `
 APPROVED CAST MEMBER (authoritative): return exactly ONE card, for this person only, using the given id and the name exactly as written. Keep them visually distinct from the existing cast: ${JSON.stringify(target)}` : ''}
 
@@ -121,7 +121,7 @@ ${JSON.stringify(outline.chapters.map((ch: any) => ({
   subsections: ch.subsections.map((s: any) => ({ title: s.title, goal: s.goal }))
 })), null, 2)}
 
-For EACH character, provide an EXHAUSTIVE profile with ALL sections:
+For ${target ? 'this one character' : 'EACH character'}, provide an EXHAUSTIVE profile with ALL sections:
 IDENTITY, PHYSICAL APPEARANCE, HAIR, FASHION & STYLE, VOICE & MANNERISMS, PERSONALITY, BACKSTORY, ROLE IN STORY.
 
 Also provide:
@@ -148,7 +148,14 @@ Return ONLY valid JSON:
       "voice": { ... },
       "personality": { ... },
       "backstory": { ... },
-      "storyRole": { ... }
+      "storyRole": { ... },
+      "reference": {
+        "heightCm": 170, "weightKg": 65, "measurementSource": "designed",
+        "features": { "build": "", "skinTone": "", "face": "", "eyes": "", "hair": "", "hands": "", "posture": "", "clothes": "", "distinctiveMarks": "" },
+        "introFeatures": ["most visible", "second most visible", "..."],
+        "tells": [ { "state": "at-ease", "cue": "", "purpose": "comfort" }, { "state": "under pressure", "cue": "", "purpose": "betray" } ],
+        "desireLine": "", "heldBackFeature": ""
+      }
     }
   ],
   "visualStyleGuide": "Overall art style description for the book"
@@ -180,13 +187,25 @@ Return ONLY valid JSON:
     let parsed;
     try {
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-      parsed = JSON.parse(jsonMatch[1].trim());
-    } catch { throw new Error("Failed to parse character data"); }
+      let raw = jsonMatch[1].trim();
+      const a = raw.indexOf('{'), b = raw.lastIndexOf('}');
+      if (a >= 0 && b > a) raw = raw.slice(a, b + 1);
+      parsed = JSON.parse(raw);
+    } catch { console.error('character JSON unreadable, length', content.length, 'tail:', content.slice(-200)); throw new Error(`The character card for ${target?.name ?? 'the cast'} came back incomplete; press Write again.`); }
 
     const characters = target && Array.isArray(parsed.characters)
       ? parsed.characters.filter((c: any) => c?.id === target.id || String(c?.name ?? '').trim().toLowerCase() === target.name.trim().toLowerCase()).slice(0, 1).map((c: any) => ({ ...c, id: target.id, name: target.name }))
       : parsed.characters;
     if (target && !characters.length) throw new Error(`No reference card was returned for ${target.name}`);
+    for (const c of (Array.isArray(characters) ? characters : [])) {
+      // Models sometimes place reference fields at the top level; fold them back in.
+      const r = (c.reference && typeof c.reference === 'object') ? c.reference : {};
+      for (const k of ['heightCm','weightKg','measurementSource','tells','desireLine','heldBackFeature','features','introFeatures']) if (r[k] === undefined && c[k] !== undefined) r[k] = c[k];
+      if (!Array.isArray(r.tells) && r.tells && typeof r.tells === 'object') r.tells = Object.values(r.tells);
+      c.reference = r;
+    }
+    if (!Array.isArray(characters)) console.error('no characters array; parsed keys:', Object.keys(parsed ?? {}), 'target', JSON.stringify(target));
+    if (Array.isArray(characters) && characters.some((c: any) => typeof c.id !== 'string' || typeof c.name !== 'string' || !Array.isArray(c.reference?.tells))) console.error('target', JSON.stringify(target), 'card missing tells; keys:', JSON.stringify(characters.map((c: any) => [typeof c.id, c.name, Object.keys(c), Object.keys(c.reference ?? {}), typeof c.reference?.tells])));
     if (!Array.isArray(characters) || characters.some((c: any) => typeof c.id !== 'string' || typeof c.name !== 'string' || !c.reference || !Array.isArray(c.reference.tells))) throw new Error('Invalid character card data');
     const visualStyleGuide = parsed.visualStyleGuide || "";
 
