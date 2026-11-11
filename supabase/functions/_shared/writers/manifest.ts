@@ -20,7 +20,7 @@ export const WRITER_BASELINES: Partial<Record<string, SliderValues>> = {
   luca: { formality: 5, emotion: 7, warmth: 8, humor: 6, authority: 6, directness: 6, pacing: 5, elaboration: 8, conceptualComplexity: 7, perspective: 4, creativity: 8, hookFrequency: 6, sensoryDetail: 10, readerIntimacy: 8, sentenceVariation: 8 },
 };
 // New real-author writers start from the closest existing baseline (sliders stay bounded ±2 per book).
-for (const [id, base] of Object.entries({"vivian": "marcus", "rafe": "marcus", "simon": "adrian", "harriet": "marcus", "edmund": "julian", "margaret": "sophia", "henri": "sophia", "lena": "sophia", "rose": "sophia", "nikolai": "sophia", "jack": "marcus", "thomas": "ethan", "amara": "sophia", "charlotte": "sophia", "bella": "sophia", "niamh": "sophia", "orson": "julian", "zane": "julian"} as Record<string, string>)) WRITER_BASELINES[id] = { ...WRITER_BASELINES[base]! };
+for (const [id, base] of Object.entries({"vivian": "marcus", "rafe": "marcus", "simon": "adrian", "harriet": "marcus", "edmund": "julian", "margaret": "sophia", "henri": "sophia", "lena": "sophia", "rose": "sophia", "nikolai": "sophia", "jack": "marcus", "thomas": "ethan", "amara": "sophia", "charlotte": "sophia", "bella": "sophia", "niamh": "sophia", "orson": "julian", "zane": "julian", "rohan": "marcus", "dash": "marcus", "lev": "sophia", "kenji": "julian", "kofi": "daniel", "samir": "ethan", "hiro": "ethan", "meilin": "sophia", "imogen": "marcus", "georgia": "sophia"} as Record<string, string>)) WRITER_BASELINES[id] = { ...WRITER_BASELINES[base]! };
 
 
 /** Effective values for a book: requested sliders bounded to the writer baseline ±MAX_ADJUST. */

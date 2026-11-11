@@ -91,6 +91,6 @@ describe("Stage D continuous writer learning", () => {
     const recs = proposeRecommendations(recurring([{ kind: "approved" }]), "u1");
     recs.forEach((r) => compatibleWriters(r.writerId).forEach((t) => transferTechnique(r, t)));
     expect(JSON.stringify([WRITER_PERSONAS, PROFILES])).toBe(before);
-    expect(Object.keys(PROFILES).length * 4).toBe(120);
+    expect(Object.keys(PROFILES).length * 4).toBe(160);
   });
 });

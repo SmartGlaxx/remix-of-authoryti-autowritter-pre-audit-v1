@@ -18,7 +18,7 @@ describe("role separation", () => {
     expect(resolveModelForRole(null, "continuity_reviser").model).toBe("openai/gpt-6-sol");
     expect(LEGACY_ROLE_MODELS.literary_reviser).toBe("openai/gpt-6-sol");
   });
-  it("in all 120 profiles continuity_reviser and editor still use the profile's own revision slot", () => {
+  it("in all 160 profiles continuity_reviser and editor still use the profile's own revision slot", () => {
     let n = 0;
     for (const [w, tiers] of Object.entries(PROFILES)) for (const [t, prof] of Object.entries(tiers)) {
       const cfg = { mode: "profile" as const, profileWriter: w, profileTier: t as never };
@@ -26,7 +26,7 @@ describe("role separation", () => {
       expect(resolveModelForRole(cfg, "editor").model).toBe(prof.revision.model);
       n++;
     }
-    expect(n).toBe(120);
+    expect(n).toBe(160);
   });
 });
 

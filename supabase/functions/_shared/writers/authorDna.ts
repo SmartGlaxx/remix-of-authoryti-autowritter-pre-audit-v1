@@ -47,14 +47,15 @@ export const AUTHORS: AuthorDna[] = [
 ];
 
 /** Avatar writer → real authors (first is the default voice). Avatars without an entry keep their own voice. */
+/** Avatar writer → exactly one real author (1:1, same gender, no doubles). */
 export const AVATAR_AUTHORS: Record<string, string[]> = {
-  marcus: ["chase"], sophia: ["austen"], julian: ["leguin"], ethan: ["wodehouse", "vonnegut", "heller"],
-  maya: ["lewis"], adrian: ["caro"], daniel: ["isaacson"], priya: ["mcphee"], elena: ["didion"],
-  vivian: ["chandler", "hammett"], rafe: ["leonard"], simon: ["lecarre"], harriet: ["christie", "sayers"],
-  edmund: ["doyle"], margaret: ["pdjames", "french"], henri: ["simenon"], lena: ["jewell", "picoult"],
-  rose: ["hannah", "moyes"], nikolai: ["dostoevsky", "tolstoy"], jack: ["hemingway"], thomas: ["dickens"],
-  amara: ["adichie", "ng"], charlotte: ["bronte", "heyer"], bella: ["roberts", "reid"], niamh: ["rooney"],
-  orson: ["asimov", "herbert"], zane: ["pkdick", "gibson"],
+  marcus: ["chase"], rafe: ["leonard"], simon: ["lecarre"], edmund: ["doyle"], henri: ["simenon"],
+  nikolai: ["dostoevsky"], jack: ["hemingway"], thomas: ["dickens"], orson: ["asimov"], zane: ["gibson"],
+  julian: ["herbert"], ethan: ["wodehouse"], daniel: ["isaacson"], adrian: ["caro"], luca: ["mcphee"],
+  rohan: ["chandler"], dash: ["hammett"], lev: ["tolstoy"], kenji: ["pkdick"], kofi: ["lewis"], samir: ["vonnegut"], hiro: ["heller"],
+  harriet: ["christie"], vivian: ["french"], margaret: ["pdjames"], lena: ["jewell"], rose: ["hannah"], amara: ["adichie"],
+  charlotte: ["bronte"], bella: ["roberts"], niamh: ["rooney"], sophia: ["austen"], elena: ["didion"], maya: ["reid"],
+  claire: ["picoult"], nora: ["moyes"], priya: ["leguin"], meilin: ["ng"], imogen: ["sayers"], georgia: ["heyer"],
 };
 
 export function getAuthor(id: unknown): AuthorDna | null {

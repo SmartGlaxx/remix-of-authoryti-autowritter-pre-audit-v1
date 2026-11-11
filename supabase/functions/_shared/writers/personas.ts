@@ -239,7 +239,7 @@ function avatar(id: string, name: string, gender: "female" | "male", age: string
 }
 
 WRITER_PERSONAS.push(
-  avatar("vivian", "Vivian Cross", "female", "late 40s", "Noir detective voice", [...FICTION, "drama"], ["noir", "detective"]),
+  avatar("vivian", "Vivian Cross", "female", "late 40s", "Haunted psychological crime", [...FICTION, "drama"], ["crime", "psychological"]),
   avatar("rafe", "Rafe Dalton", "male", "early 50s", "Cool crime dialogue", [...FICTION, "drama"], ["crime"]),
   avatar("simon", "Simon Ashcombe", "male", "early 60s", "Espionage and betrayal", FICTION, ["espionage", "thriller"]),
   avatar("harriet", "Harriet Quill", "female", "mid 50s", "Classic puzzle mysteries", FICTION, ["mystery"]),
@@ -256,6 +256,16 @@ WRITER_PERSONAS.push(
   avatar("bella", "Bella Monroe", "female", "early 40s", "Warm romance and glamour", FICTION, ["romance", "contemporary"]),
   avatar("niamh", "Niamh Byrne", "female", "early 30s", "Intimate modern love stories", FICTION, ["romance", "contemporary"]),
   avatar("orson", "Orson Kade", "male", "late 50s", "Big-idea science fiction", FICTION, ["science fiction"]),
+  avatar("rohan", "Rohan Mehta", "male", "late 40s", "Rain-slick noir detective", [...FICTION, "drama"], ["noir", "detective"]),
+  avatar("dash", "Dash Freeman", "male", "early 50s", "Hard, terse crime", [...FICTION, "drama"], ["crime", "hardboiled"]),
+  avatar("lev", "Lev Arden", "male", "early 60s", "Panoramic literary epics", FICTION, ["literary", "historical"]),
+  avatar("kenji", "Kenji Mori", "male", "early 40s", "Reality-bending science fiction", FICTION, ["science fiction", "paranoid"]),
+  avatar("kofi", "Kofi Mensah", "male", "mid 40s", "Lively stories of money and misfits", ["business", "biography", "self-help"], ["business", "money"]),
+  avatar("samir", "Samir Haddad", "male", "mid 50s", "Deadpan humane satire", FICTION, ["satire", "humor"]),
+  avatar("hiro", "Hiro Sato", "male", "late 40s", "Absurd institutional comedy", FICTION, ["satire", "humor"]),
+  avatar("meilin", "Mei-Lin Zhou", "female", "late 30s", "Quiet family-secret dramas", FICTION, ["family", "literary"]),
+  avatar("imogen", "Imogen Sayle", "female", "early 50s", "Witty literary mysteries", FICTION, ["mystery", "romance"]),
+  avatar("georgia", "Georgia Pryce", "female", "mid 40s", "Sparkling period romance", FICTION, ["romance", "historical"]),
   avatar("zane", "Zane Okafor", "male", "late 30s", "Cyberpunk and paranoid sci-fi", FICTION, ["cyberpunk", "science fiction"]),
 );
 

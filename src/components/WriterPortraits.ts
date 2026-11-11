@@ -29,5 +29,15 @@ import bella from "@/assets/writers/bella.jpg";
 import niamh from "@/assets/writers/niamh.jpg";
 import orson from "@/assets/writers/orson.jpg";
 import zane from "@/assets/writers/zane.jpg";
+import rohan from "@/assets/writers/rohan.jpg";
+import dash from "@/assets/writers/dash.jpg";
+import lev from "@/assets/writers/lev.jpg";
+import kenji from "@/assets/writers/kenji.jpg";
+import kofi from "@/assets/writers/kofi.jpg";
+import samir from "@/assets/writers/samir.jpg";
+import hiro from "@/assets/writers/hiro.jpg";
+import meilin from "@/assets/writers/meilin.jpg";
+import imogen from "@/assets/writers/imogen.jpg";
+import georgia from "@/assets/writers/georgia.jpg";
 
-export const WRITER_PORTRAITS: Record<string, string> = { elena, maya, claire, nora, sophia, priya, daniel, marcus, adrian, ethan, julian, luca, vivian, rafe, simon, harriet, edmund, margaret, henri, lena, rose, nikolai, jack, thomas, amara, charlotte, bella, niamh, orson, zane };
+export const WRITER_PORTRAITS: Record<string, string> = { elena, maya, claire, nora, sophia, priya, daniel, marcus, adrian, ethan, julian, luca, vivian, rafe, simon, harriet, edmund, margaret, henri, lena, rose, nikolai, jack, thomas, amara, charlotte, bella, niamh, orson, zane, rohan, dash, lev, kenji, kofi, samir, hiro, meilin, imogen, georgia };

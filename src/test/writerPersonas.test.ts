@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { WRITER_PERSONAS, bestWriterFor, resolveWriter, renderWriterPrompt, genreSpecialistFor } from "../../supabase/functions/_shared/writers/personas";
 import { BOOK_TYPE_GENRES } from "../types/book";
 describe("Writer personas", () => {
-  it("30 unique writers, 15 female / 15 male", () => {
-    expect(new Set(WRITER_PERSONAS.map((w) => w.id)).size).toBe(30);
-    expect(WRITER_PERSONAS.filter((w) => w.gender === "female")).toHaveLength(15);
+  it("40 unique writers, 18 female / 22 male", () => {
+    expect(new Set(WRITER_PERSONAS.map((w) => w.id)).size).toBe(40);
+    expect(WRITER_PERSONAS.filter((w) => w.gender === "female")).toHaveLength(18);
   });
   it("covers every requested book type", () => {
     for (const t of ["novel","self-help","finance","business","children","comic","technology","science-popular","cookbook","drama","magazine"])

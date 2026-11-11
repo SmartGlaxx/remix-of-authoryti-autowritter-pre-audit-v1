@@ -5,10 +5,10 @@ import { TIME_PLAN_ENABLED } from "../../supabase/functions/_shared/narrative/pl
 import { textDossierLock, validateCharacterLock } from "../../supabase/functions/_shared/narrative/characterReference";
 
 describe("real-author voices", () => {
-  it("has 40 authors (no V. C. Andrews) and 30 writers", () => {
+  it("has 40 authors (no V. C. Andrews) and 40 writers", () => {
     expect(AUTHORS).toHaveLength(40);
     expect(AUTHORS.some((a) => /andrews/i.test(a.name))).toBe(false);
-    expect(WRITER_PERSONAS).toHaveLength(30);
+    expect(WRITER_PERSONAS).toHaveLength(40);
   });
   it("every author belongs to exactly one existing writer", () => {
     const used = Object.values(AVATAR_AUTHORS).flat();
@@ -20,12 +20,17 @@ describe("real-author voices", () => {
     expect(p).toContain("writing as James Hadley Chase");
     expect(p).toContain("Never copy, remix or closely resemble");
   });
-  it("a chosen secondary author is honoured only for its own writer", () => {
-    expect(resolveAuthor("vivian", "hammett")!.name).toBe("Dashiell Hammett");
-    expect(resolveAuthor("vivian", "austen")!.name).toBe("Raymond Chandler");
+  it("one author per writer, same gender as the writer", () => {
+    const male = new Set(["chandler","leonard","chase","hammett","lecarre","doyle","simenon","dostoevsky","tolstoy","hemingway","dickens","asimov","pkdick","herbert","gibson","caro","lewis","isaacson","mcphee","wodehouse","vonnegut","heller"]);
+    for (const w of WRITER_PERSONAS) {
+      const ids = AVATAR_AUTHORS[w.id];
+      expect(ids).toHaveLength(1);
+      expect(male.has(ids[0])).toBe(w.gender === "male");
+    }
   });
-  it("writers without a real author get no directive", () => {
-    expect(authorVoiceDirective("Nora", resolveAuthor("nora"), "plan")).toBe("");
+  it("another writer's author is never borrowed", () => {
+    expect(resolveAuthor("vivian", "austen")!.name).toBe("Tana French");
+    expect(authorVoiceDirective("Nobody", resolveAuthor("nobody"), "plan")).toBe("");
   });
   it("forced time markers are retired", () => { expect(TIME_PLAN_ENABLED).toBe(false); });
   it("a written dossier locks a character without any image", () => {
