@@ -61,3 +61,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 | 🟧 [ ] | 200-word sample passage per writer (needs paid AI or approval of hand-written samples) |
 | 🟧 [ ] | Two-path start screen: Writer-first (pitches) and Idea-first (best-fit writers) |
 | 🟧 [ ] | Live end-to-end test with a new book (paid AI) |
+
+- [x] Two-path start window (book type → writers, or browse writers → book types); placeholder writer samples
+- [ ] Real 200-word writer samples generated in-app
+- [ ] Trim Planning Studio sliders/choices now driven by writer voice

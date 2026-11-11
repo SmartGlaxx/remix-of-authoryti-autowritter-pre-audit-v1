@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import BookCard from "@/components/BookCard";
 import CreateBookEngine from "@/components/CreateBookEngine";
+import { StartBookDialog } from "@/components/StartBookDialog";
 import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
 import { useBooks } from "@/hooks/useBooks";
 import { getDefaultControls } from "@/types/book";
@@ -27,6 +28,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { bookType: routeBookType, slug } = useParams<{ bookType?: string; slug?: string }>();
   const [showEngine, setShowEngine] = useState(false);
+  const [showStart, setShowStart] = useState(false);
   const [showIdeas, setShowIdeas] = useState(false);
   const [engineInitial, setEngineInitial] = useState<Partial<CreateBookInput> | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>("updated");
@@ -198,6 +200,7 @@ const Index = () => {
         controls: { ...getDefaultControls(type), writerId: bestWriterFor(type).id, ...initial?.controls } as any,
       });
       setShowIdeas(false);
+      setShowStart(false);
       navigate(`/books/${newBook.id}/plan`);
     } catch (e) { console.error("Failed to start book:", e); toast.error("Couldn't start a new book"); }
     finally { setStarting(false); }
@@ -539,7 +542,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation onCreateBook={() => startNewBook()} onBookIdeas={() => setShowIdeas(true)} />
+      <Navigation onCreateBook={() => setShowStart(true)} onBookIdeas={() => setShowIdeas(true)} />
 
       <main>
         {isLoading ? (
@@ -572,7 +575,7 @@ const Index = () => {
                   generation.
                 </p>
               </div>
-              <Button variant="hero" size="lg" onClick={() => startNewBook()} className="group">
+              <Button variant="hero" size="lg" onClick={() => setShowStart(true)} className="group">
                 <Sparkles className="w-5 h-5 transition-transform group-hover:scale-110" />
                 Get Started
               </Button>
@@ -626,6 +629,7 @@ const Index = () => {
 
       <AnimatePresence>
         {showIdeas && <BookIdeasGenerator initialTab="saved" onBack={() => setShowIdeas(false)} onAccept={startNewBook} accepting={starting} />}
+        <StartBookDialog open={showStart} busy={starting} onClose={() => setShowStart(false)} onStart={(p) => startNewBook({ bookType: p.bookType, genre: p.genre, controls: { writerId: p.writerId } as any })} />
         {showEngine && <CreateBookEngine key={engineInitial ? "prefilled" : "blank"} initial={engineInitial} onClose={() => { setShowEngine(false); setEngineInitial(undefined); }} onCreate={handleCreateBook} />}
       </AnimatePresence>
     </div>
