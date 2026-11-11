@@ -60,7 +60,7 @@ describe("Stage 2 chapter blueprints", () => {
     expect(parseBlueprint(JSON.stringify(good()), input).ok).toBe(true);
   });
   it("unknown location/event references are rejected", () => { const o = good(); o.microbeats[0].locationId = "l9"; expect(parseBlueprint(JSON.stringify(o), input).ok).toBe(false); });
-  it("prompt carries cast ids and has no word limit on the synopsis", () => { const p = buildBlueprintPrompt(input).user; expect(p).toContain("k: Kiera Vance"); expect(p).toContain("no word limit"); });
+  it("prompt carries cast ids and caps the synopsis at 250 words", () => { const p = buildBlueprintPrompt(input).user; expect(p).toContain("k: Kiera Vance"); expect(p).toContain("at most 250 words"); });
   it("validator is deterministic", () => { const b = (parseBlueprint(JSON.stringify(good()), input) as any).value; expect(validateBlueprint(b, input)).toEqual([]); });
 });
 

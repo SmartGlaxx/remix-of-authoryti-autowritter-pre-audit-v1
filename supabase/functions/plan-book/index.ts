@@ -482,6 +482,13 @@ async function handle(req: Request): Promise<Response> {
         if (details.length !== chapter.sections.length) return json({ error: "Plan this chapter's sections first" }, 409);
         const notes = chapter.sections.flatMap((sec) => latest("BEATS", ch).find((r) => r.subsection_index === sec.sectionIndex)?.content?.notes ?? []);
         const chapRow = latest("CHAPTER", ch)[0];
+        // Setup cast (lightweight entries) becomes book cast before blueprinting, so planned people are known.
+        for (const c of normalizeSetup(book.story_setup).cast) {
+          if (!c.name?.trim()) continue;
+          const source_key = `setup:${c.key ?? c.name}`;
+          const { data: ex } = await db.from("story_characters").select("id").eq("book_id", bookId).eq("source_key", source_key).maybeSingle();
+          if (!ex) await db.from("story_characters").insert({ book_id: bookId, user_id: userId, name: c.name.trim().slice(0, 200), role: c.role ?? null, source_key });
+        }
         const { data: castRows } = await db.from("story_characters").select("id, name, aliases").eq("book_id", bookId).eq("user_id", userId).eq("is_active", true);
         const cast: CastRef[] = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases ?? [] }));
         const input: BlueprintInput = { m, chapter, details, notes, cast, expanded, stakes: chapRow?.content?.stakes, focus: chapRow?.content?.focus };

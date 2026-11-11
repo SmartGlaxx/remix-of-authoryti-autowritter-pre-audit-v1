@@ -68,7 +68,7 @@ const leaks = (text: string, secrets: string[]) => secrets.filter((t) => new Reg
 export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
   const { m, chapter } = i;
   const ch = chapter.chapterIndex;
-  const est = expectedMicrobeats(chapter.targetWords);
+  const est = Math.max(chapter.sections.length * 2, Math.min(24, Math.round(expectedMicrobeats(chapter.targetWords) / 2)));
   const sec = i.details.map((d) => {
     const beats = i.notes.filter((n) => n.id.startsWith(`${d.id}b`)).map((n) => `${n.kind}: ${n.note}`).join("; ");
     const si = chapter.sections.find((s) => s.id === d.id)?.sectionIndex;
@@ -80,16 +80,16 @@ export function buildBlueprintPrompt(i: BlueprintInput): Prompt {
     : "";
   const cast = i.cast.map((c) => `- ${c.id}: ${c.name}${c.aliases?.length ? ` (also ${c.aliases.join(", ")})` : ""}`).join("\n") || "- (no cast recorded yet)";
   return {
-    system: "You are a book planner. You expand ONE approved chapter into a detailed narrative blueprint. You never invent developments outside the approved plan. Output JSON only.",
+    system: "You are a book planner. You expand ONE approved chapter into a compact narrative blueprint. You never invent developments outside the approved plan. Output JSON only.",
     user: `${renderWholeBook(m, { ...i.expanded, [ch]: chapter })}\n\n` +
       `CHAPTER ${ch + 1} — objective: ${chapter.objective}${i.stakes ? `\nStakes: ${i.stakes}` : ""}${i.focus ? `\nFocus: ${i.focus}` : ""}\nAbout ${chapter.targetWords} words.\nApproved sections:\n${sec}\n\n` +
       `Book cast (use these ids; never create a person outside this list — if the approved plan truly needs someone new, add them to castProposals with a justification and use the proposal id):\n${cast}\n\n` +
       (isBlueprintExampleRole("Reader", m.skeleton.adapter) ? `Generic instructional roles such as Reader or Bill payer are plan-local example participants, not new people: put them in cast with local ids, never castProposals. Named people still require a proposal.\n` : "") +
       `Write the blueprint:\n` +
       `1. keyPoints and conclusion must preserve the chapter's approved objective, plot direction and ending.\n` +
-      `2. synopsis: a flowing prose account of the whole chapter from opening to conclusion — as long as completeness needs; no word limit. Names may repeat; every pronoun must be unambiguous.\n` +
+      `2. synopsis: a flowing prose account of the whole chapter from opening to conclusion — at most 250 words. Names may repeat; every pronoun must be unambiguous.\n` +
       `3. cast / locations / events: every participating character, consequential place and significant event, each with a stable id (locations l0.., events e0..). Every event names its source in the approved plan: "master", "chapter" or a section id.\n` +
-      `4. microbeats: about ${est} ordered units (roughly one per planned paragraph; more or fewer where the story needs it), covering every section in order. Each: id (m0..), sectionId, text (one explanatory sentence starting with a named character, not a pronoun), characterIds, locationId, eventIds, purpose (why it happens), transition (how it leads to the next beat).\n` +
+      `4. microbeats: about ${est} ordered units (one per key story turn), covering every section in order. Each: id (m0..), sectionId, text (one explanatory sentence starting with a named character, not a pronoun), characterIds, locationId, eventIds, purpose (≤12 words), transition (≤12 words). Keep every text field short; the whole JSON must stay compact.\n` +
       `5. knowledge: author (what only the author knows — twists, concealed identities), reader (what the reader learns by chapter end), characters (per character: knows / doesNotKnow at chapter end). Later reveals never appear in reader or character layers.\n` +
       timeRule +
       `JSON: {"objective":"","keyPoints":[""],"conclusion":"","synopsis":"","cast":[{"id":"","name":"","role":"","pov":false}],"locations":[{"id":"l0","name":"","significance":""}],"events":[{"id":"e0","name":"","consequence":"","source":"chapter"}],"microbeats":[{"id":"m0","sectionId":"${i.details[0]?.id ?? `c${ch}s0`}","text":"","characterIds":[],"locationId":"l0","eventIds":[],"purpose":"","transition":""}],"knowledge":{"author":[],"reader":[],"characters":[{"characterId":"","knows":[],"doesNotKnow":[]}]},"castProposals":[{"id":"p0","name":"","role":"","justification":""}]}`,
