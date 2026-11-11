@@ -11,4 +11,23 @@ import ethan from "@/assets/writers/ethan.jpg";
 import julian from "@/assets/writers/julian.jpg";
 import luca from "@/assets/writers/luca.jpg";
 
-export const WRITER_PORTRAITS: Record<string, string> = { elena, maya, claire, nora, sophia, priya, daniel, marcus, adrian, ethan, julian, luca };
+import vivian from "@/assets/writers/vivian.jpg";
+import rafe from "@/assets/writers/rafe.jpg";
+import simon from "@/assets/writers/simon.jpg";
+import harriet from "@/assets/writers/harriet.jpg";
+import edmund from "@/assets/writers/edmund.jpg";
+import margaret from "@/assets/writers/margaret.jpg";
+import henri from "@/assets/writers/henri.jpg";
+import lena from "@/assets/writers/lena.jpg";
+import rose from "@/assets/writers/rose.jpg";
+import nikolai from "@/assets/writers/nikolai.jpg";
+import jack from "@/assets/writers/jack.jpg";
+import thomas from "@/assets/writers/thomas.jpg";
+import amara from "@/assets/writers/amara.jpg";
+import charlotte from "@/assets/writers/charlotte.jpg";
+import bella from "@/assets/writers/bella.jpg";
+import niamh from "@/assets/writers/niamh.jpg";
+import orson from "@/assets/writers/orson.jpg";
+import zane from "@/assets/writers/zane.jpg";
+
+export const WRITER_PORTRAITS: Record<string, string> = { elena, maya, claire, nora, sophia, priya, daniel, marcus, adrian, ethan, julian, luca, vivian, rafe, simon, harriet, edmund, margaret, henri, lena, rose, nikolai, jack, thomas, amara, charlotte, bella, niamh, orson, zane };

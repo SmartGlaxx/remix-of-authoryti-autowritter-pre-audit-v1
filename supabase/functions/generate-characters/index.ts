@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
-import { createCharacterReference } from '../_shared/narrative/characterReferenceServer.ts';
+import { textDossierLock, validateCharacterLock, dossierWordCount } from '../_shared/narrative/characterReference.ts';
 import { missingReferenceNames } from '../_shared/narrative/characterReference.ts';
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
@@ -127,6 +127,8 @@ IDENTITY, PHYSICAL APPEARANCE, HAIR, FASHION & STYLE, VOICE & MANNERISMS, PERSON
 Also provide:
 - A brief description (for quick reference)
 - A visualDescription for illustration consistency
+- dossier: ONE 500–700 word prose dossier so detailed no image is ever needed: exact build, height, face, eyes, skin, hair, hands, scars/marks, signature clothes, scent, voice and cadence, posture, how they move, nervous habits, what they do under pressure, deepest flaw, moral line, how they treat others. Plain prose, no lists, no markdown.
+- reference.features: {build, skinTone, face, eyes, hair, hands, posture, clothes, distinctiveMarks} — short exact phrases matching the dossier.
 - reference: {heightCm: exact positive number, weightKg: exact positive number, measurementSource: "designed", tells:[{state,cue,purpose}], desireLine, heldBackFeature}. Design height and weight consistent with age/outline; these are design decisions NOT image measurements. 4–10 distinct functional tells with purpose betray/assist/reveal/endanger/mislead/comfort, including state "at-ease". Avoid duplicating cues across cast. Give 5–7 noticeability-ranked introduction features (introFeatures), top two most visible, one signature held back. Preserve explicit author facts.
 
 Return ONLY valid JSON:
@@ -137,6 +139,7 @@ Return ONLY valid JSON:
       "name": "Character Name",
       "description": "Quick reference summary",
       "visualDescription": "Visual description for illustration",
+      "dossier": "500–700 word prose dossier",
       "role": "protagonist|supporting|minor|background",
       "identity": { ... },
       "appearance": { ... },
@@ -192,7 +195,14 @@ Return ONLY valid JSON:
     const imgAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     for (const character of characters) {
       const existing = outline.characters?.find((c: any) => c.id === character.id && c.reference?.locked);
-      const prepared = existing ?? await createCharacterReference(imgAdmin,auth.user.id,book.id,character,charactersWithPortraits.map(c=>c.reference));
+      let prepared = existing;
+      if (!prepared) {
+        if (dossierWordCount(character.dossier) < 350) throw new Error(`The profile for ${character.name} was too short; try again`);
+        const lock = textDossierLock({ ...character.reference, features: character.reference?.features ?? {} });
+        const issues = validateCharacterLock(lock, charactersWithPortraits.map((c: any) => c.reference));
+        if (issues.length) throw new Error(issues.join('; '));
+        prepared = { ...character, reference: lock };
+      }
       charactersWithPortraits.push(prepared);
       // Checkpoint after each character; retry never discards completed references.
       const { data: latest } = await imgAdmin.from('books').select('outline').eq('id',book.id).eq('user_id',auth.user.id).single();

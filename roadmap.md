@@ -46,6 +46,18 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [x] Write Chapter 1 sections 2–4 on Sonnet 5
 - [ ] Save section 4 into story memory (~$0.05; paused at the $0.50 cap)
 - [x] Time plan cascade: book timeframe in fiction master plans; 4–8 chapter time refs (40–60% relative / 10–30% raw / 20–40% combined, scattered across sections); section summaries must quote assigned phrases verbatim; blueprint microbeats must carry them; writer brief lists the section's approved refs; 783 tests passed; plan-book + generate-content deployed; signed-in chapter dry-run verified (no AI cost)
-- [ ] Generate a new chapter with the time plan live (paid AI — awaiting explicit go-ahead)
+- [x] Time plan retired (real-author voices pace time); generation switch `TIME_PLAN_ENABLED=false`
 
 - [x] Chapter/section with no stored status renders as Pending instead of crashing the page (ChapterView + BookCard guarded; 777 tests passed; Clockwork Rose loads signed-in)
+
+## Real-author writers (approved outline)
+| Progress | Work item |
+| --- | --- |
+| 🟩 [x] | 40 real authors (V. C. Andrews omitted) mapped to 30 writers (12 existing + 18 new) |
+| 🟩 [x] | Smiling 3/4 portraits for the 18 new writers |
+| 🟩 [x] | Author voice + originality rules at every step: ideas, master plan, chapters, sections, beats, blueprint, drafting |
+| 🟩 [x] | Forced time markers removed from planning |
+| 🟩 [x] | Character pictures replaced by 500–700 word written dossiers, sent to the writer |
+| 🟧 [ ] | 200-word sample passage per writer (needs paid AI or approval of hand-written samples) |
+| 🟧 [ ] | Two-path start screen: Writer-first (pitches) and Idea-first (best-fit writers) |
+| 🟧 [ ] | Live end-to-end test with a new book (paid AI) |

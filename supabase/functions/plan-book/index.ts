@@ -6,6 +6,7 @@ import { generateAIText } from "../_shared/ai/client.ts";
 import { configForPlanningAction, schemaForIdeaAction } from "../_shared/ai/ideation.ts";
 import { getWriter, resolveWriter } from "../_shared/writers/personas.ts";
 import { ideationVoiceBlock, bookToneDirective } from "../_shared/writers/toneMatch.ts";
+import { authorVoiceDirective, resolveAuthor, type AuthorStage } from "../_shared/writers/authorDna.ts";
 import { createAIDeps, loadBookModelConfig } from "../_shared/ai/server.ts";
 import { statusForAIError, failClosedDeps } from "../_shared/ai/client.ts";
 import { verifyBookOwnership } from "../_shared/narrative/supabaseRepo.ts";
@@ -334,7 +335,12 @@ async function handle(req: Request): Promise<Response> {
     }
     // Book tone from Book Variants carries into master plan, chapters, sections, beats and blueprints (untoned books unchanged).
     const toneDirective = bookToneDirective(resolveWriter((book as any).controls ?? {}, ovType).id, (book as any).controls?.bookTone, "plan");
-    const toned = <P extends { user: string }>(p: P): P => (toneDirective ? { ...p, user: p.user + toneDirective } : p);
+    // Real-author voice reminder at every expansion stage (idea → master → chapter → sections/beats/blueprint).
+    const voiceWriter = getWriter(body.writerId) ?? resolveWriter((book as any).controls ?? {}, ovType);
+    const stage: AuthorStage = ["alternatives", "concepts", "adjust_premise", "twists"].includes(action) ? "idea"
+      : action === "master" ? "plan" : action === "chapters" ? "chapter" : "section";
+    const authorDirective = authorVoiceDirective(voiceWriter.name, resolveAuthor(voiceWriter.id, (book as any).controls?.authorId), stage);
+    const toned = <P extends { user: string }>(p: P): P => ({ ...p, user: p.user + toneDirective + authorDirective });
 
     try {
       if (action === "adjust_premise") {
@@ -344,7 +350,7 @@ async function handle(req: Request): Promise<Response> {
         let pr: Prompt;
         try { pr = buildAdjustPremisePrompt(brief, keys, custom); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const mock = JSON.stringify({ premise: `${brief.premise}\n\nRevised for: ${[...keys.map((k) => PREMISE_ADJUSTMENTS[k]), custom].filter(Boolean).join("; ")}. The story now leans into these qualities from its opening through its ending, keeping the original characters and setting.`, changes: "Test version: no AI was used." });
-        const r = await runWithRepair(storyCall(mock), pr, parseAdjustedPremise);
+        const r = await runWithRepair(storyCall(mock), { ...pr, user: pr.user + authorDirective }, parseAdjustedPremise);
         return r.ok ? json({ ...r.value, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues }, 422);
       }
 
@@ -355,7 +361,7 @@ async function handle(req: Request): Promise<Response> {
         if (fixed.length) brief.guidance = [brief.guidance, `Fixed author requirements (keep in every alternative): ${fixed.join("; ")}`].filter(Boolean).join("\n");
         if (typeof body.twistMode === "boolean" && adapterForBookType(ovType).isFiction) brief.twistMode = body.twistMode;
         const pr = buildAlternativesPrompt(brief, count);
-        const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), pr, (t) => parseAlternatives(t, count, summaryBand(ovType, brief.genre)));
+        const r = await runWithRepair(storyCall(mockAlternativesOutput(brief, count, fixed)), { ...pr, user: pr.user + authorDirective }, (t) => parseAlternatives(t, count, summaryBand(ovType, brief.genre)));
         return r.ok ? json({ alternatives: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
@@ -364,7 +370,7 @@ async function handle(req: Request): Promise<Response> {
         const count = Number(body.count) as AlternativeCount;
         try { assertConceptsEligible(ovType, count); } catch (e) { return json({ error: (e as Error).message }, 400); }
         const pr = buildConceptsPrompt(brief, count);
-        const r = await runWithRepair(storyCall(mockConceptsOutput(brief, count)), pr, (t) => parseConcepts(t, count));
+        const r = await runWithRepair(storyCall(mockConceptsOutput(brief, count)), { ...pr, user: pr.user + authorDirective }, (t) => parseConcepts(t, count));
         return r.ok ? json({ concepts: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 
@@ -374,7 +380,7 @@ async function handle(req: Request): Promise<Response> {
         const alt = st.selectedIndex !== null ? st.alternatives[st.selectedIndex] ?? null : null;
         const n = Math.min(6, Math.max(1, Number(body.count) || 3));
         const pr = buildTwistPrompt(brief, alt, n);
-        const r = await runWithRepair(storyCall(mockTwistsOutput(brief, n)), pr, (t) => parseTwists(t, brief.chapterCount));
+        const r = await runWithRepair(storyCall(mockTwistsOutput(brief, n)), { ...pr, user: pr.user + authorDirective }, (t) => parseTwists(t, brief.chapterCount));
         return r.ok ? json({ twists: r.value, attempts: r.attempts, engine: storyLive() && !testMode ? "live" : "mock" }) : json({ error: "PLAN_INVALID", issues: r.issues, attempts: r.attempts }, 422);
       }
 

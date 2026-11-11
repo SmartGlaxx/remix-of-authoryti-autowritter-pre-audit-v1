@@ -21,7 +21,7 @@ export interface NarrativeRows {
   snapshots: Row[];       // story_state_snapshots
 }
 
-export interface OutlineCharacter { id?: string; name?: string; role?: string; description?: string; personality?: string; appearance?: string; firstAppearance?: StoryPosition }
+export interface OutlineCharacter { id?: string; name?: string; role?: string; description?: string; personality?: string; appearance?: string; dossier?: string; firstAppearance?: StoryPosition }
 
 export interface MergedCharacterState {
   location: string | null; physical: string | null; emotional: string | null;
@@ -216,6 +216,8 @@ export function renderNarrativeContext(s: SelectedNarrativeState): string {
       const base = [c.role || b?.role, b?.description || b?.personality].filter(Boolean).join(" — ");
       const tag = !c.state && c.cast === "enters_now" ? " [planned to first appear in THIS section]" : !c.state && c.cast === "unplaced" ? " [planned cast; not yet on page]" : "";
       out.push(`- ${c.name}${tag}${base ? `: ${base.slice(0, 200)}` : ""}`);
+      // Text dossier is the character's fixed look, voice and behaviour (replaces images); never sent for off-page cast.
+      if (b?.dossier && c.cast !== "unplaced") out.push(`  dossier (keep every physical and behavioural detail consistent): ${String(b.dossier).slice(0, 5000)}`);
       const st = c.state;
       if (st) {
         const parts = [

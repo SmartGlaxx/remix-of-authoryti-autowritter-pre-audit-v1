@@ -309,7 +309,7 @@ META RULE: Show > tell. Panels > paragraphs.
     : "";
 
   const activeWriterPersona = resolveWriter(controls, book.bookType);
-  const writerBlock = renderWriterPrompt(activeWriterPersona, book.bookType);
+  const writerBlock = renderWriterPrompt(activeWriterPersona, book.bookType, controls?.authorId);
   // Book tone chosen in Book Variants: applied to every paragraph through this writer's lens (absent = prompt unchanged).
   const bookTone = typeof controls?.bookTone === "string" && controls.bookTone.trim() ? controls.bookTone.trim() : "";
   const toneLensBlock = bookTone ? `\nBOOK TONE (applies to EVERY paragraph, including transitions, description and dialogue): "${bookTone}". ${lensFor(activeWriterPersona, bookTone)} Never drift out of this tone, and never let it override the writer's own voice.\n` : "";

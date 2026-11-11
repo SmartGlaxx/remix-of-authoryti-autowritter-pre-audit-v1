@@ -32,7 +32,7 @@ const p = (d: Slot, r: Slot, c: Slot, a: Slot): Profile => ({ draft: d, revision
 /** One pipeline for every writer (one tier). Draft: Sonnet 5 (writer toggle → Sol) · everything else: Sol.
  * Writers differ only in persona, sliders and tone. No other models. */
 export const PREMIER_PROFILE: Profile = p(s(SO), s(SOL), s(SOL, "low"), s(SOL, "low"));
-const WRITER_IDS = ["elena", "maya", "claire", "nora", "sophia", "priya", "daniel", "marcus", "adrian", "ethan", "julian", "luca"];
+const WRITER_IDS = ["elena", "maya", "claire", "nora", "sophia", "priya", "daniel", "marcus", "adrian", "ethan", "julian", "luca", "vivian", "rafe", "simon", "harriet", "edmund", "margaret", "henri", "lena", "rose", "nikolai", "jack", "thomas", "amara", "charlotte", "bella", "niamh", "orson", "zane"];
 /** Legacy saved tiers still resolve — every tier maps to the premier profile. */
 export const PROFILES: Record<string, Record<Tier, Profile>> = Object.fromEntries(
   WRITER_IDS.map((id) => [id, { economy: PREMIER_PROFILE, balanced: PREMIER_PROFILE, professional: PREMIER_PROFILE, maximum: PREMIER_PROFILE }]),

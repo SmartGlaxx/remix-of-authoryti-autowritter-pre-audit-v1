@@ -2,6 +2,8 @@
 // The persona supplies the authorial identity; the chosen AI model only supplies the intelligence,
 // so the voice stays recognisable across models. Rendered text is stable per book (prompt-cache safe).
 
+import { AUTHORS, AVATAR_AUTHORS, authorVoiceDirective, resolveAuthor } from "./authorDna.ts";
+
 export interface WriterPersona {
   id: string;
   name: string;
@@ -223,6 +225,40 @@ export const WRITER_PERSONAS: WriterPersona[] = [
   },
 ];
 
+const FICTION = ["novel", "short-story", "fiction-serial"];
+/** Avatar writers built from their real-author DNA (prompt-only voices). */
+function avatar(id: string, name: string, gender: "female" | "male", age: string, tagline: string, bookTypes: string[], topics: string[]): WriterPersona {
+  const a = AUTHORS.find((x) => x.id === AVATAR_AUTHORS[id][0])!;
+  const t = `Writes in the tradition of ${a.name}: ${a.dna}.`;
+  return { id, name, tagline, gender, age, background: `Novelist specialising in ${a.genre.toLowerCase()}.`,
+    personality: t, temperament: t, intellect: t, communication: t, vocabulary: t, rhythm: t, paragraphs: t,
+    formality: "As the tradition demands.", humor: "As the tradition demands.", storytelling: t, figurative: t,
+    evidence: "Shown through people, never explained.", readerRelationship: "Keeps the reader turning pages.",
+    philosophy: t, strengths: a.genre, quirks: t, avoids: "Procedures, explanations, copying any published story.",
+    signature: a.dna, bookTypes, topics };
+}
+
+WRITER_PERSONAS.push(
+  avatar("vivian", "Vivian Cross", "female", "late 40s", "Noir detective voice", [...FICTION, "drama"], ["noir", "detective"]),
+  avatar("rafe", "Rafe Dalton", "male", "early 50s", "Cool crime dialogue", [...FICTION, "drama"], ["crime"]),
+  avatar("simon", "Simon Ashcombe", "male", "early 60s", "Espionage and betrayal", FICTION, ["espionage", "thriller"]),
+  avatar("harriet", "Harriet Quill", "female", "mid 50s", "Classic puzzle mysteries", FICTION, ["mystery"]),
+  avatar("edmund", "Edmund Grey", "male", "late 50s", "Brilliant-detective adventures", FICTION, ["detective", "adventure"]),
+  avatar("margaret", "Margaret Fenwick", "female", "early 60s", "Psychological crime", FICTION, ["crime", "psychological"]),
+  avatar("henri", "Henri Duval", "male", "mid 50s", "Atmospheric investigator", FICTION, ["detective", "psychological"]),
+  avatar("lena", "Lena Hart", "female", "early 40s", "Domestic suspense", FICTION, ["suspense", "family"]),
+  avatar("rose", "Rose Calloway", "female", "late 40s", "Sweeping family sagas", FICTION, ["family", "historical", "romance"]),
+  avatar("nikolai", "Nikolai Varga", "male", "late 50s", "Grand literary novels", FICTION, ["literary", "philosophical"]),
+  avatar("jack", "Jack Mercer", "male", "early 50s", "Spare literary minimalist", FICTION, ["literary", "war", "loss"]),
+  avatar("thomas", "Thomas Pell", "male", "mid 50s", "Big-hearted social novels", FICTION, ["social", "literary"]),
+  avatar("amara", "Amara Obi", "female", "early 40s", "Contemporary literary fiction", FICTION, ["identity", "family", "literary"]),
+  avatar("charlotte", "Charlotte Wren", "female", "late 30s", "Gothic and period romance", FICTION, ["romance", "gothic", "historical"]),
+  avatar("bella", "Bella Monroe", "female", "early 40s", "Warm romance and glamour", FICTION, ["romance", "contemporary"]),
+  avatar("niamh", "Niamh Byrne", "female", "early 30s", "Intimate modern love stories", FICTION, ["romance", "contemporary"]),
+  avatar("orson", "Orson Kade", "male", "late 50s", "Big-idea science fiction", FICTION, ["science fiction"]),
+  avatar("zane", "Zane Okafor", "male", "late 30s", "Cyberpunk and paranoid sci-fi", FICTION, ["cyberpunk", "science fiction"]),
+);
+
 export function getWriter(id: unknown): WriterPersona | null {
   return typeof id === "string" ? WRITER_PERSONAS.find((w) => w.id === id) ?? null : null;
 }
@@ -271,7 +307,7 @@ export function resolveWriter(controls: { writerId?: unknown } | null | undefine
 }
 
 /** Identity + style block for the writer's system prompt. Book type adapts the voice; hard format rules still win. */
-export function renderWriterPrompt(w: WriterPersona, bookType: string): string {
+export function renderWriterPrompt(w: WriterPersona, bookType: string, authorId?: unknown): string {
   const native = w.bookTypes.includes(bookType);
   return `WRITER IDENTITY — you ARE ${w.name}, ${w.tagline.toLowerCase()} (${w.age}). Write every line as this author. Keep this voice identical in every section, whatever the model.
 - Background: ${w.background}
@@ -294,5 +330,5 @@ STYLE ENGINE:
 - Never: ${w.avoids}
 
 GENRE ADAPTATION: ${native ? `This is one of your natural forms (${bookType}); write at full strength.` : `You are adapting your voice to a ${bookType} book: keep your personality, rhythm and signature, but obey that form's conventions.`}
-Book-specific instructions, format rules (screenplay, children's, comic), banned words and story memory below ALWAYS override persona habits. Never mention your name or persona in the text.`;
+Book-specific instructions, format rules (screenplay, children's, comic), banned words and story memory below ALWAYS override persona habits. Never mention your name or persona in the text.${authorVoiceDirective(w.name, resolveAuthor(w.id, authorId), "draft")}`;
 }

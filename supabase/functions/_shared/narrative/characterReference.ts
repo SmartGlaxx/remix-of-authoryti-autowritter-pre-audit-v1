@@ -8,9 +8,9 @@ export interface CharacterLock {
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 export function validateCharacterLock(card: CharacterLock, others: CharacterLock[] = []): string[] {
   const issues: string[] = [];
-  if (!card.referencePath) issues.push('Five-view reference required');
+  if (!card.referencePath) issues.push('Character reference required');
   if (!['author','designed'].includes(card.measurementSource)) issues.push('Measurement provenance required');
-  if (!card.features || Object.keys(card.features).length === 0) issues.push('Image-observed features required');
+  if (!card.features || Object.keys(card.features).length === 0) issues.push('Designed appearance features required');
   if (!Number.isFinite(card.heightCm) || card.heightCm <= 0 || !Number.isFinite(card.weightKg) || card.weightKg <= 0) issues.push('Exact designed or author-provided height and weight required');
   if (card.tells.length < 4 || card.tells.length > 10) issues.push('Four to ten behavioural tells required');
   if (!card.tells.some(t => t.state === 'at-ease')) issues.push('At-ease tell required');
@@ -56,3 +56,10 @@ export function missingReferenceNames(cast: readonly string[], cards: readonly {
   const locked = new Set(cards.filter((c) => c?.reference?.locked && c.name).map((c) => norm(c.name!)));
   return [...new Set(cast.map((n) => n?.trim()).filter(Boolean))].filter((n) => !locked.has(norm(n)));
 }
+
+/** Text-only reference: the designed features + 500–700 word dossier replace the image. No paid image or vision call. */
+export const TEXT_DOSSIER_PATH = 'text-dossier';
+export function textDossierLock(reference: Omit<CharacterLock, 'referencePath' | 'locked'> & Partial<CharacterLock>): CharacterLock {
+  return { ...reference, referencePath: TEXT_DOSSIER_PATH, locked: true } as CharacterLock;
+}
+export function dossierWordCount(text: unknown): number { return typeof text === 'string' ? text.trim().split(/\s+/).filter(Boolean).length : 0; }

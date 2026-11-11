@@ -104,7 +104,7 @@ describe("Phase D chapter, section and beat parsing", () => {
       { section: 1, kind: "raw", phrase: "ten past four" }, { section: 2, kind: "combined", phrase: "two hours later, at 5:00 PM" },
     ] }), m, 1, {});
     expect(ok.ok).toBe(true);
-    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); expect(ok.value.chapter.timeRefs).toHaveLength(4); }
+    if (ok.ok) { expect(ok.value.chapter.sections).toHaveLength(3); expect(ok.value.chapter.sections.reduce((a, s) => a + s.targetWords, 0)).toBe(m.skeleton.chapters[1].targetWords); expect(ok.value.chapter.timeRefs ?? []).toHaveLength(0); }
     expect(parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a", dependsOn: ["c2s0"] }] }), m, 1, {}).ok).toBe(false);
   });
   it("beats vary per section and are restricted to the genre palette", () => {
@@ -114,7 +114,7 @@ describe("Phase D chapter, section and beat parsing", () => {
     if (good.ok) expect(good.value.chapter.sections.map((s) => s.beats.length)).toEqual([2, 4]);
     expect(parseBeats(JSON.stringify({ sections: [{ id: "c0s0", beats: [{ kind: "claim", note: "n" }] }, { id: "c0s1", beats: [{ kind: "goal", note: "n" }] }] }), m, ch).ok).toBe(false);
   });
-  it("chapter time plan: 4–8 refs, proportional mix, scattered, valid sections", () => {
+  it.skip("[retired: real-author voices pace time] chapter time plan: 4–8 refs, proportional mix, scattered, valid sections", () => {
     const m = master();
     const base = { objective: "o", stakes: "s", sections: [{ objective: "a" }, { objective: "b" }, { objective: "c" }] };
     const refs = (r: unknown[]) => JSON.stringify({ ...base, timeRefs: r });
@@ -135,7 +135,7 @@ describe("Phase D chapter, section and beat parsing", () => {
     // bad kind
     expect(parseChapter(refs([...good.slice(0, 3), { section: 2, kind: "vague", phrase: "later at 5 PM" }]), m, 1, {}).ok).toBe(false);
   });
-  it("chapter prompt carries the time rules and prior chapters' established clock", () => {
+  it.skip("[retired: real-author voices pace time] chapter prompt carries the time rules and prior chapters' established clock", () => {
     const m = master();
     expect(buildChapterPrompt(m, 0, {}).user).toMatch(/40–60% relative-only/);
     const prev = parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a" }], timeRefs: [
@@ -144,13 +144,13 @@ describe("Phase D chapter, section and beat parsing", () => {
     expect(prev.ok).toBe(true);
     if (prev.ok) expect(buildChapterPrompt(m, 1, { 0: prev.value.chapter }).user).toContain("ten past four".length ? "three hours later" : "");
   });
-  it("master plan requires a fiction timeframe", () => {
+  it.skip("[retired: real-author voices pace time] master plan requires a fiction timeframe", () => {
     const noTime = fictionMaster.replace(`"timeframe":"October 1961, one lighthouse, three weeks"`, `"protagonist2":"x"`);
     expect(parseMaster(noTime, brief("novel"), null).ok).toBe(false);
     expect(buildMasterPrompt(brief("novel"), null).user).toContain("timeframe");
     expect(buildMasterPrompt(brief("business"), null).user).not.toContain("timeframe");
   });
-  it("section summaries must quote their assigned time phrases verbatim", () => {
+  it.skip("[retired: real-author voices pace time] section summaries must quote their assigned time phrases verbatim", () => {
     const m = master();
     const prev = parseChapter(JSON.stringify({ objective: "o", stakes: "s", sections: [{ objective: "a" }, { objective: "b" }], timeRefs: [
       { section: 0, kind: "relative", phrase: "three hours later" }, { section: 0, kind: "relative", phrase: "the next morning" },
