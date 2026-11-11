@@ -293,7 +293,7 @@ async function handle(req: Request): Promise<Response> {
       prompts.push(p);
       if (dryRun) throw new DryRunStop();
       if (mockPlanner !== null) return mockPlanner;
-      const { text } = await generateAIText({ role: "planner", config: callConfig, userId, bookId, request: { system: p.system, user: p.user, json: true, ...(jsonSchema ? { jsonSchema, reasoning: "low" as const } : {}) } }, deps);
+      const { text } = await generateAIText({ role: "planner", config: callConfig, userId, bookId, bookType: (typeof body.bookType === "string" ? body.bookType : null) ?? book?.book_type ?? null, request: { system: p.system, user: p.user, json: true, ...(jsonSchema ? { jsonSchema, reasoning: "low" as const } : {}) } }, deps);
       return text;
     };
     // Free deterministic engine for story services (same prompts, parsers and repair loop as live).

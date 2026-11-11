@@ -74,6 +74,9 @@ export function defaultBookConfig(writerId: string | null | undefined, draftMode
 export const SCRIPT_BOOK_TYPES: ReadonlySet<string> = new Set(["drama"]);
 export const SCRIPT_DRAFT_MODEL = SOL;
 
+/** Story book types whose planning runs on Sonnet 5. */
+export const FICTION_PLANNING_TYPES: ReadonlySet<string> = new Set(["novel", "fiction-serial", "short-story", "comic", "drama", "children"]);
+
 export function draftModelFor(choice: DraftChoice | null | undefined, bookType?: string | null): string {
   if (choice) return DRAFT_MODELS[choice];
   return bookType && SCRIPT_BOOK_TYPES.has(bookType) ? SOL : SONNET;
@@ -82,6 +85,8 @@ export function draftModelFor(choice: DraftChoice | null | undefined, bookType?:
 export function resolveModelForRole(config: BookModelConfig | null | undefined, role: Role, opts: { fast?: boolean; bookType?: string | null } = {}): ResolvedModel {
   const c = normalizeConfig(config ?? DEFAULT_CONFIG);
   if (PROSE_ROLES.has(role)) return { role, model: draftModelFor(c.draftModel, opts.bookType), fallback: null, source: "profile" };
+  // Fiction planning runs on Sonnet 5: Sol's safety filter refuses crime/violence story plans.
+  if (role === "planner" && opts.bookType && FICTION_PLANNING_TYPES.has(opts.bookType)) return { role, model: SONNET, fallback: null, source: "profile" };
   const slot = slotForRole(PREMIER_PROFILE, role);
   // Locked: no per-role overrides and no silent fallback to another model.
   return { role, model: slot.model, fallback: null, source: "profile", reasoning: reasoningFor(slot.mode), thinking: thinkingFor(slot.mode) };

@@ -45,6 +45,8 @@ export interface RunAIOptions {
   maxRetries?: number;
   /** Only the caller's own provider key may be used (no platform/gateway route, no surprise billing). */
   requireUserKey?: boolean;
+  /** Book type, so routing can follow book-type rules (e.g. fiction planning on Sonnet 5). */
+  bookType?: string | null;
 }
 
 export interface RunAIMeta {
@@ -87,7 +89,7 @@ const emptyUsage = (): Usage => ({ inputTokens: null, outputTokens: null, cached
 /** Streams text chunks. `meta` is filled as the call progresses; usage is recorded when the stream ends. */
 export async function* streamAI(opts: RunAIOptions, deps: AIDeps, meta: Partial<RunAIMeta> = {}): AsyncGenerator<string> {
   if (!ACTIVE_ROLES.includes(opts.role)) throw new AIProviderError("inactive_role", `The ${opts.role} role is not active yet.`);
-  const resolved = resolveModelForRole(opts.config, opts.role);
+  const resolved = resolveModelForRole(opts.config, opts.role, { bookType: opts.bookType });
   const primary = opts.modelOverride && opts.modelOverride !== resolved.model ? opts.modelOverride : resolved.model;
   const candidates = [primary, ...(resolved.fallback && resolved.fallback !== primary ? [resolved.fallback] : [])];
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
