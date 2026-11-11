@@ -29,6 +29,17 @@ export function parseSectionMemory(raw: unknown, text: string, source: string): 
   if (!raw || typeof raw !== 'object') throw new Error('Paragraph memory is missing');
   const r = raw as SectionMemory;
   const count = paragraphsOf(text).length;
+  // A summary that spills into two sentences is merged into one; paragraph counts must still match exactly.
+  const oneSentence = (v: unknown) => {
+    if (typeof v !== 'string' || sentence(v)) return v;
+    const parts = [...new Segmenter('en', { granularity: 'sentence' }).segment(v.trim())].map((x) => String((x as { segment: string }).segment).trim().replace(/[.!?]+$/, '')).filter(Boolean);
+    const merged = parts.join('; ') + '.';
+    return sentence(merged) ? merged : v;
+  };
+  if (r?.summary) {
+    if (Array.isArray(r.summary.writerView)) r.summary.writerView = r.summary.writerView.map(oneSentence) as string[];
+    if (r.summary.characterViews && typeof r.summary.characterViews === 'object') for (const k of Object.keys(r.summary.characterViews)) { const v = r.summary.characterViews[k]; if (Array.isArray(v)) r.summary.characterViews[k] = v.map(oneSentence) as string[]; }
+  }
   const validView = (v: unknown) => Array.isArray(v) && v.length === count && v.every(sentence);
   if (!validView(r.summary?.writerView)) throw new Error('Each paragraph needs exactly one writer-view sentence');
   if (!r.summary.characterViews || Array.isArray(r.summary.characterViews) || typeof r.summary.characterViews !== 'object') throw new Error('Character views are missing');
@@ -83,7 +94,7 @@ function parseParagraphTimes(raw: unknown, count: number): ParagraphTimeAnchor[]
 }
 export function memoryExtractionInstruction(text: string): string {
   return `ALSO return "section_memory": {"summary":{"writerView":[],"characterViews":{}},"dialogueCards":{"incidents":{},"people":{}},"sectionTime":{"date":null,"time":null},"paragraphTimes":[]}.
-There are ${paragraphsOf(text).length} paragraphs. For EVERY paragraph give exactly ONE sentence in writerView and exactly ONE sentence in each present character's characterViews array, in paragraph order. If absent/unaware, say so; never give a character the writer's hidden knowledge. Writer view summarizes only what this accepted text establishes, not future plans.
+There are exactly ${paragraphsOf(text).length} paragraphs (a one-line or one-word paragraph still counts), starting: ${paragraphsOf(text).map((p, i) => `[${i}] "${p.slice(0, 30)}"`).join(' ')}. Each array must have exactly that many entries. For EVERY paragraph give exactly ONE sentence in writerView and exactly ONE sentence in each present character's characterViews array, in paragraph order. If absent/unaware, say so; never give a character the writer's hidden knowledge. Writer view summarizes only what this accepted text establishes, not future plans.
 paragraphTimes: exactly ONE anchor per paragraph, in paragraph order: {paragraphIndex (0-based), frameType ("linear"|"flashback"|"memory"|"flashforward"|"parallel"), frameId ("main" for linear; one stable id per non-linear frame), relativeTime, rawTime, parentReturnIndex (paragraph index where an open non-linear frame returns, else null)}. RELATIVE time is pegged to something else ("five hours later", "the next morning", "that same day"); RAW/EXACT time is a fixed clock or calendar stamp ("7:00 PM", "29th June", "at noon"). Copy each phrase VERBATIM from the paragraph; a paragraph may carry one, both, or neither (nulls). When a paragraph mentions time, that mention MUST also appear in its writerView summary sentence. Open a non-linear frame only on a real transition (flashback, recollection, glimpse ahead, "meanwhile"); inside it time still moves forward. The arithmetic must hold: if the scene was at noon and "five hours later" passes, a stated "7:00 PM" is impossible — flag it by omitting nothing, never by inventing a fix.
 Dialogue incidents: {id,label,location,time,source,participants:[],addressedTo:[],present:[],groups:{groupName:[members]},turns:[{n:1,speaker,text,delivery:null}]}. Copy spoken text CHARACTER-FOR-CHARACTER, punctuation included; no paraphrase, truncation or skipped spoken exchanges. Distinguish quoted labels/thoughts from speech. Speakers must be participants or named groups. Use full known names. Group members and witnesses belong in the incident; unknown speakers must not be guessed. Delivery is separate from spoken text. No separate location ledger. Extract section date/time only if established, otherwise null (never invent a historical date).`;
 }
