@@ -67,5 +67,6 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [ ] Trim Planning Studio sliders/choices now driven by writer voice
 - [x] Real-author names visible only to admin
 - [x] Fiction planning on Sonnet 5 (Sol filter refuses crime plans)
-- [ ] Chapter blueprints on Sonnet 5 run too long (16k-token cap hit, function times out) — needs shorter blueprint output
+- [x] Chapter scene plans shortened; finish in ~4 min
 - [ ] Write Chapters 1–3 of "A Good Seat for a Killing" (blocked by blueprint fix)
+- [ ] Scene-plan spoiler check rejects Chapter 1 of "A Good Seat for a Killing": master plan marks "paper ticket"/"escort captain" secret but chapter 1 plan uses them

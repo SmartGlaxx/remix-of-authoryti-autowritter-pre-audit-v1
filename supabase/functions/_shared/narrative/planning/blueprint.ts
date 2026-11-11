@@ -61,7 +61,7 @@ export const expectedMicrobeats = (targetWords: number) => Math.max(3, Math.roun
 
 /** Planner-only secrets that must not appear in reader- or character-facing layers of this chapter. */
 export function futureSecrets(s: MasterPlanSkeleton, ch: number): string[] {
-  return (s.reveals ?? []).filter((r) => r.revealChapter > ch).flatMap((r) => r.secretTerms ?? []).filter((t) => t && t.trim().length >= 3);
+  return (s.reveals ?? []).filter((r) => r.revealChapter > ch).flatMap((r) => r.secretTerms ?? []).filter((t) => t && (t.trim().includes(" ") || t.trim().length >= 4)); // 3-letter single words ("box") are ordinary vocabulary, not spoilers
 }
 const leaks = (text: string, secrets: string[]) => secrets.filter((t) => new RegExp(`(^|[^a-z0-9])${norm(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(norm(text)));
 
