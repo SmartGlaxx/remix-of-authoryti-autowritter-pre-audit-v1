@@ -445,7 +445,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         // One cast member per call; repeat until the server reports none remaining.
         for (let round = 0; round < 15; round++) {
           const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
-          if(error || !data?.characters) { const m = data?.error ?? 'Character references could not be completed.'; throw isTerminalMessage(m) ? new TerminalGenerationError(m) : new Error(m); }
+          if(error || !data?.characters) { let m = data?.error as string|undefined; if(!m && error){ const ctx=(error as {context?:Response}).context; const body=ctx && typeof ctx.json==='function' ? await ctx.clone().json().catch(()=>null) : null; m = body?.error ?? (ctx?.status===429 ? "You've reached the hourly limit for character references. Wait a few minutes, then press Write again — nothing has been lost." : undefined); } m = m ?? 'Character references could not be completed.'; throw isTerminalMessage(m) ? new TerminalGenerationError(m) : new Error(m); }
           if (!data.remaining) break;
         }
         setState(st=>({...st,phase:'writing'}));

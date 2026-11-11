@@ -49,7 +49,7 @@ async function getAuthUser(req: Request) {
 
 async function checkRateLimit(userId: string, functionName: string) {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data } = await supabase.rpc("check_rate_limit", { _user_id: userId, _function_name: functionName, _max_per_hour: 10, _max_per_day: 50 });
+  const { data } = await supabase.rpc("check_rate_limit", { _user_id: userId, _function_name: functionName, _max_per_hour: 60, _max_per_day: 300 });
   return data as boolean ?? true;
 }
 
