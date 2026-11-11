@@ -268,7 +268,7 @@ async function handle(req: Request): Promise<Response> {
         const r = plan.rows[0];
         const { error } = await db.from("knowledge_acquisitions").upsert([{ user_id: userId, book_id: bookId, universe_id: universeId, identity_id: identityId, claim: r.claim, source: r.source,
           source_identity_id: r.source_identity_id, certainty: r.certainty, learned_date: r.learned_date, learned_chapter_index: r.learned_chapter_index, learned_subsection_index: r.learned_subsection_index,
-          knowledge_kind: r.knowledge_kind, truth_status: r.truth_status, evidence: r.evidence, scene_point: r.scene_point, extraction_id: `review:${rv.id}`, source_section_key: rv.source_section_key,
+          knowledge_kind: r.knowledge_kind, truth_status: r.truth_status, evidence: r.evidence, scene_point: r.scene_point, extraction_id: null, source_section_key: rv.source_section_key,
           content_hash: rv.content_hash, dedup_key: r.dedup_key }], { onConflict: "dedup_key", ignoreDuplicates: true });
         if (error) return json({ error: error.message }, 400);
       }
