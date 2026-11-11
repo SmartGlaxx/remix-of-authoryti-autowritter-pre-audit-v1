@@ -11,3 +11,16 @@ describe("planning model by book type", () => {
     expect(resolveModelForRole(null, "narrative_extractor", { bookType: "novel" }).model).toBe("openai/gpt-6-sol");
   });
 });
+
+import { isTerminalMessage } from "@/hooks/useBookGeneration";
+describe("fiction character descriptions and terminal errors", () => {
+  it("character descriptions for a novel run on Sonnet 5", async () => {
+    const { resolveModelForRole } = await import("../../supabase/functions/_shared/ai/roles");
+    expect(resolveModelForRole(null, "character_generator", { bookType: "novel" }).model).toBe("anthropic/claude-sonnet-5");
+  });
+  it("rate limits and safety refusals are never retried", () => {
+    expect(isTerminalMessage("Rate limit exceeded. Please try again later.")).toBe(true);
+    expect(isTerminalMessage("lovable_gateway: the AI provider's safety filter refused this request")).toBe(true);
+    expect(isTerminalMessage("network timeout")).toBe(false);
+  });
+});

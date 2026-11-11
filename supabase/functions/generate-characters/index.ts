@@ -169,7 +169,7 @@ Return ONLY valid JSON:
     const __ctx = await aiBookContext(__admin, book.id, auth.user.id);
     let content: string;
     try {
-      const __r = await generateAIText({ role: "character_generator", config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { user: extractPrompt, temperature: 0.5, reasoning: "low" } }, createAIDeps(__admin, auth.user.id));
+      const __r = await generateAIText({ role: "character_generator", bookType: book.bookType ?? null, config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { user: extractPrompt, temperature: 0.5, reasoning: "low" } }, createAIDeps(__admin, auth.user.id));
       content = __r.text;
     } catch (e) {
       if (e instanceof AIProviderError) return new Response(JSON.stringify({ error: e.message }), { status: statusForAIError(e), headers: { ...corsHeaders, "Content-Type": "application/json" } });

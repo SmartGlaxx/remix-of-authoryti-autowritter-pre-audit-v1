@@ -86,7 +86,7 @@ export function resolveModelForRole(config: BookModelConfig | null | undefined, 
   const c = normalizeConfig(config ?? DEFAULT_CONFIG);
   if (PROSE_ROLES.has(role)) return { role, model: draftModelFor(c.draftModel, opts.bookType), fallback: null, source: "profile" };
   // Fiction planning runs on Sonnet 5: Sol's safety filter refuses crime/violence story plans.
-  if (role === "planner" && opts.bookType && FICTION_PLANNING_TYPES.has(opts.bookType)) return { role, model: SONNET, fallback: null, source: "profile" };
+  if ((role === "planner" || role === "character_generator") && opts.bookType && FICTION_PLANNING_TYPES.has(opts.bookType)) return { role, model: SONNET, fallback: null, source: "profile" };
   const slot = slotForRole(PREMIER_PROFILE, role);
   // Locked: no per-role overrides and no silent fallback to another model.
   return { role, model: slot.model, fallback: null, source: "profile", reasoning: reasoningFor(slot.mode), thinking: thinkingFor(slot.mode) };

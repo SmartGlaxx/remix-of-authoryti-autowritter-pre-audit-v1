@@ -72,6 +72,10 @@ function getGenerationChapterSlice(bookData: Book, chapterIndex: number) {
   }];
 }
 
+/** Errors that must never be retried automatically (rate limits, AI safety refusals). */
+export class TerminalGenerationError extends Error { readonly terminal = true; }
+export const isTerminalMessage = (m: string) => /rate limit|safety filter|refused this request/i.test(m);
+
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   retries: number = MAX_RETRIES,
@@ -83,6 +87,7 @@ async function retryWithBackoff<T>(
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      if ((lastError as { terminal?: boolean }).terminal || isTerminalMessage(lastError.message)) throw lastError;
       if (attempt < retries) {
         const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
         onRetry?.(attempt, lastError);
@@ -440,7 +445,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
         // One cast member per call; repeat until the server reports none remaining.
         for (let round = 0; round < 15; round++) {
           const {data,error} = await supabase.functions.invoke('generate-characters',{body:{book:{id:bookData.id,title:bookData.title},outline:{},ieltsBand}});
-          if(error || !data?.characters) throw new Error(data?.error ?? 'Character references could not be completed.');
+          if(error || !data?.characters) { const m = data?.error ?? 'Character references could not be completed.'; throw isTerminalMessage(m) ? new TerminalGenerationError(m) : new Error(m); }
           if (!data.remaining) break;
         }
         setState(st=>({...st,phase:'writing'}));
@@ -462,6 +467,10 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
       if (errorData?.code === "RECOVER_EXTRACTION") {
         throw new Error("Story memory for the previous section is still updating. Wait a moment, then press the write button again — nothing has been lost.");
       }
+      if (response.status === 429) {
+        throw new TerminalGenerationError("You've reached the hourly writing limit. Wait a few minutes, then press Write again — nothing has been lost.");
+      }
+      if (isTerminalMessage(msg)) throw new TerminalGenerationError(msg);
       if (response.status === 402) {
         throw new Error(msg.includes("Daily") ? "Daily word limit reached for your plan. It resets at midnight UTC, or upgrade to keep writing now" : `Credit limit reached: ${msg}. Please upgrade your plan.`);
       }
