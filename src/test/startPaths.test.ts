@@ -30,3 +30,12 @@ describe("author mapping visibility", () => {
     expect(sampleTemplate(WRITER_PERSONAS.find((w) => w.id === "marcus")!)).not.toContain("Chase");
   });
 });
+import { AUTHORS } from "../../supabase/functions/_shared/writers/authorDna";
+describe("persona text shown to users", () => {
+  it("never contains a real author's name", () => {
+    for (const w of WRITER_PERSONAS) for (const a of AUTHORS) {
+      const shown = [w.tagline, w.personality, w.signature, w.background, w.rhythm, sampleTemplate(w)].join(" ");
+      expect(shown.includes(a.name), `${w.id} shows ${a.name}`).toBe(false);
+    }
+  });
+});

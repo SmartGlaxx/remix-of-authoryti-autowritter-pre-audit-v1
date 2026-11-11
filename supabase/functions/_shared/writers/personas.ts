@@ -229,7 +229,7 @@ const FICTION = ["novel", "short-story", "fiction-serial"];
 /** Avatar writers built from their real-author DNA (prompt-only voices). */
 function avatar(id: string, name: string, gender: "female" | "male", age: string, tagline: string, bookTypes: string[], topics: string[]): WriterPersona {
   const a = AUTHORS.find((x) => x.id === AVATAR_AUTHORS[id][0])!;
-  const t = `Writes in the tradition of ${a.name}: ${a.dna}.`;
+  const t = `${a.genre} voice: ${a.dna}.`; // never names the real author (shown to users)
   return { id, name, tagline, gender, age, background: `Novelist specialising in ${a.genre.toLowerCase()}.`,
     personality: t, temperament: t, intellect: t, communication: t, vocabulary: t, rhythm: t, paragraphs: t,
     formality: "As the tradition demands.", humor: "As the tradition demands.", storytelling: t, figurative: t,
