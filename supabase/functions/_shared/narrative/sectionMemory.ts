@@ -32,7 +32,7 @@ export function parseSectionMemory(raw: unknown, text: string, source: string): 
   // A summary that spills into two sentences is merged into one; paragraph counts must still match exactly.
   const oneSentence = (v: unknown) => {
     if (typeof v !== 'string' || sentence(v)) return v;
-    const parts = [...new Segmenter('en', { granularity: 'sentence' }).segment(v.trim())].map((x) => String((x as { segment: string }).segment).trim().replace(/[.!?]+$/, '')).filter(Boolean);
+    const parts = [...new Segmenter('en', { granularity: 'sentence' }).segment(String(v).trim())].map((x) => String((x as { segment: string }).segment).trim().replace(/[.!?]+$/, '')).filter(Boolean);
     const merged = parts.join('; ') + '.';
     return sentence(merged) ? merged : v;
   };
