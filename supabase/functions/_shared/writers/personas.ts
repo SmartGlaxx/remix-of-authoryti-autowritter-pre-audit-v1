@@ -260,7 +260,7 @@ WRITER_PERSONAS.push(
   avatar("dash", "Dash Freeman", "male", "early 50s", "Hard, terse crime", [...FICTION, "drama"], ["crime", "hardboiled"]),
   avatar("lev", "Lev Arden", "male", "early 60s", "Panoramic literary epics", FICTION, ["literary", "historical"]),
   avatar("kenji", "Kenji Mori", "male", "early 40s", "Reality-bending science fiction", FICTION, ["science fiction", "paranoid"]),
-  avatar("kofi", "Uche Brown", "male", "mid 40s", "Lively stories of money and misfits", ["business", "biography", "self-help"], ["business", "money"]),
+  avatar("kofi", "James Hartley", "male", "mid 40s", "Lively stories of money and misfits", ["business", "biography", "self-help"], ["business", "money"]),
   avatar("samir", "Samir Haddad", "male", "mid 50s", "Deadpan humane satire", FICTION, ["satire", "humor"]),
   avatar("hiro", "Hiro Sato", "male", "late 40s", "Absurd institutional comedy", FICTION, ["satire", "humor"]),
   avatar("meilin", "Mei-Lin Zhou", "female", "late 30s", "Quiet family-secret dramas", FICTION, ["family", "literary"]),
