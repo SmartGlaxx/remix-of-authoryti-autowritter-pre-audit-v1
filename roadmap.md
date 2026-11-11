@@ -65,3 +65,7 @@ Green checked boxes mean verified complete; orange unchecked boxes mean still op
 - [x] Two-path start window (book type → writers, or browse writers → book types); placeholder writer samples
 - [ ] Real 200-word writer samples generated in-app
 - [ ] Trim Planning Studio sliders/choices now driven by writer voice
+- [x] Real-author names visible only to admin
+- [x] Fiction planning on Sonnet 5 (Sol filter refuses crime plans)
+- [ ] Chapter blueprints on Sonnet 5 run too long (16k-token cap hit, function times out) — needs shorter blueprint output
+- [ ] Write Chapters 1–3 of "A Good Seat for a Killing" (blocked by blueprint fix)
