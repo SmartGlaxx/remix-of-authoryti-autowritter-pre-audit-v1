@@ -5,7 +5,7 @@
 - All AI text calls go through `supabase/functions/_shared/ai/` (registry → `resolveModelForRole` → adapters → `streamAI`/`generateAIText`) — one place for models, pricing, providers, retries, fallbacks and usage records.
 - Initial actions use `ai/ideation.ts` call-local config and strict schemas; later planning keeps book routing to protect fixed profiles.
 - User provider keys are AES-GCM encrypted server-side (`BYOK_ENCRYPTION_KEY`, per-user HKDF) in `user_provider_keys`, which has no client access — keys are write-only from the browser.
-- Books without a `book_model_configs` row use the `legacy` role map, reproducing pre-Pass-3 models exactly — backward compatibility without migration.
+- Books without a `book_model_configs` row use the writer's premium profile (`defaultBookConfig`), never the legacy DeepSeek map; older saved modes also resolve to the same profile pipeline.
 - Continuity (Pass 4) runs server-side in `check-continuity` via pure logic in `_shared/narrative/continuity.ts`, before extraction; history is append-only in `continuity_checks` — only the accepted final text ever reaches story memory.
 - Manuscript audit uses pure `_shared/narrative/audit.ts`, caches manuscript/outline/memory hashes, writes only audit tables (owners change finding status/notes) — diagnosis never mutates prose or canon.
 - Full audit repair is a separate owner-authorized progressive-only workflow: pure `auditRepair.ts` decisions, atomic fenced multi-section patches, immutable before/after run history, reverse transactional extraction unwind then ordered strict replay; book writes stay locked until memory sync succeeds — bidirectional repair never bypasses validation or impersonates author decisions.
@@ -24,6 +24,7 @@
 - Conflict repairs stay versioned and fenced; display reconciliation never alters canon/history. Verbatim duplicates use pure `naturalnessMetrics.ts` and existing advisory findings, preserving statistical thresholds and acceptance.
 - Forward autonomous repair runs only in progressive pre-acceptance, with at most two evidence-backed canon-compatible rounds after targeted repairs, cumulative draft-relative edit limits and full revalidation; successful repairs use resolved editorial history, never owner decision RPCs, so existing canon and fenced acceptance remain authoritative.
 - Subdirectories have their own `AGENTS.md` (e.g. `supabase/functions/_shared/writers/`) — read it before changing files there.
+- Planning rules live in `supabase/functions/_shared/narrative/planning/AGENTS.md` and `plan-book` rules (setup, test mode, knowledge review) in `supabase/functions/plan-book/AGENTS.md` — read them before changing files there.
 
 - Blueprint cast checks use the shared adapter-aware example-role classifier across parsing, approval, writing gates and UI; instructional roles stay plan-local while named people and narrative books still require cast approval.
 - All images go through `_shared/ai/openaiImage.ts` with one cheapest OpenAI model at low quality on both the user-key and gateway routes, and a failure never switches models — predictable image cost.
