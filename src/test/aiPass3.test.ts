@@ -35,7 +35,7 @@ function makeDeps(fetchImpl: typeof fetch, over: Partial<AIDeps> = {}, userKeys:
 
 describe("Pass 3 — registry", () => {
   it("1. resolves models and required providers", () => {
-    expect(MODEL_REGISTRY.map((m) => m.key).sort()).toEqual(["anthropic/claude-sonnet-5", "openai/gpt-6-sol"]);
+    expect(MODEL_REGISTRY.map((m) => m.key).sort()).toEqual(["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5", "deepseek/deepseek-chat", "deepseek/deepseek-reasoner", "openai/gpt-6-sol"]);
     expect(getModel("nope")).toBeUndefined();
     expect(new Set(MODEL_REGISTRY.map((m) => m.key)).size).toBe(MODEL_REGISTRY.length);
   });

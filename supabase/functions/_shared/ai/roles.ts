@@ -21,7 +21,12 @@ export interface BookModelConfig {
 /** One pipeline for every book: Sonnet 5 drafts prose, Sol does everything else. Kept names for callers. */
 const SONNET = "anthropic/claude-sonnet-5", SOL = "openai/gpt-6-sol";
 export const DRAFT_MODELS = { sonnet: SONNET, sol: SOL } as const;
-export type DraftChoice = keyof typeof DRAFT_MODELS;
+/** "sonnet" | "sol" aliases or any registry model key the author picked. */
+export type DraftChoice = string;
+export function parseDraftChoice(v: unknown): string | null {
+  if (v === "sonnet" || v === "sol") return v;
+  return typeof v === "string" && !!getModel(v) ? v : null;
+}
 export const LEGACY_ROLE_MODELS: Record<Role, string> = {
   planner: SOL, writer: SONNET, narrative_extractor: SOL, continuity_checker: SOL, continuity_reviser: SOL, editor: SOL,
   difficult_chapter: SONNET, manuscript_auditor: SOL, character_generator: SOL, summarizer: SOL, intro_writer: SONNET, literary_reviser: SOL,
@@ -62,7 +67,7 @@ export function normalizeConfig(raw: unknown): BookModelConfig {
   const dm = r.draftModel ?? r.draft_model;
   // Every book runs the same pipeline; older saved modes resolve to it too.
   void mode;
-  return { mode: "profile", profileWriter, profileTier, draftModel: dm === "sol" || dm === "sonnet" ? dm : null, singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
+  return { mode: "profile", profileWriter, profileTier, draftModel: parseDraftChoice(dm), singleModel: validKey(single) ? single : null, roleModels: pick(r.roleModels ?? r.role_models), fallbacks: pick(r.fallbacks) };
 }
 
 /** A book with no saved model config writes through its writer's premium profile (never the legacy DeepSeek map). */
@@ -78,7 +83,8 @@ export const SCRIPT_DRAFT_MODEL = SOL;
 export const FICTION_PLANNING_TYPES: ReadonlySet<string> = new Set(["novel", "fiction-serial", "short-story", "comic", "drama", "children"]);
 
 export function draftModelFor(choice: DraftChoice | null | undefined, bookType?: string | null): string {
-  if (choice) return DRAFT_MODELS[choice];
+  if (choice === "sonnet" || choice === "sol") return DRAFT_MODELS[choice];
+  if (choice && getModel(choice)) return choice;
   return bookType && SCRIPT_BOOK_TYPES.has(bookType) ? SOL : SONNET;
 }
 

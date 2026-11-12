@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ACTIVE_ROLES, MODEL_REGISTRY, ROLE_LABELS, USER_ROLES, modelLabel, type Role } from "../../supabase/functions/_shared/ai/registry";
+import { ACTIVE_ROLES, DRAFT_MODEL_KEYS, getModel, MODEL_REGISTRY, ROLE_LABELS, USER_ROLES, modelLabel, type Role } from "../../supabase/functions/_shared/ai/registry";
 import { PROFILES, PROFILE_ROLE_LABELS, TIERS, writerTierOrDefault, type ProfileRole, type Tier } from "../../supabase/functions/_shared/writers/profiles";
 import { draftModelFor, type BookModelConfig } from "../../supabase/functions/_shared/ai/roles";
 import { Switch } from "@/components/ui/switch";
@@ -51,25 +51,24 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
   }, [bookId]);
 
   const [bookType, setBookType] = useState<string | null>(null);
-  const [draftModel, setDraftModel] = useState<"sonnet" | "sol">("sonnet");
+  const [draftModel, setDraftModel] = useState<string>("anthropic/claude-sonnet-5");
   useEffect(() => {
     supabase.from("books").select("book_type, controls").eq("id", bookId).maybeSingle().then(({ data }) => {
       if (!data) return;
       setBookType(data.book_type);
       const saved = (data.controls as Record<string, unknown> | null)?.draftModel;
-      setDraftModel(saved === "sol" || saved === "sonnet" ? saved : data.book_type === "drama" ? "sol" : "sonnet");
+      setDraftModel(draftModelFor(typeof saved === "string" ? saved : null, data.book_type));
     });
   }, [bookId]);
   const draftLabel = modelLabel(draftModelFor(draftModel, bookType));
-  const toggleDraft = async (useSol: boolean) => {
-    const next = useSol ? "sol" : "sonnet";
+  const toggleDraft = async (next: string) => {
     setSaving(true);
     try {
       const { data } = await supabase.from("books").select("controls").eq("id", bookId).maybeSingle();
       const { error } = await supabase.from("books").update({ controls: { ...((data?.controls as Record<string, unknown>) ?? {}), draftModel: next } }).eq("id", bookId);
       if (error) throw error;
       setDraftModel(next);
-      toast.success(useSol ? "This book will be written with Sol" : "This book will be written with Sonnet");
+      toast.success(`This book will be written with ${getModel(next)?.displayName ?? next}`);
     } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
   };
 
@@ -88,10 +87,17 @@ export function ModelConfigCard({ bookId, writerId }: { bookId: string; writerId
           <>
             <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3">
               <div className="min-w-0">
-                <Label htmlFor="draft-model" className="text-sm font-medium">Write with Sol instead of Sonnet</Label>
+                <Label htmlFor="draft-model" className="text-sm font-medium">Writing model</Label>
                 <p className="text-xs text-muted-foreground">Prose is written by {draftLabel}. Every writer uses the same models — their personality and sliders make the difference.</p>
               </div>
-              <Switch id="draft-model" checked={draftModel === "sol"} disabled={saving} onCheckedChange={toggleDraft} />
+              <Select value={draftModel} onValueChange={toggleDraft} disabled={saving}>
+                <SelectTrigger id="draft-model" className="w-56 shrink-0"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DRAFT_MODEL_KEYS.map((k) => { const m = getModel(k)!; return (
+                    <SelectItem key={k} value={k}>{m.displayName} · ${m.pricing.inputPerM}/${m.pricing.outputPerM}{m.provider === "deepseek" ? " (your key)" : ""}</SelectItem>
+                  ); })}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1 rounded-md border border-border p-3 text-xs">
               <p><span className="text-muted-foreground">Writing:</span> {draftLabel}</p>

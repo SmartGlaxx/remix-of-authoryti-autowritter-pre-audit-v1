@@ -3,7 +3,7 @@
 // deno-lint-ignore-file no-explicit-any
 import type { AIDeps, UsageRecord } from "./client.ts";
 import type { ProviderId } from "./registry.ts";
-import { defaultBookConfig, normalizeConfig, type BookModelConfig } from "./roles.ts";
+import { defaultBookConfig, normalizeConfig, parseDraftChoice, type BookModelConfig } from "./roles.ts";
 import { resolveWriter } from "../writers/personas.ts";
 import { decryptKey } from "./keyCrypto.ts";
 
@@ -41,7 +41,7 @@ export async function loadBookModelConfig(admin: any, bookId: string | null | un
   if (!bookId) return normalizeConfig(null);
   const { data } = await admin.from("book_model_configs").select("mode, single_model, role_models, fallbacks, profile_writer, profile_tier").eq("book_id", bookId).eq("user_id", userId).maybeSingle();
     const { data: book } = await admin.from("books").select("book_type, genre, controls").eq("id", bookId).eq("user_id", userId).maybeSingle();
-    const draftModel = book?.controls?.draftModel === "sol" || book?.controls?.draftModel === "sonnet" ? book.controls.draftModel : null;
+    const draftModel = parseDraftChoice(book?.controls?.draftModel);
     if (data) return normalizeConfig({ ...data, draftModel });
     return book ? defaultBookConfig(resolveWriter(book.controls ?? {}, book.book_type, book.genre).id, draftModel) : normalizeConfig(null);
 }

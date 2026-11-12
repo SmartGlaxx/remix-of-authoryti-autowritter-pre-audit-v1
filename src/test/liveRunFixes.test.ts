@@ -29,6 +29,8 @@ describe("one model pair for every writer", () => {
   it("the writer toggle switches drafting to Sol (or drama back to Sonnet)", () => {
     expect(resolveModelForRole(defaultBookConfig("elena", "sol"), "writer", { bookType: "novel" }).model).toBe("openai/gpt-6-sol");
     expect(resolveModelForRole(defaultBookConfig("elena", "sonnet"), "writer", { bookType: "drama" }).model).toBe("anthropic/claude-sonnet-5");
+    expect(resolveModelForRole(defaultBookConfig("elena", "anthropic/claude-haiku-5-5"), "writer", { bookType: "novel" }).model).toBe("anthropic/claude-haiku-5-5");
+    expect(resolveModelForRole(defaultBookConfig("elena", "bogus/model"), "writer", { bookType: "novel" }).model).toBe("anthropic/claude-sonnet-5");
   });
   it("planning, checks, memory and character cards use Sol", () => {
     for (const role of ["planner", "continuity_checker", "narrative_extractor", "summarizer", "character_generator", "manuscript_auditor"] as const)
