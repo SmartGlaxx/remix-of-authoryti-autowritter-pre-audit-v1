@@ -250,6 +250,7 @@ async function handleRequest(req: Request): Promise<Response> {
         const saved = await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: edited ? "author_edit" : "retry", parentId: c.id });
         return json({ status: "held", decision: r.decision, candidateId: saved.candidateId, findings: r.findings, usage: r.usage });
       }
+      await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: "retry" });
       const worker = `cr_${crypto.randomUUID()}`;
       const { data: lease } = await db.rpc("acquire_generation_lease", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_worker: worker, p_ttl_seconds: LEASE_TTL_SECONDS });
       if (!lease?.acquired) return json({ error: "SECTION_BUSY" }, 409);
@@ -260,7 +261,6 @@ async function handleRequest(req: Request): Promise<Response> {
         return json({ error: error.message }, 409);
       }
       await db.rpc("write_accepted_outline_text", { p_book_id: bookId, p_user_id: userId, p_chapter: c.chapter_index, p_sub: c.subsection_index, p_text: r.text, p_hash: hash }).then(() => {}, () => {});
-      await persistOutcome(r, { db, bookId, userId, chapter: c.chapter_index, sub: c.subsection_index, hash, masterPlanId: c.master_plan_id, origin: "retry" });
       // Stage D: an accepted author-edited version is an author-approved correction (best-effort).
       if (c.parent_candidate_id) {
         const cats = await sectionFindingCategories(db, bookId, c.chapter_index, c.subsection_index);

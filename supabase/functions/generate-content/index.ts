@@ -861,7 +861,9 @@ serve(async (req) => {
         try {
           const { data: factRows } = await adminSupabase.from("canonical_facts").select("id, subject, predicate, value, is_canonical, conflict_status, canon_status, source_chapter_index, source_subsection_index").eq("book_id", book.id).eq("canon_status", "ESTABLISHED").limit(400);
           const beatNotes = (progressive?.readyPlans ?? []).filter((r: any) => r.subsection_index === subsectionIndex).flatMap((r: any) => Array.isArray(r.content?.notes) ? r.content.notes : []);
-          const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes });
+          const { data: appliedDecisions, error: decisionsError } = await adminSupabase.from("canon_reconciliation_logs").select("id, decision, canon_reference").eq("book_id", book.id).eq("decision", "ACCEPT_PROSE_UPDATE_CANON").eq("application_status", "APPLIED");
+          if (decisionsError) throw new Error("Could not read applied author decisions");
+          const ctx = buildEvalContext({ bookType: book.bookType, plan: progressive!.plan, chapterIndex: absChapter, anchors: progressive!.anchors as never, facts: factRows ?? [], controls: book.controls, beatNotes, approvedLogs: appliedDecisions ?? [] });
           if (isChildrensBook) ctx.adapter = "childrens";
           const bpForCheck = (bpGateResult as any)?.blueprint ?? null;
           ctx.lockedLooks = (serverOutline?.characters ?? []).filter((c: any) => c?.reference?.locked && c?.reference?.features).map((c: any) => ({ name: String(c.name), features: c.reference.features, locked: true }));

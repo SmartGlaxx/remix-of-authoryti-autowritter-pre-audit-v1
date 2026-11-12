@@ -1,5 +1,14 @@
 # Roadmap — Closed-world writing
 
+## Forward autonomous resolution
+| Progress | Work item |
+| --- | --- |
+| 🟩 [x] | Automatically reconcile conflicts in new progressive drafts; existing chapters and canon untouched |
+| 🟩 [x] | Prioritize reader appeal within believable, canon-compatible repairs; rewrite economy breaks ties |
+| 🟩 [x] | Revalidate every repair, enforce cumulative edit limits, record successful repairs without impersonating author decisions |
+| 🟩 [x] | 816 deterministic tests passed, 4 skipped; generate-content and candidate-review deployed; no paid AI test calls |
+| 🟧 [ ] | Live AI writing verification: awaits separate authorization for a paid test; repairs that fail validation still remain held |
+
 ## Character references and whole-book memory — progress
 Green checked boxes mean verified complete; orange unchecked boxes mean still open.
 

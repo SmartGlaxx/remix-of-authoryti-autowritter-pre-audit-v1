@@ -5,7 +5,7 @@ import { findUnplannedNames, appearanceContradictions, deadlineFindings, type Lo
 // always runs too. Subjective style never blocks acceptance; critical checks are never skipped:
 // if the evaluator cannot run, the draft is held for the author instead of accepted unchecked.
 import {
-  checkEvidence, classifyBeats, deterministicValidation, routeFinding, runValidationLoop,
+  checkEvidence, classifyBeats, deterministicValidation, routeFinding, runValidationLoop, decideRevision,
   type Adapter, type BeatCheck, type BeatIntent, type Claim, type EvidenceTier, type Finding, type LoopResult,
 } from "./validation.ts";
 import { ageFindings, parseEpistemic, postDeathFindings, type EvalNarration, type LifeRecord } from "../knowledge.ts";
@@ -186,7 +186,7 @@ export function applyReplacements(draft: string, raw: string): string {
   let text = draft;
   for (const r of arr(o.replacements).slice(0, 12)) {
     const find = typeof r?.find === "string" ? r.find : ""; const rep = typeof r?.replace === "string" ? r.replace : "";
-    if (find.length < 8 || find.length > 2000 || rep.length > 3000 || !text.includes(find)) continue;
+    if (find.length < 8 || find.length > 2000 || rep.length > 3000 || !rep.trim() || !text.includes(find) || text.indexOf(find) !== text.lastIndexOf(find)) continue;
     text = text.replace(find, rep);
   }
   return text;
@@ -196,15 +196,16 @@ export interface PreAcceptanceResult {
   text: string; findings: StagedFinding[]; rounds: number; outcome: LoopResult["outcome"] | "evaluator_unavailable";
   decision: "accept" | "blocked_material" | "needs_author_review"; heldForApproval?: { text: string; ratio: number };
   /** Material canon conflicts the agent resolved itself by conforming the prose to established canon. */
-  autoResolved?: { code: string; message: string; excerpt?: string; reasoning?: string }[];
+  autoResolved?: { code: string; message: string; excerpt?: string; sourceRef?: string; reasoning?: string }[];
   usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number };
 }
 
 /**
- * Canon-locked auto-resolution prompt: established canon is always the truth; the conflicting
- * sentences are rewritten to match it exactly. Used for one final autonomous round before a
- * draft is ever held for the author.
+ * Forward-only reconciliation: preserve the strongest believable, canon-compatible turn.
+ * Existing manuscript and canon never change in this stage.
  */
+export const MAX_FORWARD_RESOLUTION_ROUNDS = 2;
+
 export function buildAutoResolvePrompt(draft: string, material: StagedFinding[], ctx: EvalContext): Prompt {
   const list = material.slice(0, 8).map((f, i) => `${i + 1}. [${f.code}] ${f.message}${f.excerpt ? ` — conflicting excerpt: "${f.excerpt}"` : ""}${f.sourceRef ? ` (canon: ${f.sourceRef})` : ""}`).join("\n");
   const truths = [
@@ -212,9 +213,11 @@ export function buildAutoResolvePrompt(draft: string, material: StagedFinding[],
     ...ctx.facts.slice(0, 80).map((f) => `- ${f.id}: ${clip(f.text, 200)}`),
   ].join("\n") || "- (none)";
   return {
-    system: "You conform prose to established canon with minimal, surgical edits. Established canon is always true; rewrite only the conflicting sentences so they match it exactly. Keep voice, length and everything else identical. Never use markdown. Return JSON only.",
+    system: "You conform prose to established canon through forward autonomous resolution. Only the supplied NEW DRAFT may change; never rewrite earlier passages or change canon, approved author decisions, exact anchors, chronology, knowledge boundaries or planned reveals. Compare believable canon-compatible reconciliations. FIRST prefer substantially stronger reader appeal: emotional impact, tension, surprise and compelling consequences. Popularity is an editorial estimate, never guaranteed. THEN, when appeal is comparable, prefer the smaller rewrite. Preserve the strongest compatible story turn, voice and objective; do not flatten it just to save edits. Nonfiction must preserve accuracy and sources, never manufacture drama or facts for popularity. Correct only the conflicting sentences, without procedural explanations or new unsupported facts. Never use markdown. Return JSON only.",
     user: [`ESTABLISHED CANON (always true):\n${truths}`, `CONFLICTS TO RESOLVE:\n${list}`, `DRAFT:\n---\n${draft}\n---`,
-      `Respond with {"reasoning":"2-4 short sentences explaining what conflicted with canon and how you fixed it","replacements":[{"find":"exact sentence copied from the draft","replace":"corrected sentence that matches canon"}]}`].join("\n\n"),
+      `SECTION OBJECTIVE: ${clip(ctx.objective, 600)}`,
+      `If a stronger turn requires changing earlier prose or canon, it is unavailable in this forward-only stage. Reconcile this draft without pretending that earlier truth changed.`,
+      `Respond with {"reasoning":"Explain the conflict, the believable alternatives, why the chosen reconciliation preserves stronger reader appeal, then rewrite economy","replacements":[{"find":"unique exact sentence copied from the draft","replace":"corrected canon-compatible sentence"}]}`].join("\n\n"),
   };
 }
 
@@ -239,32 +242,41 @@ export async function runPreAcceptance(draft: string, ctx: EvalContext, evaluate
   const revise = async (t: string, targets: Finding[]) => {
     try { const r = await repair(buildRepairPrompt(t, targets, ctx)); track(r.usage); return applyReplacements(t, r.text); } catch { return t; }
   };
-  const loop = await runValidationLoop(draft, validate, revise, opts);
+  const loop = await runValidationLoop(draft, validate, revise, { ...opts, repairMaterial: false });
   let text = loop.text;
   let all = loop.remaining as StagedFinding[];
   let autoResolved: PreAcceptanceResult["autoResolved"];
-  // Autonomous resolution agent: before anything is held for the author, repairable material
-  // canon conflicts get one canon-locked round — established canon wins, prose is conformed.
-  const materialTargets = all.filter((f) => routeFinding(f) === "canon_reconciliation" && f.repairable);
-  if (materialTargets.length && !unavailable) {
+  let heldForApproval = loop.heldForApproval;
+  let autonomousRounds = 0;
+  // Material conflicts use evidence-backed, reader-appeal-first reconciliation, not the generic
+  // repair prompt. Bounded attempts never waive validation, author choices or scope limits.
+  while (autonomousRounds < MAX_FORWARD_RESOLUTION_ROUNDS && !unavailable && !heldForApproval) {
+    const materialTargets = all.filter((f) => routeFinding(f) === "canon_reconciliation" && f.repairable && f.excerpt && text.includes(f.excerpt)
+      && (!["CANON_CONTRADICTION", "ANCHOR_MISMATCH"].includes(f.code) || ctx.facts.some((a) => a.id === f.sourceRef) || ctx.anchors.some((a) => a.key === f.sourceRef)));
+    if (!materialTargets.length) break;
+    autonomousRounds++;
     try {
       const r = await repair(buildAutoResolvePrompt(text, materialTargets, ctx)); track(r.usage);
       const candidate = applyReplacements(text, r.text);
       if (candidate !== text) {
         const after = await validate(candidate);
-        const stillMaterial = after.some((f) => routeFinding(f) === "canon_reconciliation");
-        const before = new Set(all.map((f) => f.code));
-        const regressions = after.filter((f) => !before.has(f.code) && (f.severity === "material" || f.severity === "moderate"));
-        if (!stillMaterial && !regressions.length) {
+        if (unavailable) break;
+        const signature = (f: StagedFinding) => `${findingKey(f)}:${f.sourceRef ?? ""}:${f.severity}`;
+        const before = new Set(all.map(signature));
+        const regressions = after.filter((f) => !before.has(signature(f)) && (f.severity === "material" || f.severity === "moderate"));
+        const scope = decideRevision({ original: draft, revised: candidate, draftInCanon: false, warnRatio: opts.warnRatio, regressions });
+        if (scope.route === "author_approval") { heldForApproval = { text: candidate, ratio: scope.ratio }; break; }
+        const resolved = materialTargets.filter((f) => !after.some((a) => signature(a) === signature(f)));
+        if (scope.apply && resolved.length) {
           let reasoning: string | undefined;
           try { const o = extractJson(r.text); if (typeof o?.reasoning === "string") reasoning = o.reasoning.trim().slice(0, 600) || undefined; } catch { /* optional */ }
-          autoResolved = materialTargets.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt, reasoning }));
+          autoResolved = [...(autoResolved ?? []), ...resolved.map((f) => ({ code: f.code, message: f.message, excerpt: f.excerpt, sourceRef: f.sourceRef, reasoning }))];
           text = candidate; all = after;
-        }
-      }
-    } catch { /* auto-resolution is best-effort; failure falls through to the author */ }
+        } else break;
+      } else break;
+    } catch { break; /* Failed repairs never bypass acceptance checks. */ }
   }
   const material = all.some((f) => routeFinding(f) === "canon_reconciliation");
-  const decision = material ? "blocked_material" : (unavailable || loop.heldForApproval) ? "needs_author_review" : "accept";
-  return { text, findings: all, rounds: loop.rounds, outcome: unavailable ? "evaluator_unavailable" : loop.outcome, decision, heldForApproval: loop.heldForApproval, autoResolved, usage };
+  const decision = material ? "blocked_material" : (unavailable || heldForApproval) ? "needs_author_review" : "accept";
+  return { text, findings: all, rounds: loop.rounds + autonomousRounds, outcome: unavailable ? "evaluator_unavailable" : decision !== "accept" ? "escalated" : autoResolved?.length ? "repaired" : loop.outcome, decision, heldForApproval, autoResolved, usage };
 }

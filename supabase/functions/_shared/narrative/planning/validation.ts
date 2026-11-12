@@ -177,18 +177,19 @@ export async function runValidationLoop(
   draft: string,
   validate: (t: string) => Finding[] | Promise<Finding[]>,
   revise: (t: string, targets: Finding[]) => Promise<string>,
-  opts: { warnRatio?: number } = {},
+  opts: { warnRatio?: number; repairMaterial?: boolean } = {},
 ): Promise<LoopResult> {
   let text = draft; let findings = await validate(text); let rounds = 0;
   while (rounds < MAX_REVISION_ROUNDS) {
-    const targets = findings.filter((f) => routeFinding(f) === "auto_repair" || (routeFinding(f) === "canon_reconciliation" && f.repairable));
+    const targets = findings.filter((f) => routeFinding(f) === "auto_repair" || (opts.repairMaterial !== false && routeFinding(f) === "canon_reconciliation" && f.repairable));
     if (!targets.length) break;
     rounds++;
     const candidate = await revise(text, targets);
     const after = await validate(candidate);
-    const before = new Set(findings.map((f) => f.code));
-    const regressions = after.filter((f) => !before.has(f.code));
-    const d = decideRevision({ original: text, revised: candidate, draftInCanon: false, warnRatio: opts.warnRatio, regressions });
+    const signature = (f: Finding) => `${f.code}:${f.excerpt ?? ""}:${f.severity}`;
+    const before = new Set(findings.map(signature));
+    const regressions = after.filter((f) => !before.has(signature(f)));
+    const d = decideRevision({ original: draft, revised: candidate, draftInCanon: false, warnRatio: opts.warnRatio, regressions });
     if (d.route === "author_approval") return { text, rounds, remaining: findings, heldForApproval: { text: candidate, ratio: d.ratio }, outcome: "escalated" };
     if (!d.apply) break; // discard regressing revision, keep best prior draft
     text = candidate; findings = after;
