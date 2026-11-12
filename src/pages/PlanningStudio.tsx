@@ -16,6 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { bulkApprovableIds, isBlueprintExampleRole } from "../../supabase/functions/_shared/narrative/planning/blueprint.ts";
 import { PlanningBookSwitcher } from "@/components/PlanningBookSwitcher";
 import { ensureChapterBlueprint } from "@/lib/autoBlueprint";
+import { buildAllBlueprints } from "@/lib/buildAllBlueprints";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
@@ -147,6 +148,8 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
   const navigate = useNavigate();
   const [progress, setProgress] = useState<{ done: number; total: number; paused: boolean } | null>(null);
   const pauseRef = useRef(false);
+  const [blueprintProgress, setBlueprintProgress] = useState<{ done: number; total: number; chapter: number } | null>(null);
+  const stopBlueprintsRef = useRef(false);
   // Continuous flow: approving the whole-book summary goes straight on to chapter and section summaries.
   const [autoNext, setAutoNext] = useState(false);
   const master = plans.masters.find((m) => m.status === "APPROVED") ?? plans.masters.find((m) => m.status === "DRAFT");
@@ -165,6 +168,20 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
     && mine.every((p) => p.plan_level === "BLUEPRINT" || p.plan_status === "READY");
   // Blueprints are built and approved automatically as writing reaches each chapter.
+  const missingBlueprints = chapters.filter((ch) => !mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === ch && ["PLANNED", "READY"].includes(p.plan_status)));
+  const buildBlueprints = () => run("blueprintsAll", async () => {
+    if (!master) return;
+    stopBlueprintsRef.current = false;
+    try {
+      const result = await buildAllBlueprints({ bookId: book.id, masterPlanId: master.id, chapters, plans: mine.map((p) => ({ plan_level: p.plan_level, chapter_index: p.chapter_index, plan_status: p.plan_status })), call: callPlanBook,
+        onProgress: (done, total, chapter) => setBlueprintProgress({ done, total, chapter }),
+        shouldStop: () => stopBlueprintsRef.current });
+      toast.success(result.done === result.total ? "All detailed blueprints are ready for review" : "Stopped — completed blueprints are saved");
+    } finally {
+      setBlueprintProgress(null);
+      await refresh();
+    }
+  });
 
   const createMaster = () => run("master", async () => {
     const extra = {}; // the story chosen in Setup reaches the planner server-side
@@ -259,6 +276,19 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             </div>
             {legacyProgressive && <div className="rounded-md border border-border p-3 text-xs flex flex-wrap items-center gap-2"><span className="flex-1">This book started before detailed blueprints. Writing still follows your approved summaries. Turning blueprints on makes every chapter not yet written need an approved blueprint first; written text is not changed.</span><Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("bpOn", async () => { const { error } = await supabase.from("books").update({ controls: { ...(book.controls ?? {}), blueprint_mode: "required" } }).eq("id", book.id); if (error) throw error; toast.success("Detailed blueprints now required for this book"); await refresh(); })}>Require blueprints</Button></div>}
             {progress && <Progress value={(progress.done / progress.total) * 100} />}
+            {chapters.length > 0 && <div className="space-y-2 border-t border-border pt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" onClick={buildBlueprints} disabled={!!busy || master.status !== "APPROVED" || !chapters.every((ch) => has("SECTION", ch)) || missingBlueprints.length === 0}>
+                  {busy === "blueprintsAll" ? <Loader2 className="w-4 h-4 animate-spin mr-2 shrink-0" /> : <Play className="w-4 h-4 mr-2 shrink-0" />}
+                  {busy === "blueprintsAll" ? "Building detailed blueprints…" : missingBlueprints.length === 0 ? "All detailed blueprints built" : "Build all detailed blueprints"}
+                </Button>
+                {blueprintProgress && <>
+                  <span role="status" className="text-xs text-muted-foreground">{blueprintProgress.done}/{blueprintProgress.total} · Chapter {blueprintProgress.chapter + 1}</span>
+                  <Button size="icon" variant="outline" aria-label="Stop after current blueprint" title="Stop after current blueprint" onClick={() => { stopBlueprintsRef.current = true; }}><Pause className="w-4 h-4" /></Button>
+                </>}
+              </div>
+              {blueprintProgress && <Progress value={blueprintProgress.total ? blueprintProgress.done / blueprintProgress.total * 100 : 0} />}
+            </div>}
             <div className="space-y-2">
               {chapters.length === 0 && <p className="p-3 text-sm text-muted-foreground border border-border rounded-md">No chapter summaries yet. Press "Plan the whole book" to explode the summary into chapters and sections.</p>}
               {chapters.map((ch) => (

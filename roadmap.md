@@ -1,5 +1,11 @@
 # Roadmap — Closed-world writing
 
+## All-chapter blueprint button
+| Progress | Work item |
+| --- | --- |
+| 🟩 [x] | Top-level sequential build button; preserve individual chapter controls and existing blueprints; progress and stop-after-current control |
+| 🟩 [x] | 25 blueprint tests passed; signed-in desktop/mobile controls and simulated generation click verified; build OK; no paid AI calls |
+
 ## Full Audit Auto-Fixer
 | Progress | Work item |
 | --- | --- |

@@ -29,3 +29,4 @@
 - Blueprint cast checks use the shared adapter-aware example-role classifier across parsing, approval, writing gates and UI; instructional roles stay plan-local while named people and narrative books still require cast approval.
 - All images go through `_shared/ai/openaiImage.ts` with one cheapest OpenAI model at low quality on both the user-key and gateway routes, and a failure never switches models — predictable image cost.
 - Spoilers are judged as concepts by pure `planning/spoilerConcepts.ts`: keyword hit → skip if the chapter's own approved plan uses it → one AI judge against a ≥10-word concept sentence — bare word matches never reject plans.
+- All-chapter blueprint building uses a sequential client queue over the existing owner-only planner; skips existing PLANNED/READY blueprints and never approves them, so partial runs resume without replacing reviewed plans.
