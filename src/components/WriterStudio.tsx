@@ -10,6 +10,7 @@ import { WRITER_PERSONAS } from "../../supabase/functions/_shared/writers/person
 import { PROFILES, TIERS, PROFILE_ROLE_LABELS, DEFAULT_WRITER_TIER, type Tier, type ProfileRole } from "../../supabase/functions/_shared/writers/profiles";
 import { SLIDERS, NEUTRAL, MAX_ADJUST, DIVERGENCE_OPTIONS, type SliderValues, type DivergenceMode } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
+import { DRAFT_MODEL_KEYS, getModel } from "../../supabase/functions/_shared/ai/registry";
 
 const short = (id: string) => id.split("/")[1]?.replace(/-/g, " ") ?? id;
 const defaults = (id: string): SliderValues => ({ ...(WRITER_BASELINES[id] ?? NEUTRAL) });
@@ -23,6 +24,7 @@ export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWrit
   const [premise, setPremise] = useState("");
   const [sample, setSample] = useState<{ text: string; model: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [draftModel, setDraftModel] = useState<string>(DRAFT_MODEL_KEYS[0]);
   const writerIndex = WRITER_PERSONAS.findIndex((w) => w.id === writerId);
   const writer = WRITER_PERSONAS[writerIndex] ?? WRITER_PERSONAS[0];
   const baseline = WRITER_BASELINES[writer.id];
@@ -43,7 +45,7 @@ export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWrit
     setLoading(true);
     setSample(null);
     try {
-      const { data, error } = await supabase.functions.invoke("try-writer", { body: { writerId: writer.id, tier, premise, sliders: values, divergence, bookType: bookType ?? writer.bookTypes[0] } });
+      const { data, error } = await supabase.functions.invoke("try-writer", { body: { writerId: writer.id, tier, premise, sliders: values, divergence, draftModel, bookType: bookType ?? writer.bookTypes[0] } });
       const msg = (data as { error?: string })?.error || (error ? (await (error as { context?: Response }).context?.json?.().catch(() => null))?.error ?? error.message : null);
       if (msg) throw new Error(msg);
       setSample({ text: data.text, model: data.model });
@@ -73,12 +75,16 @@ export function WriterStudio({ initialWriterId, bookType, onUse }: { initialWrit
                 <span className="font-medium">{t.label}</span>
                 <span className="space-y-1 text-xs font-normal text-muted-foreground">
                   {(Object.keys(PROFILE_ROLE_LABELS) as ProfileRole[]).map((role) => (
-                    <span key={role} className="block break-words leading-snug"><span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{PROFILE_ROLE_LABELS[role]}:</span> <span className="text-foreground">{short(PROFILES[writer.id][t.value][role].model)}</span></span>
+                    <span key={role} className="block break-words leading-snug"><span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{PROFILE_ROLE_LABELS[role]}:</span> <span className="text-foreground">{short(role === "draft" ? draftModel : PROFILES[writer.id][t.value][role].model)}</span></span>
                   ))}
                 </span>
               </Button>
             ))}
           </div>
+          <label htmlFor="studio-draft-model" className="block pt-2 text-xs font-medium">Writing model</label>
+          <select id="studio-draft-model" value={draftModel} onChange={(e) => { setDraftModel(e.target.value); setSample(null); }} className="w-full rounded-sm border border-border bg-card p-2 text-xs">
+            {DRAFT_MODEL_KEYS.map((k) => <option key={k} value={k}>{getModel(k)?.displayName}{getModel(k)?.provider === "deepseek" ? " (your key)" : ""}</option>)}
+          </select>
         </aside>
 
         <section className="min-w-0 space-y-4" aria-label="Writer sample">

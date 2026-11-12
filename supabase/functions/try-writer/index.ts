@@ -7,6 +7,7 @@ import { createAIDeps } from "../_shared/ai/server.ts";
 import { getWriter, renderWriterPrompt } from "../_shared/writers/personas.ts";
 import { openingDirective } from "../_shared/writers/opening.ts";
 import { planOpeningStrategy, renderOpeningStrategyBlock } from "../_shared/writers/rhetoric.ts";
+import { parseDraftChoice } from "../_shared/ai/roles.ts";
 import { isTier, getProfile } from "../_shared/writers/profiles.ts";
 import { SLIDERS, NEUTRAL, boundAll, renderExpressionBlock, resolveDivergence, type SliderValues } from "../_shared/writers/sliders.ts";
 import { WRITER_BASELINES } from "../_shared/writers/manifest.ts";
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
     const user = `This is a short preview so the author can hear your voice. Write the opening of a ${bookType} piece (about 200–250 words) based on this premise:\n\n${premise}\n\n${renderOpeningStrategyBlock(strategy)}`;
 
     try {
-      const r = await generateAIText({ role: "writer", config: { mode: "profile", profileWriter: writer.id, profileTier: body.tier }, userId, bookId: null, request: { system, user, temperature: 0.8 } }, createAIDeps(admin, userId));
+      const r = await generateAIText({ role: "writer", config: { mode: "profile", profileWriter: writer.id, profileTier: body.tier, draftModel: parseDraftChoice(body?.draftModel) }, userId, bookId: null, request: { system, user, temperature: 0.8 } }, createAIDeps(admin, userId));
       return json({ text: r.text.trim(), model: r.meta.model, opening_strategy: strategy, baseline_slider_values: base ?? null, effective_slider_values: effective });
     } catch (e) {
       if (e instanceof AIProviderError) return json({ error: e.message }, statusForAIError(e));
