@@ -8,6 +8,7 @@
 - Books without a `book_model_configs` row use the `legacy` role map, reproducing pre-Pass-3 models exactly — backward compatibility without migration.
 - Continuity (Pass 4) runs server-side in `check-continuity` via pure logic in `_shared/narrative/continuity.ts`, before extraction; history is append-only in `continuity_checks` — only the accepted final text ever reaches story memory.
 - Manuscript audit uses pure `_shared/narrative/audit.ts`, caches manuscript/outline/memory hashes, writes only audit tables (owners change finding status/notes) — diagnosis never mutates prose or canon.
+- Full audit repair is a separate owner-authorized progressive-only workflow: pure `auditRepair.ts` decisions, atomic fenced multi-section patches, immutable before/after run history, reverse transactional extraction unwind then ordered strict replay; book writes stay locked until memory sync succeeds — bidirectional repair never bypasses validation or impersonates author decisions.
 - Provider API keys are managed at app level (`/settings`), not per book — keys are per user.
 - Live model prices are cached in `provider_pricing_cache` (signed-in read, service write) and refreshed from the gateway catalog when older than 24h via `_shared/ai/pricing.ts`; the registry prices are only a fallback.
 - DeepSeek prices come from parsing its official pricing page at peak rates (no price API); Claude "adaptive" profile slots send thinking type adaptive (Opus 5.x rejects fixed budgets), "extended" sends a fixed budget.

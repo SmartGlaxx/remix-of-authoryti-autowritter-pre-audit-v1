@@ -2046,6 +2046,82 @@ export type Database = {
           },
         ]
       }
+      manuscript_repair_runs: {
+        Row: {
+          audit_id: string
+          book_id: string
+          created_at: string
+          earliest_position: number | null
+          error: string | null
+          extraction_backup: Json
+          id: string
+          original_outline: Json
+          outcomes: Json
+          patches: Json
+          rollback_complete: boolean
+          status: string
+          sync_cursor: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audit_id: string
+          book_id: string
+          created_at?: string
+          earliest_position?: number | null
+          error?: string | null
+          extraction_backup?: Json
+          id?: string
+          original_outline: Json
+          outcomes?: Json
+          patches?: Json
+          rollback_complete?: boolean
+          status?: string
+          sync_cursor?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audit_id?: string
+          book_id?: string
+          created_at?: string
+          earliest_position?: number | null
+          error?: string | null
+          extraction_backup?: Json
+          id?: string
+          original_outline?: Json
+          outcomes?: Json
+          patches?: Json
+          rollback_complete?: boolean
+          status?: string
+          sync_cursor?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manuscript_repair_runs_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "manuscript_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manuscript_repair_runs_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manuscript_repair_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       narrative_events: {
         Row: {
           authority: string
@@ -3523,6 +3599,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      audit_repair_selftest: { Args: never; Returns: Json }
       calculate_downstream_blast_radius: {
         Args: { p_book_id: string; p_chapter: number; p_sub: number }
         Returns: Json
@@ -3545,6 +3622,16 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_request_logs: { Args: never; Returns: undefined }
+      commit_audit_repair: {
+        Args: {
+          p_changes: Json
+          p_details: Json
+          p_run_id: string
+          p_user_id: string
+          p_worker: string
+        }
+        Returns: Json
+      }
       commit_candidate_draft: {
         Args: {
           p_candidate_id: string
@@ -3654,6 +3741,10 @@ export type Database = {
       mark_testimonial_prompted: {
         Args: { _user_id: string }
         Returns: undefined
+      }
+      prepare_audit_memory_replay: {
+        Args: { p_run_id: string; p_user_id: string }
+        Returns: Json
       }
       record_canon_discrepancy: {
         Args: {

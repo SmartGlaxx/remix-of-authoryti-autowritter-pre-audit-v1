@@ -1,5 +1,14 @@
 # Roadmap — Closed-world writing
 
+## Full Audit Auto-Fixer
+| Progress | Work item |
+| --- | --- |
+| 🟩 [x] | Evidence-backed, reader-appeal-first bidirectional repair with full-text revalidation; progressive only, safe size limit, 20% cumulative per-section cap |
+| 🟩 [x] | Atomic fenced multi-section commits, immutable before/after history, transactional reverse unwind and strict ordered downstream memory recovery |
+| 🟩 [x] | Owner-only automatic repair authorization, progress/history, interruption recovery and resume in manuscript audit |
+| 🟩 [x] | 834 tests passed / 4 skipped; 67 targeted regressions passed; deployed; signed-in desktop/mobile, five live transaction checks and no-paid-call gate verified |
+| 🟧 [ ] | Paid AI repair verification: requires separate authorization |
+
 ## Forward autonomous resolution
 | Progress | Work item |
 | --- | --- |

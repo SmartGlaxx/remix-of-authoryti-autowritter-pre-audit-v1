@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
     // Fail-closed test mode: the extractor reply is caller-supplied and runs through the real parser, evidence
     // checks and saves; without one the call is refused. No AI key is ever reached.
     const testMode = testHeader || body.testMode === true;
+    const strictSync = body.strictSync === true;
     if (testMode && typeof body.mockOutput !== "string") return json({ error: "test_mode_blocked" }, 403);
     const { bookId, chapterIndex, subsectionIndex } = body as { bookId: unknown; chapterIndex: unknown; subsectionIndex: unknown };
     if (typeof bookId !== "string" || !UUID.test(bookId)) return json({ error: "Invalid bookId" }, 400);
@@ -55,6 +56,9 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const owned = await verifyBookOwnership(db, bookId, userId);
     if (!owned) return json({ error: "Book not found" }, 404);
+    const { data: repairLock, error: repairLockError } = await db.from("manuscript_repair_runs").select("id,status").eq("book_id", bookId).in("status", ["RUNNING", "SYNCING", "NEEDS_SYNC"]).limit(1);
+    if (repairLockError) throw new Error("Cannot verify active manuscript repair");
+    if (repairLock?.length && (!strictSync || repairLock[0].status !== "SYNCING")) return json({ error: "AUDIT_REPAIR_IN_PROGRESS" }, 409);
 
     const { data: allowed } = await db.rpc("check_rate_limit", { _user_id: userId, _function_name: "extract-narrative-state", _max_per_hour: 300, _max_per_day: 3000 });
     if (allowed === false) return json({ error: "Rate limit exceeded" }, 429);
@@ -67,10 +71,14 @@ Deno.serve(async (req) => {
     const markSync = async (st: "EXTRACTED" | "FAILED" | null, err?: unknown) => {
       if (!progressiveBook || !st) return;
       try {
-        await db.rpc("mark_section_extraction", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_status: st, p_error: st === "FAILED" ? String(err ?? "").slice(0, 500) : null });
+        const marked = await db.rpc("mark_section_extraction", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_status: st, p_error: st === "FAILED" ? String(err ?? "").slice(0, 500) : null });
+        if (strictSync && marked.error) throw new Error(marked.error.message);
         // Author-approved canon changes become authoritative only once the accepted prose is in story memory.
-        if (st === "EXTRACTED") await db.rpc("finalize_canon_application", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub });
-      } catch (e) { console.warn("[phase-f] acceptance update skipped:", e instanceof Error ? e.message : e); }
+        if (st === "EXTRACTED") {
+          const finalized = await db.rpc("finalize_canon_application", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub });
+          if (strictSync && finalized.error) throw new Error(finalized.error.message);
+        }
+      } catch (e) { if (strictSync) throw e; console.warn("[phase-f] acceptance update skipped:", e instanceof Error ? e.message : e); }
     };
 
     const trackKnowledge = knowledgeEnabled(ctl as never);
@@ -88,18 +96,33 @@ Deno.serve(async (req) => {
     // Phase 2D: only accepted, freshly extracted text feeds the identity registry. Never fails the extraction.
     if (outcome.status === "completed") {
       try {
-        const identity = await syncIdentityForSection(db, bookId, userId, { chapterIndex: ch, subsectionIndex: sub });
+        const identity = await syncIdentityForSection(db, bookId, userId, { chapterIndex: ch, subsectionIndex: sub }, strictSync ? repairLock?.[0]?.id : undefined);
         (outcome as Record<string, unknown>).identity = identity;
         console.log("[identity-sync]", JSON.stringify(identity));
-      } catch (e) { console.warn("[identity-sync] skipped:", e instanceof Error ? e.message : e); }
+      } catch (e) {
+        if (strictSync) {
+          await db.from("narrative_extractions").update({ status: "failed", error: "Identity synchronization failed" }).eq("id", outcome.extractionId);
+          await markSync("FAILED", "Identity synchronization failed");
+          throw e;
+        }
+        console.warn("[identity-sync] skipped:", e instanceof Error ? e.message : e);
+      }
       // Phase 3: character knowledge from accepted text only; never fails the extraction.
       if (trackKnowledge && outcome.knowledge) {
         try {
           const k = await syncKnowledgeForSection(db, { bookId, userId, universeId: (ctl as any)?.universe_id ?? null, pos: { chapterIndex: ch, subsectionIndex: sub },
-            extractionId: outcome.extractionId, contentHash: outcome.contentHash!, items: outcome.knowledge, sectionDate: outcome.sectionDate, nonLinear: outcome.nonLinear });
+            extractionId: outcome.extractionId, contentHash: outcome.contentHash ?? "", items: outcome.knowledge, sectionDate: outcome.sectionDate, nonLinear: outcome.nonLinear });
+          if (strictSync && k.heldForReview > 0) throw new Error("Knowledge synchronization requires review");
           (outcome as Record<string, unknown>).knowledgeSync = k;
           delete (outcome as Record<string, unknown>).knowledge;
-        } catch (e) { console.warn("[knowledge-sync] skipped:", e instanceof Error ? e.message : e); }
+        } catch (e) {
+          if (strictSync) {
+            await db.from("narrative_extractions").update({ status: "failed", error: "Knowledge synchronization failed" }).eq("id", outcome.extractionId);
+            await markSync("FAILED", "Knowledge synchronization failed");
+            throw e;
+          }
+          console.warn("[knowledge-sync] skipped:", e instanceof Error ? e.message : e);
+        }
       }
     }
     await markSync(extractionStatusFor(outcome as never), (outcome as any).error);

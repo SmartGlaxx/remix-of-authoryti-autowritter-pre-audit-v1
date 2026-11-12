@@ -9,7 +9,7 @@ import type { StoryPosition } from "./rules.ts";
 type Db = any;
 const fromPos = (p: number): StoryPosition => ({ chapterIndex: Math.floor(p / 10000), subsectionIndex: p % 10000 });
 
-export async function syncIdentityForSection(db: Db, bookId: string, userId: string, pos: StoryPosition) {
+export async function syncIdentityForSection(db: Db, bookId: string, userId: string, pos: StoryPosition, replayRunId?: string) {
   const { data: ext } = await db.from("narrative_extractions").select("id, content_hash, status")
     .eq("book_id", bookId).eq("chapter_index", pos.chapterIndex).eq("subsection_index", pos.subsectionIndex)
     .eq("status", "completed").order("updated_at", { ascending: false }).limit(1).maybeSingle();
@@ -58,7 +58,7 @@ export async function syncIdentityForSection(db: Db, bookId: string, userId: str
   const changes = plan.changes.map((c) => ({ entity_id: ids.get(c.entity_key) ?? c.entity_key, attribute: c.attribute, value: c.value, authority: c.authority, evidence: c.evidence, source: c.source, position }));
   let commit: unknown = null;
   if (changes.length) {
-    const { data, error } = await db.rpc("commit_identity_batch", { p_book_id: bookId, p_user_id: userId, p_section_id: `${pos.chapterIndex}:${pos.subsectionIndex}`, p_content_hash: ext.content_hash, p_purpose: "identity_sync", p_schema_version: 1, p_extraction_id: ext.id, p_changes: changes });
+    const { data, error } = await db.rpc("commit_identity_batch", { p_book_id: bookId, p_user_id: userId, p_section_id: `${pos.chapterIndex}:${pos.subsectionIndex}`, p_content_hash: ext.content_hash, p_purpose: replayRunId ? `audit_replay_${replayRunId}` : "identity_sync", p_schema_version: 1, p_extraction_id: ext.id, p_changes: changes });
     if (error) throw new Error(`identity commit failed: ${error.message}`);
     commit = data;
   }
