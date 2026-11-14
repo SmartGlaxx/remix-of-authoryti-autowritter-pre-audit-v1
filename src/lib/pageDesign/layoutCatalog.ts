@@ -1,0 +1,2 @@
+export { LAYOUT_CATALOG, LAYOUT_BY_ID, getLayout, isLayoutId, compatibleLayouts, STYLE_FAMILY_DEFS, BOOK_TYPE_STYLES, FONT_TOKENS, MIN_BODY_PT, DEFAULT_BODY_PT, DEFAULT_PRINT, MAX_PAGE_PT_VARIATION, compatibleAccent, shapeAllowed, treatmentAllowed, asDesignBookType } from "../../../supabase/functions/_shared/pageDesign/catalog";
+export type { LayoutDef, LayoutCategory, SlotDef, RegionDef, StyleFamilyDef } from "../../../supabase/functions/_shared/pageDesign/catalog";

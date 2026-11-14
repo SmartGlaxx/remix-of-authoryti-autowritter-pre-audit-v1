@@ -2570,6 +2570,50 @@ export type Database = {
           },
         ]
       }
+      page_designs: {
+        Row: {
+          book_id: string
+          created_at: string
+          generated_spec: Json | null
+          id: string
+          page_key: string
+          schema_version: number
+          spec: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          generated_spec?: Json | null
+          id?: string
+          page_key: string
+          schema_version?: number
+          spec: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          generated_spec?: Json | null
+          id?: string
+          page_key?: string
+          schema_version?: number
+          spec?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_designs_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personas: {
         Row: {
           ai_expansions: Json
