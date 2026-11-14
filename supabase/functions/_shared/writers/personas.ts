@@ -66,7 +66,7 @@ export const WRITER_PERSONAS: WriterPersona[] = [
     readerRelationship: "Mentor who expects action.", philosophy: "Clarity and speed beat perfection.",
     strengths: "Actionable steps, decision rules, crisp frameworks.", quirks: "Ends sections with a 'do this today' line.",
     avoids: "Vague inspiration, long preambles, motivational clichés.", signature: "Every idea converts into a concrete move.",
-    bookTypes: ["business", "technology", "self-help"], topics: ["startups", "sales", "productivity", "growth"],
+    bookTypes: ["manual", "business", "technology", "self-help"], topics: ["startups", "careers", "sales", "productivity", "growth"],
   },
   {
     id: "claire", name: "Claire Whitmore", tagline: "Elegant financial analyst", gender: "female", age: "early 50s",
@@ -146,7 +146,7 @@ export const WRITER_PERSONAS: WriterPersona[] = [
     philosophy: "Systems beat motivation.", strengths: "Clarity, structure, practical walkthroughs.",
     quirks: "Summarises each section in one sentence rule.", avoids: "Rambling, emotional manipulation.",
     signature: "No-nonsense rules you can apply immediately.",
-    bookTypes: ["programming", "technology", "business", "self-help", "reference"], topics: ["productivity", "engineering", "habits", "focus"],
+    bookTypes: ["programming", "technology", "business", "self-help", "manual", "reference"], topics: ["productivity", "engineering", "careers", "habits", "focus"],
   },
   {
     id: "marcus", name: "Marcus Hale", tagline: "Charismatic dramatist", gender: "male", age: "mid 40s",
@@ -191,7 +191,7 @@ export const WRITER_PERSONAS: WriterPersona[] = [
     readerRelationship: "Buddy.", philosophy: "If they laugh, they remember.",
     strengths: "Comics, humour, visual scenes, accessibility.", quirks: "Sneaks a callback joke into endings.",
     avoids: "Meanness, dense jargon, long blocks of text.", signature: "Laugh-out-loud clarity.",
-    bookTypes: ["comic", "children", "magazine", "self-help", "fiction-serial"], topics: ["humor", "adventure", "everyday life", "general nonfiction"],
+    bookTypes: ["comic", "children", "magazine", "manual", "self-help", "fiction-serial"], topics: ["humor", "adventure", "everyday life", "general nonfiction"],
   },
   {
     id: "julian", name: "Julian Reyes", tagline: "Imaginative, emotionally nuanced novelist", gender: "male", age: "late 30s",
@@ -221,7 +221,7 @@ export const WRITER_PERSONAS: WriterPersona[] = [
     readerRelationship: "Host at a long dinner table.", philosophy: "Good things are made to be shared.",
     strengths: "Cookbooks, magazines, lifestyle features.", quirks: "Adds a 'cook's note' or insider tip.",
     avoids: "Vague measurements, snobbery, filler.", signature: "Recipes and features you can almost taste.",
-    bookTypes: ["cookbook", "magazine", "memoir"], topics: ["food", "travel", "lifestyle", "culture"],
+    bookTypes: ["cookbook", "magazine", "manual", "memoir"], topics: ["food", "travel", "lifestyle", "culture", "careers"],
   },
 ];
 

@@ -1,5 +1,12 @@
 # Roadmap — Closed-world writing
 
+## Manual / E-Guide category and page-design foundation
+| Progress | Work item |
+| --- | --- |
+| 🟧 [ ] | Add the manual category, 20–50 page / 6,000–15,000-word defaults, audiences, topics, writers and editorial planning route |
+| 🟧 [ ] | Register visual templates and shared AI page-composition contracts for children's books, magazines and manuals |
+| 🟧 [ ] | Run deterministic tests and verify the category in the signed-in creation flow; no paid AI calls |
+
 ## All-chapter blueprint button
 | Progress | Work item |
 | --- | --- |

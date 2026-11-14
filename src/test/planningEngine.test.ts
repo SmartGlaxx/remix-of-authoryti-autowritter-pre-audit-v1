@@ -13,7 +13,7 @@ describe("Phase C adapters", () => {
   });
   it("every app book type maps to exactly one adapter", () => {
     const types = CONTEXT_PROFILES.flatMap((p) => p.bookTypes);
-    expect(types.length).toBe(21);
+    expect(types.length).toBe(22);
     expect(GENRE_ADAPTERS.find((a) => a.bookTypes.includes("textbook"))?.id).toBe("technical");
     for (const t of types) expect(GENRE_ADAPTERS.filter((a) => a.bookTypes.includes(t)).length).toBe(1);
   });

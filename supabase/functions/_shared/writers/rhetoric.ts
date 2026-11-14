@@ -41,7 +41,7 @@ export function allowedStrategies(bookType: string): OpeningStrategy[] {
     case "poetry": return ["sensory_moment", "paradox", "unexpected_comparison", "question"];
     case "cookbook": return ["sensory_moment", "direct_instruction", "anecdote", "historical_observation", "problem_statement"];
     case "biography": case "memoir": return LIFE;
-    case "self-help": case "business": case "finance": return PRACTICAL;
+    case "self-help": case "business": case "finance": case "manual": return PRACTICAL;
     case "magazine": return ["anecdote", "contrarian_claim", "case_study", "question", "concrete_scene", "statistic", "consequence_first"];
     default: return TECHNICAL;
   }

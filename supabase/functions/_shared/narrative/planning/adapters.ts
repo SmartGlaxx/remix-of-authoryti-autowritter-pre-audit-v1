@@ -97,8 +97,8 @@ export const GENRE_ADAPTERS: readonly GenreAdapter[] = [
     weight: flat, minSectionWords: 150,
   },
   {
-    id: "magazine", label: "Magazines", isFiction: false,
-    bookTypes: ["magazine", "custom"],
+    id: "magazine", label: "Magazines & visual guides", isFiction: false,
+    bookTypes: ["magazine", "manual", "custom"],
     masterFields: ["issue_theme", "audience", "departments"],
     chapterObjectives: ["front_of_book", "feature", "department", "back_of_book"],
     sectionUnit: "article", sectionsPerChapter: { min: 1, max: 6, default: 3 },

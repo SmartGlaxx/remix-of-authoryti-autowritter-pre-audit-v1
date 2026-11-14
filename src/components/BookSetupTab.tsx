@@ -24,7 +24,7 @@ import { BookIdeasGenerator } from "@/components/BookIdeasGenerator";
 import { BoundedSlider, offsetLabel } from "@/components/BoundedSlider";
 import { SLIDERS, MAX_ADJUST, NEUTRAL, readSliders, type SliderValues } from "../../supabase/functions/_shared/writers/sliders";
 import { WRITER_BASELINES } from "../../supabase/functions/_shared/writers/manifest";
-import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, type BookType, type CreateBookInput } from "@/types/book";
+import { BOOK_TYPE_INFO, BOOK_TYPE_GENRES, GENRE_PRESETS, DEFAULT_BANNED_WORDS, TEXTBOOK_COUNTRIES, TEXTBOOK_LEVELS, MANUAL_WORD_COUNT_PRESETS, getDefaultControls, type BookType, type CreateBookInput } from "@/types/book";
 import { adapterForBookType } from "../../supabase/functions/_shared/narrative/planning/adapters";
 import { BOOK_ROLES, emptySetup, validateSetup, type BookSetup, type SetupCastMember } from "../../supabase/functions/_shared/narrative/planning/bookSetup";
 
@@ -48,6 +48,9 @@ const ADJUSTMENTS = [
   { value: "custom", label: "Something else…" },
 ];
 const LENGTHS = [{ v: 20000, l: "Short (~20k words)" }, { v: 50000, l: "Standard (~50k)" }, { v: 80000, l: "Long (~80k)" }, { v: 120000, l: "Epic (~120k)" }];
+const lengthsFor = (bookType: string) => bookType === "manual"
+  ? MANUAL_WORD_COUNT_PRESETS.map((preset) => ({ v: preset.value, l: `${preset.label} (~${preset.value / 1000}k words)` }))
+  : LENGTHS;
 const genresFor = (t: string) => BOOK_TYPE_GENRES[t as BookType] ?? GENRE_PRESETS[BOOK_TYPE_INFO[t as BookType]?.category ?? "fiction"] ?? [];
 const fictionType = (t: string) => { try { return adapterForBookType(t).isFiction; } catch { return true; } };
 const nice = (r: string) => r.replace(/_/g, " ");
@@ -88,7 +91,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
   const [prevPremise, setPrevPremise] = useState<string | null>(null);
   const [exAudience, setExAudience] = useState<string>(book.audience ?? "");
   const [exTone, setExTone] = useState<string>(typeof book.controls?.bookTone === "string" ? book.controls.bookTone : "");
-  const [exLength, setExLength] = useState(50000);
+  const [exLength, setExLength] = useState(() => Number(book.controls?.structureControls?.targetWordCount) || getDefaultControls((book.book_type ?? "novel") as BookType).structureControls.targetWordCount || 50000);
   const [exSetting, setExSetting] = useState("");
   const [writerId, setWriterId] = useState<string>(book.controls?.writerId ?? "");
   const [sliders, setSliders] = useState<SliderValues>(() => readSliders(book.tone_profile, book.controls));
@@ -325,7 +328,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
         <CardContent className="space-y-3">
           {!locked && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Book type</label>
-              <Select value={exType} onValueChange={(v) => { setExType(v); setExGenre(""); setExAudience(""); applyVoice(recommendWriterForTone(exTone || null, v, null).id, exTone); }}><SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={exType} onValueChange={(v) => { setExType(v); setExLength(getDefaultControls(v as BookType).structureControls.targetWordCount || 50000); setExGenre(""); setExAudience(""); applyVoice(recommendWriterForTone(exTone || null, v, null).id, exTone); }}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(BOOK_TYPE_INFO).map(([k, v]) => <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">{exType === "textbook" ? "Subject" : "Sub-category"}</label>
               <Select value={exGenre || "__any"} onValueChange={(v) => { const g = v === "__any" ? "" : v; setExGenre(g); applyVoice(recommendWriterForTone(exTone || null, exType, g || null).id, exTone); }}><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
@@ -379,7 +382,7 @@ export default function BookSetupTab({ book, isFiction, onSaved, onContinue, onT
               <span className="text-xs text-muted-foreground">Originality:</span>
               {(["safe", "balanced", "bold"] as const).map((o) => <Button key={o} size="sm" variant={exOriginality === o ? "default" : "outline"} onClick={() => setExOriginality(o)}>{o === "safe" ? "Familiar" : o === "bold" ? "Bold" : "Balanced"}</Button>)}
               <Select value={String(exLength)} onValueChange={(v) => setExLength(+v)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                <SelectContent>{LENGTHS.map((l) => <SelectItem key={l.v} value={String(l.v)}>{l.l}</SelectItem>)}</SelectContent></Select>
+                <SelectContent>{lengthsFor(exType).map((l) => <SelectItem key={l.v} value={String(l.v)}>{l.l}</SelectItem>)}</SelectContent></Select>
               <Button size="sm" variant="ghost" onClick={() => setShowMore(!showMore)}>{showMore ? "Fewer options" : "More options"}</Button>
             </div>
             {showMore && <div className="grid gap-3 sm:grid-cols-3">

@@ -9,7 +9,7 @@ const assemble = (bookType: string, candidates: ContextCandidate[], extras = {})
 describe("Phase 2A adaptive context", () => {
   it("assigns every enabled book type exactly one of five profiles", () => {
     expect(CONTEXT_PROFILES).toHaveLength(5);
-    expect(ENABLED_BOOK_TYPES).toHaveLength(21);
+    expect(ENABLED_BOOK_TYPES).toHaveLength(22);
     for (const type of ENABLED_BOOK_TYPES) expect(CONTEXT_PROFILES.filter((p) => p.bookTypes.includes(type))).toHaveLength(1);
     expect(profileForBookType("business").id).toBe("practical");
     expect(profileForBookType("drama").facets).toContain("character-continuity");

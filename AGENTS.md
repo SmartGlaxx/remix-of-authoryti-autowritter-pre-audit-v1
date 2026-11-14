@@ -30,3 +30,4 @@
 - All images go through `_shared/ai/openaiImage.ts` with one cheapest OpenAI model at low quality on both the user-key and gateway routes, and a failure never switches models — predictable image cost.
 - Spoilers are judged as concepts by pure `planning/spoilerConcepts.ts`: keyword hit → skip if the chapter's own approved plan uses it → one AI judge against a ≥10-word concept sentence — bare word matches never reject plans.
 - All-chapter blueprint building uses a sequential client queue over the existing owner-only planner; skips existing PLANNED/READY blueprints and never approves them, so partial runs resume without replacing reviewed plans.
+- Visual page-design contracts live in `src/types/pageDesign.ts`: AI chooses a serializable composition spec, while a separate deterministic renderer owns text flow and print geometry so layout decisions stay testable and reproducible.

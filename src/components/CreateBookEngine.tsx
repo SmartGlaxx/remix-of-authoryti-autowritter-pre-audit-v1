@@ -49,6 +49,7 @@ import {
   BOOK_TYPE_GENRES,
   ENABLED_BOOK_TYPES,
   WORD_COUNT_PRESETS,
+  MANUAL_WORD_COUNT_PRESETS,
   TEASER_STYLE_OPTIONS,
   getDefaultControls,
   AutomationLevel,
@@ -761,7 +762,7 @@ const CreateBookEngine = ({ initial, onClose, onCreate }: CreateBookEngineProps)
                   {/* Word Count */}
                   <Section emoji="📏" title="Target Word Count">
                     <div className="flex flex-wrap gap-1.5">
-                      {WORD_COUNT_PRESETS.map((preset) => (
+                      {(formData.bookType === "manual" ? MANUAL_WORD_COUNT_PRESETS : WORD_COUNT_PRESETS).map((preset) => (
                         <Tooltip key={preset.value}>
                           <TooltipTrigger asChild>
                             <Badge

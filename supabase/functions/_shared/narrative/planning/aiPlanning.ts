@@ -65,6 +65,7 @@ const seriesText = (b: BookBrief) => b.seriesPlan && b.seriesPlan.books > 1 ? `\
 const briefText = (b: BookBrief) => [
   `Title: ${b.title}`, `Book type: ${b.bookType}`, b.genre ? `Genre: ${b.genre}` : "", b.audience ? `Audience: ${b.audience}` : "",
   `Target length: about ${b.targetWords} words across about ${b.chapterCount} chapters (estimates).`,
+  b.bookType === "manual" ? "Format: a visual manual, e-guide or magazine-like career journal of 20–50 pages (about 6,000–15,000 words). Use concise front matter, modular quick-start units, visual step-by-step guides where useful, and summary action points. In genre_data, issue_theme is the guide's central reader outcome and departments are its modular units. Keep it practical and visually scannable, not a full textbook or an ongoing periodical." : "",
   `Premise: ${b.premise}`, b.guidance ? `Author guidance: ${b.guidance}` : "",
   b.voice ? `\n${b.voice}` : "",
 ].filter(Boolean).join("\n");

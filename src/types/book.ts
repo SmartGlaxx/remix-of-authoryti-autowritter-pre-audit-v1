@@ -17,13 +17,14 @@ export type BookType =
   | "textbook"
   | "cookbook"
   | "magazine"
+  | "manual"
   | "poetry"
   | "drama"
   | "reference"
   | "custom";
 
 // ============= VISUAL BOOK TYPES & TEMPLATES =============
-export const VISUAL_BOOK_TYPES: BookType[] = ["children", "comic", "cookbook", "science-popular", "magazine"];
+export const VISUAL_BOOK_TYPES: BookType[] = ["children", "comic", "cookbook", "science-popular", "magazine", "manual"];
 
 export type ImageShape = "square" | "rectangle" | "circle" | "hexagon" | "triangle" | "rounded-rect";
 export type ImagePosition = "left" | "right" | "center" | "full-width";
@@ -158,6 +159,29 @@ export const BOOK_TEMPLATES: BookTemplate[] = [
     layouts: [
       { shape: "hexagon", position: "right", size: "medium", wrapText: true },
       { shape: "circle", position: "left", size: "small", wrapText: true },
+    ],
+    previewStyle: "feature",
+  },
+  // Manual / E-Guide & Career Journal
+  {
+    id: "manual-quick-start",
+    name: "Quick-Start Guide",
+    description: "Clear visual units with practical action points and room for diagrams",
+    bookType: "manual",
+    layouts: [
+      { shape: "rounded-rect", position: "full-width", size: "large", wrapText: false },
+      { shape: "rectangle", position: "right", size: "medium", wrapText: true },
+    ],
+    previewStyle: "editorial",
+  },
+  {
+    id: "manual-career-journal",
+    name: "Career Journal",
+    description: "Magazine-like pages mixing guidance, examples and visual checkpoints",
+    bookType: "manual",
+    layouts: [
+      { shape: "rectangle", position: "left", size: "large", wrapText: true },
+      { shape: "circle", position: "right", size: "small", wrapText: true },
     ],
     previewStyle: "feature",
   },
@@ -502,6 +526,7 @@ export const BOOK_TYPE_INFO: Record<BookType, { label: string; icon: string; des
   
   // Specialized
   magazine: { label: "Magazine / Periodical", icon: "📰", description: "Ongoing issues or episodic content", category: "specialized" },
+  manual: { label: "Manual / E-Guide & Career Journal", icon: "🧭", description: "Visual 20–50 page guides for careers, skills and quick starts", category: "specialized" },
   reference: { label: "Reference Manual", icon: "📋", description: "Comprehensive reference documentation", category: "specialized" },
   custom: { label: "Custom / Hybrid", icon: "🎯", description: "Custom format combining multiple styles", category: "specialized" },
 };
@@ -629,6 +654,7 @@ export const BOOK_TYPE_AUDIENCES: Record<BookType, string[]> = {
 
   // Specialized
   magazine: ["16-plus", "general-readers", "professionals"],
+  manual: ["16-plus", "general-readers", "professionals", "industry-experts"],
   reference: ["professionals", "industry-experts", "specialized-experts", "scholars-researchers"],
   custom: ["children-1-9", "older-children-10-15", "16-plus", "general-readers", "academics-undergraduate", "industry-experts", "professionals", "scholars-researchers", "specialized-experts"],
 };
@@ -641,6 +667,20 @@ export const getIELTSBandForAudience = (audienceValue: string): IELTSBand => {
 
 // Legacy array for backward compatibility
 export const AUDIENCE_PRESETS = AUDIENCE_OPTIONS.map(opt => opt.value);
+
+export const MANUAL_BOOK_LIMITS = {
+  minPages: 20,
+  maxPages: 50,
+  minWords: 6000,
+  maxWords: 15000,
+  defaultWords: 10000,
+} as const;
+
+export const MANUAL_WORD_COUNT_PRESETS = [
+  { value: MANUAL_BOOK_LIMITS.minWords, label: "Concise", description: "~6k words — a focused 20–30 page quick guide" },
+  { value: MANUAL_BOOK_LIMITS.defaultWords, label: "Guide", description: "~10k words — a balanced 30–40 page visual guide" },
+  { value: MANUAL_BOOK_LIMITS.maxWords, label: "Full Guide", description: "~15k words — a detailed 40–50 page guide" },
+] as const;
 
 export const WORD_COUNT_PRESETS = [
   { value: 10000, label: "Short", description: "~10k words — short stories, guides" },
@@ -695,6 +735,7 @@ export const BOOK_TYPE_GENRES: Record<BookType, string[]> = {
   textbook: TEXTBOOK_SUBJECTS,
   cookbook: ["Weeknight & Quick Meals", "Baking & Pastries", "Plant-Based & Vegan", "Regional & Heritage", "Comfort Classics", "Meal Prep & Budget", "Drinks & Fermentation"],
   magazine: ["Industry Insights", "Culture & Arts", "Lifestyle", "Special Interest", "Local & Community"],
+  manual: ["Career Starters", "Professional Skills", "How-To & Quick Start", "Industry Guides", "Learning New Skills", "Personal Development"],
   poetry: ["Nature & Contemplation", "Love & Yearning", "Spoken Word & Urban", "Free Verse", "Structured & Traditional", "Grief & Resilience"],
   drama: ["Feature Screenplay", "TV Pilot / Episodic", "Stage Play", "Chamber Drama", "Dark Satire", "Mystery Script"],
   reference: ["Technical Manuals", "Field Guides", "Comprehensive Handbooks", "Dictionaries & Glossaries", "How-To Guides"],
@@ -755,6 +796,25 @@ export const getDefaultControls = (bookType: BookType): BookControls => {
     divergenceAllowed: false,
     teaserStyle: "none",
   };
+
+  // Short visual manuals have their own length and composition defaults.
+  if (bookType === "manual") {
+    return {
+      ...baseControls,
+      creativity: 2,
+      scope: 7,
+      automationLevel: "assisted",
+      imageGeneration: true,
+      imageFrequency: 5,
+      selectedTemplateId: "manual-quick-start",
+      temporalContext: { era: "timeless", timelineStructure: "linear" },
+      structureControls: {
+        ...baseControls.structureControls,
+        sectionsPerChapter: 3,
+        targetWordCount: MANUAL_BOOK_LIMITS.defaultWords,
+      },
+    };
+  }
 
   // Adjust defaults based on category
   switch (category) {
