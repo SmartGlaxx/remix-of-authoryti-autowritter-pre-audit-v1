@@ -1,3 +1,4 @@
+import { recoverAcceptedText } from "../_shared/narrative/recoverAcceptedText.ts";
 // Phase H — owner-only review of held drafts and canon decisions. Every write goes through
 // owner-verified database functions; acceptance re-runs full validation under a fenced lease.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
@@ -112,13 +113,23 @@ async function handleRequest(req: Request): Promise<Response> {
       const ch = int(body.chapter), sub = int(body.subsection);
       if (ch === null || sub === null) return json({ error: "Invalid position" }, 400);
       const since = typeof body.since === "string" ? body.since : new Date(Date.now() - 10 * 60_000).toISOString();
-      const [{ data: acc }, { data: cand }] = await Promise.all([
-        db.from("book_section_acceptances").select("id, manuscript_status, created_at").eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).in("manuscript_status", ["ACCEPTED", "ESTABLISHED"]).gte("created_at", since).limit(1),
+      const [acceptances, candidates] = await Promise.all([
+        db.from("book_section_acceptances").select("id, manuscript_status, created_at, content_hash").eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).in("manuscript_status", ["ACCEPTED", "ESTABLISHED"]).order("created_at", { ascending: false }).limit(1),
         db.from("book_candidate_drafts").select("id, validation_status, created_at").eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).gte("created_at", since).order("created_at", { ascending: false }).limit(1),
       ]);
+      if (acceptances.error || candidates.error) return json({ error: "Could not check the saved section. Retry before writing." }, 503);
+      const acc = acceptances.data, cand = candidates.data;
       if (acc?.length) {
-        const { data: b } = await db.from("books").select("outline").eq("id", bookId).maybeSingle();
-        return json({ state: "accepted", text: b?.outline?.chapters?.[ch]?.subsections?.[sub]?.content ?? null });
+        const { data: b, error } = await db.from("books").select("outline, full_text").eq("id", bookId).maybeSingle();
+        if (error || !b) return json({ error: "Could not read the accepted manuscript." }, 503);
+        const old = b.outline?.chapters?.[ch]?.subsections?.[sub]?.content;
+        const text = recoverAcceptedText(acc[0].content_hash, old, b.full_text);
+        if (!text) return json({ error: "This section is already accepted, but its exact text could not be recovered. Writing stopped to protect your manuscript.", code: "ACCEPTED_TEXT_MISSING" }, 409);
+        if (old !== text) {
+          const restored = await db.rpc("write_accepted_outline_text", { p_book_id: bookId, p_user_id: userId, p_chapter: ch, p_sub: sub, p_text: text, p_hash: acc[0].content_hash });
+          if (restored.error) return json({ error: "Could not restore the accepted section. Your manuscript is safe." }, 409);
+        }
+        return json({ state: "accepted", text });
       }
       if (cand?.length) return json({ state: "held", candidateId: cand[0].id, status: cand[0].validation_status });
       return json({ state: "pending" });
