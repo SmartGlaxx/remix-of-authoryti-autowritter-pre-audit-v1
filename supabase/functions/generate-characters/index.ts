@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
-import { textDossierLock, validateCharacterLock, dossierWordCount } from '../_shared/narrative/characterReference.ts';
+import { textDossierLock, validateCharacterLock } from '../_shared/narrative/characterReference.ts';
+import { CharacterProfileError, ensureCharacterDossier } from '../_shared/narrative/characterDossier.ts';
 import { missingReferenceNames } from '../_shared/narrative/characterReference.ts';
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
@@ -128,7 +129,7 @@ IDENTITY, PHYSICAL APPEARANCE, HAIR, FASHION & STYLE, VOICE & MANNERISMS, PERSON
 Also provide:
 - A brief description (for quick reference)
 - A visualDescription for illustration consistency
-- dossier: ONE 500–700 word prose dossier so detailed no image is ever needed: exact build, height, face, eyes, skin, hair, hands, scars/marks, signature clothes, scent, voice and cadence, posture, how they move, nervous habits, what they do under pressure, deepest flaw, moral line, how they treat others. Plain prose, no lists, no markdown.
+- dossier: ONE 500–700 word prose dossier so detailed no image is ever needed: exact build, height, face, eyes, skin, hair, hands, scars/marks, signature clothes, scent, voice and cadence, posture, how they move, nervous habits, what they do under pressure, deepest flaw, moral line, how they treat others. Plain prose, no lists, no markdown. The dossier field ALONE must contain 500–700 words; keep other structured sections brief. Count before returning. Unidentified cast members still need a full designed profile; keep their approved label and do not reveal or invent a hidden identity or unestablished biography.
 - reference.features: {build, skinTone, face, eyes, hair, hands, posture, clothes, distinctiveMarks} — short exact phrases matching the dossier.
 - reference: {heightCm: exact positive number, weightKg: exact positive number, measurementSource: "designed", tells:[{state,cue,purpose}], desireLine, heldBackFeature}. Design height and weight consistent with age/outline; these are design decisions NOT image measurements. 4–10 distinct functional tells with purpose betray/assist/reveal/endanger/mislead/comfort, including state "at-ease". Avoid duplicating cues across cast. Give 5–7 noticeability-ranked introduction features (introFeatures), top two most visible, one signature held back. Preserve explicit author facts.
 
@@ -197,7 +198,7 @@ Return ONLY valid JSON:
     const characters = target && Array.isArray(parsed.characters)
       ? parsed.characters.filter((c: any) => c?.id === target.id || String(c?.name ?? '').trim().toLowerCase() === target.name.trim().toLowerCase()).slice(0, 1).map((c: any) => ({ ...c, id: target.id, name: target.name }))
       : parsed.characters;
-    if (target && !characters.length) throw new Error(`No reference card was returned for ${target.name}`);
+    if (target && (!Array.isArray(characters) || !characters.length)) throw new CharacterProfileError(`No reference card was returned for ${target.name}`);
     for (const c of (Array.isArray(characters) ? characters : [])) {
       // Models sometimes place reference fields at the top level; fold them back in.
       const r = (c.reference && typeof c.reference === 'object') ? c.reference : {};
@@ -217,7 +218,10 @@ Return ONLY valid JSON:
       const existing = outline.characters?.find((c: any) => c.id === character.id && c.reference?.locked);
       let prepared = existing;
       if (!prepared) {
-        if (dossierWordCount(character.dossier) < 350) throw new Error(`The profile for ${character.name} was too short; try again`);
+        character.dossier = await ensureCharacterDossier(character, async (prompt) => {
+          const expanded = await generateAIText({ role: 'character_generator', bookType: book.bookType ?? null, config: __ctx.config, userId: auth.user.id, bookId: __ctx.bookId, request: { user: prompt, reasoning: 'low', maxOutputTokens: 2500 } }, createAIDeps(__admin, auth.user.id));
+          return expanded.text;
+        });
         const lock = textDossierLock({ ...character.reference, features: character.reference?.features ?? {} });
         const issues = validateCharacterLock(lock, charactersWithPortraits.map((c: any) => c.reference));
         if (issues.length) throw new Error(issues.join('; '));
@@ -238,6 +242,6 @@ Return ONLY valid JSON:
     });
   } catch (error) {
     console.error("generate-characters error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), { status: error instanceof AIProviderError ? statusForAIError(error) : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", ...(error instanceof CharacterProfileError ? { code: error.code } : {}) }), { status: error instanceof CharacterProfileError ? error.status : error instanceof AIProviderError ? statusForAIError(error) : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

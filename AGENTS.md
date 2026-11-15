@@ -31,3 +31,4 @@
 - Spoilers are judged as concepts by pure `planning/spoilerConcepts.ts`: keyword hit → skip if the chapter's own approved plan uses it → one AI judge against a ≥10-word concept sentence — bare word matches never reject plans.
 - All-chapter blueprint building uses a sequential client queue over the existing owner-only planner; skips existing PLANNED/READY blueprints and never approves them, so partial runs resume without replacing reviewed plans.
 - Visual page-design contracts live in `src/types/pageDesign.ts`: AI chooses a serializable composition spec, while a separate deterministic renderer owns text flow and print geometry so layout decisions stay testable and reproducible.
+- Short character dossiers use pure `characterDossier.ts` with one same-route prose-only expansion before locking; preserve the approved card and return controlled 422 on failure to avoid repeated full-card generation and incomplete saved profiles.
