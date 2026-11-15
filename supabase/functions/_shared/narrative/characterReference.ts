@@ -63,3 +63,17 @@ export function textDossierLock(reference: Omit<CharacterLock, 'referencePath' |
   return { ...reference, referencePath: TEXT_DOSSIER_PATH, locked: true } as CharacterLock;
 }
 export function dossierWordCount(text: unknown): number { return typeof text === 'string' ? text.trim().split(/\s+/).filter(Boolean).length : 0; }
+
+/** Cast members named anywhere in chapters 0..upToChapter (titles, summaries, section plans, written text).
+ *  Writing a chapter only needs locked references for people who have debuted by then. */
+export function castDueByChapter(cast: readonly string[], outline: { chapters?: unknown[] } | null | undefined, upToChapter: number): string[] {
+  const chapters = Array.isArray(outline?.chapters) ? outline!.chapters.slice(0, Math.max(0, upToChapter) + 1) : [];
+  const text = JSON.stringify(chapters);
+  const lower = text.toLowerCase();
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return cast.filter((name) => {
+    const n = name?.trim(); if (!n) return false;
+    if (lower.includes(n.toLowerCase())) return true;
+    return n.split(/\s+/).filter((t) => t.length >= 3 && /^\p{Lu}/u.test(t)).some((t) => new RegExp(`\\b${esc(t)}\\b`, 'u').test(text));
+  });
+}

@@ -4,7 +4,7 @@ import { generateAIText, statusForAIError } from "../_shared/ai/client.ts";
 import { AIProviderError } from "../_shared/ai/providers.ts";
 import { textDossierLock, validateCharacterLock } from '../_shared/narrative/characterReference.ts';
 import { CharacterProfileError, ensureCharacterDossier } from '../_shared/narrative/characterDossier.ts';
-import { missingReferenceNames } from '../_shared/narrative/characterReference.ts';
+import { missingReferenceNames, castDueByChapter } from '../_shared/narrative/characterReference.ts';
 import { createAIDeps, aiBookContext } from "../_shared/ai/server.ts";
 
 // ── Security Config ──
@@ -100,8 +100,10 @@ serve(async (req) => {
     const { data: castRows } = await ownerAdmin.from('story_characters').select('id,name,role').eq('book_id',book.id).eq('user_id',auth.user.id).eq('is_active',true);
     const approvedCast = (castRows ?? []).map((c: any) => ({ id: c.id, name: c.name, role: c.role ?? null }));
     // One cast member per request keeps each call well inside the function time limit; the app repeats until none remain.
-    const missing = missingReferenceNames(approvedCast.map((c) => c.name), outline.characters ?? []);
-    const allLocked = (outline.characters ?? []).every((c: any) => c?.reference?.locked);
+    const upTo = Number.isInteger(body.upToChapter) && body.upToChapter >= 0 ? body.upToChapter : null;
+    const castNames = approvedCast.map((c) => c.name);
+    const missing = missingReferenceNames(upTo === null ? castNames : castDueByChapter(castNames, outline, upTo), outline.characters ?? []);
+    const allLocked = (outline.characters ?? []).filter((c: any) => upTo === null || (c?.name && castDueByChapter([c.name], outline, upTo).length)).every((c: any) => c?.reference?.locked);
     if ((approvedCast.length && !missing.length) || (!approvedCast.length && allLocked)) return new Response(JSON.stringify({ characters: outline.characters ?? [], visualStyleGuide: outline.visualStyleGuide ?? '', remaining: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const target = approvedCast.find((c) => c.name.trim() === missing[0]) ?? null;
     const existingCards = (outline.characters ?? []).map((c: any) => ({ id: c.id, name: c.name, visualDescription: c.visualDescription, reference: c.reference ? { heightCm: c.reference.heightCm, tells: c.reference.tells } : undefined }));

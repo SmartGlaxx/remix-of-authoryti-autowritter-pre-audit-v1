@@ -32,7 +32,7 @@ import { loadNarratorContext, type NarratorContext } from "../_shared/narrative/
 import { modelCallers, persistOutcome, runPreAcceptance } from "../_shared/narrative/planning/preAcceptanceServer.ts";
 import { contentHash } from "../_shared/narrative/extraction.ts";
 import { renderWholeBookMemory, lastAppearanceChapters } from '../_shared/narrative/sectionMemory.ts';
-import { missingReferenceNames, reentryCuePlans } from '../_shared/narrative/characterReference.ts';
+import { missingReferenceNames, reentryCuePlans, castDueByChapter } from '../_shared/narrative/characterReference.ts';
 import { plannedDebuts, castStatus, castKey } from '../_shared/narrative/cast.ts';
 
 // ── Security Config ──
@@ -558,10 +558,12 @@ serve(async (req) => {
     let castMissingRefs = false;
     if (!dryRun && book.id && refFiction && pipeline === "progressive") {
       const { data: castRows } = await adminSupabase.from("story_characters").select("name").eq("book_id", book.id).eq("user_id", auth.user.id).eq("is_active", true);
-      castMissingRefs = missingReferenceNames((castRows ?? []).map((c: any) => c.name), serverOutline?.characters ?? []).length > 0;
+      const due = castDueByChapter((castRows ?? []).map((c: any) => c.name), serverOutline, absChapter);
+      castMissingRefs = missingReferenceNames(due, serverOutline?.characters ?? []).length > 0;
     }
+    const dueCards = (serverOutline?.characters ?? []).filter((c: any) => c?.name && castDueByChapter([c.name], serverOutline, absChapter).length);
     if (!dryRun && book.id && refFiction
-      && (castMissingRefs || serverOutline?.characters?.some((c: any)=>!c.reference?.locked))) {
+      && (castMissingRefs || dueCards.some((c: any)=>!c.reference?.locked))) {
       return new Response(JSON.stringify({error:'Preparing character references is required before writing.',code:'CHARACTER_REFERENCES_REQUIRED'}),{status:409,headers:{...corsHeaders,'Content-Type':'application/json'}});
     }
     // Gate first (previous section accepted + in story memory, no undecided serious contradiction),
