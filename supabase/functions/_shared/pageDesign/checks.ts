@@ -53,6 +53,7 @@ export function staticChecks(spec: PageCompositionSpec, currentTextHash: string)
   const paperL = hslLuminance(spec.colors.paper), inkL = hslLuminance(spec.colors.ink), panelL = hslLuminance(spec.colors.panel);
   if (contrastRatio(paperL, inkL) < MIN_CONTRAST) out.push({ level: "error", code: "LOW_CONTRAST", message: `Text/paper contrast ${contrastRatio(paperL, inkL).toFixed(1)}:1 is below ${MIN_CONTRAST}:1`, pageKey: k });
   for (const r of spec.textRegions) if (r.overImage && r.panel && contrastRatio(panelL, inkL) < MIN_CONTRAST) out.push({ level: "error", code: "LOW_PANEL_CONTRAST", message: "Text panel contrast is too low", pageKey: k });
+  for (const r of spec.textRegions) if (r.overImage && !r.panel) out.push({ level: "error", code: "UNVERIFIED_IMAGE_CONTRAST", message: "Enable a solid text panel before exporting text over artwork.", pageKey: k });
   for (const im of spec.images) {
     if (!im.url) out.push({ level: "warning", code: "EMPTY_SLOT", message: `Picture slot ${im.slot + 1} has no illustration yet`, pageKey: k });
     const dpi = effectiveDpi(im);

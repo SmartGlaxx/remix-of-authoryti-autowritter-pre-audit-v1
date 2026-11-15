@@ -1,5 +1,7 @@
+import { composeDeterministic, defaultSettings } from "../../supabase/functions/_shared/pageDesign/compose";
+import { validateSpec } from "../../supabase/functions/_shared/pageDesign/validate";
 import { describe, expect, it } from "vitest";
-import { LAYOUT_STRUCTURES, PAGE_DESIGN_BOOK_TYPES, type PageCompositionSpec } from "@/types/pageDesign";
+import { LAYOUT_STRUCTURES, PAGE_DESIGN_BOOK_TYPES } from "@/types/pageDesign";
 
 describe("visual page-composition contracts", () => {
   it("supports children's books, magazines and manuals", () => {
@@ -18,17 +20,9 @@ describe("visual page-composition contracts", () => {
   });
 
   it("keeps AI composition serializable and separate from rendering", () => {
-    const spec: PageCompositionSpec = {
-      pageIndex: 0,
-      styleFamily: "career-guide",
-      layout: "split-right",
-      images: [{ url: "signed-image-url", alt: "A mentor speaking with a new employee", shape: "circle", treatment: "feathered", size: "large", alignment: "right" }],
-      textBlock: { content: "Your first week", flow: "wrap-left", align: "left", dropCap: true },
-      typography: { fontFamily: "body-sans", fontSize: "base", lineHeight: "relaxed" },
-      colors: { bg: "background", text: "foreground", accent: "primary" },
-      print: { pageSize: "letter", widthInches: 8.5, heightInches: 11, bleedInches: 0.125, safeMarginInches: 0.25, gutterInches: 0.375 },
-    };
+    const spec = composeDeterministic({ bookType: "manual", pageKey: "section-1", pageIndex: 0, text: "Your first week", images: [], settings: defaultSettings("manual", "book-1"), recentLayouts: [] }, "consistent");
     expect(JSON.parse(JSON.stringify(spec))).toEqual(spec);
-    expect(spec.textBlock.flow).toBe("wrap-left");
+    expect(validateSpec(spec).errors).toEqual([]);
+    expect(spec.schemaVersion).toBe(2);
   });
 });

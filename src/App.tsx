@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import CheckEmail from "./pages/CheckEmail";
 import Waitlist from "./pages/Waitlist";
 import Onboarding from "./pages/Onboarding";
+import PageDesign from "./pages/PageDesign";
 import BookDetail from "./pages/BookDetail";
 import AccountSettings from "./pages/AccountSettings";
 import TryWriter from "./pages/TryWriter";
@@ -148,6 +149,7 @@ const App = () => (
             />
             <Route path="/settings" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
             <Route path="/writers" element={<ProtectedRoute><TryWriter /></ProtectedRoute>} />
+            <Route path="/books/:bookId/design" element={<ProtectedRoute><PageDesign /></ProtectedRoute>} />
             <Route path="/books/:bookId/plan" element={<ProtectedRoute><PlanningStudio /></ProtectedRoute>} />
             <Route path="/writer-improvement" element={<ProtectedRoute><WriterImprovement /></ProtectedRoute>} />
             <Route path="/personas" element={<ProtectedRoute><PersonaStudio /></ProtectedRoute>} />

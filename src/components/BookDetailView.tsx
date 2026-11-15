@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Play, Pause, Square, Download, Settings, BookText, Pencil, Check, X, RefreshCw, FileText, Zap, ChevronDown, Search, Pen, Replace, BookOpen, Sparkles, Loader2, Users } from "lucide-react";
@@ -285,6 +286,7 @@ const BookDetailView = ({ book, onBack }: BookDetailViewProps) => {
 
             {/* Right: action buttons + sidebar */}
             <div className="flex items-center gap-2 shrink-0">
+              {["children", "magazine", "manual"].includes(book.bookType) && <Button variant="outline" asChild><Link to={`/books/${book.id}/design`}>Page Design</Link></Button>}
               {/* Desktop action buttons */}
               {!hasOutline && canStart && (
                 <>

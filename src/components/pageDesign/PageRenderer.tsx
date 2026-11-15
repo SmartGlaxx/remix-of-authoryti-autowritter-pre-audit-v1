@@ -118,7 +118,7 @@ export function PageRenderer({ page, scale, showGuides, showBleed, selectedSlot,
         })}
         {spec?.textRegions.filter((r) => r.overImage && r.panel).map((r, i) => {
           const b = intersect(r.box, page.live); if (!b) return null;
-          return <div key={`p${i}`} className="absolute rounded" style={{ left: px(b.x - 0.1), top: px(b.y - 0.1), width: px(b.w + 0.2), height: px(b.h + 0.2), background: hsl(spec.colors.panel, 0.9), zIndex: 5 }} />;
+          return <div key={`p${i}`} className="absolute rounded" style={{ left: px(b.x - 0.1), top: px(b.y - 0.1), width: px(b.w + 0.2), height: px(b.h + 0.2), background: hsl(spec.colors.panel, 1), zIndex: 5 }} />;
         })}
         {plan && page.flow ? (
           <div ref={floatRef} className="absolute overflow-hidden" data-testid="css-float-region" style={{ left: px(plan.region.x), top: px(plan.region.y), width: px(plan.region.w), height: px(plan.region.h), zIndex: 6, color: hsl(ink), fontFamily: page.flow.lines[0]?.font.family, fontSize: `${(spec!.typography.bodyPt / 72) * scale}px`, lineHeight: spec!.typography.lineHeight, textAlign: spec!.textRegions[0].align }}>
