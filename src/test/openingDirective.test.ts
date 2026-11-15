@@ -16,7 +16,8 @@ describe("opening guidance", () => {
   it("uses appropriate nonfiction and format-aware alternatives", () => {
     expect(openingDirective("finance")).toContain("never invent figures");
     expect(openingDirective("self-help")).toContain("Advance the argument");
-    expect(openingDirective("novel")).toContain("do not force danger");
+    expect(openingDirective("novel")).not.toContain("do not force danger");
+    expect(openingDirective("novel")).toContain("selected writer's voice");
     expect(openingDirective("drama")).toContain("scene-heading");
     expect(openingDirective("comic")).toContain("panel format");
     expect(openingDirective("cookbook")).toContain("measurements");

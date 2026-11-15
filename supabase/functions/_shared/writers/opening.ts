@@ -11,7 +11,7 @@ export function openingDirective(bookType: string): string {
 - Enter through a concrete onstage action, exchange or situation while keeping the required scene-heading and screenplay format.`;
   if (["novel", "fiction-serial", "short-story", "children", "biography", "memoir"].includes(bookType))
     return `${common}
-- Where a new scene begins, enter through a concrete action, exchange, place or sensory detail appropriate to the audience; do not force danger or action into quiet scenes.`;
+- Where a new scene begins, enter the way the selected writer's voice naturally would, appropriate to the audience; the writer's own style decides the pace and pressure of the opening.`;
   if (bookType === "poetry") return `${common}
 - Begin with a precise image, voice or rhythmic turn that fits the poem; do not force a prose hook.`;
   if (bookType === "cookbook") return `${common}
