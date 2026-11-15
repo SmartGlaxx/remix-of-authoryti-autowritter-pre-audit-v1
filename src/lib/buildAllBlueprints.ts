@@ -12,7 +12,8 @@ export async function buildAllBlueprints(options: {
   shouldStop: () => boolean;
 }) {
   const pending = [...new Set(options.chapters)].sort((a, b) => a - b).filter((chapter) =>
-    !options.plans.some((p) => p.chapter_index === chapter && p.plan_level === "BLUEPRINT" && ["PLANNED", "READY"].includes(p.plan_status)));
+    options.plans.some((p) => p.chapter_index === chapter && p.plan_level === "SECTION") // only chapters whose sections are planned
+    && !options.plans.some((p) => p.chapter_index === chapter && p.plan_level === "BLUEPRINT" && ["PLANNED", "READY"].includes(p.plan_status)));
   let done = 0;
   for (const chapter of pending) {
     if (options.shouldStop()) break;

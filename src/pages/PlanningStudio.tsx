@@ -17,6 +17,7 @@ import { bulkApprovableIds, isBlueprintExampleRole } from "../../supabase/functi
 import { PlanningBookSwitcher } from "@/components/PlanningBookSwitcher";
 import { ensureChapterBlueprint } from "@/lib/autoBlueprint";
 import { buildAllBlueprints } from "@/lib/buildAllBlueprints";
+import { autoPlanBook, type AutoProgress } from "@/lib/autoPlanBook";
 import { callPlanBook, callReview, needsReplaceConfirmation, saveThenAccept } from "@/lib/candidateReview";
 import { runNarrativeExtraction } from "@/lib/narrativeExtraction";
 import BookSetupTab from "@/components/BookSetupTab";
@@ -168,7 +169,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
     && chapters.every((c) => ["CHAPTER", "SECTION"].every((lv) => mine.some((p) => p.plan_level === lv && p.chapter_index === c)))
     && mine.every((p) => p.plan_level === "BLUEPRINT" || p.plan_status === "READY");
   // Blueprints are built and approved automatically as writing reaches each chapter.
-  const missingBlueprints = chapters.filter((ch) => !mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === ch && ["PLANNED", "READY"].includes(p.plan_status)));
+  const missingBlueprints = chapters.filter((ch) => has("SECTION", ch) && !mine.some((p) => p.plan_level === "BLUEPRINT" && p.chapter_index === ch && ["PLANNED", "READY"].includes(p.plan_status)));
   const buildBlueprints = () => run("blueprintsAll", async () => {
     if (!master) return;
     stopBlueprintsRef.current = false;
@@ -181,6 +182,19 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
       setBlueprintProgress(null);
       await refresh();
     }
+  });
+
+  const [auto, setAuto] = useState<AutoProgress | null>(null);
+  const stopAutoRef = useRef(false);
+  const handsOff = () => run("handsOff", async () => {
+    stopAutoRef.current = false;
+    try {
+      const r = await autoPlanBook({ bookId: book.id, brief, adapter: master?.adapter ?? master?.plan_skeleton?.adapter, call: callPlanBook,
+        onProgress: (p) => { setAuto(p); void refresh(); }, shouldStop: () => stopAutoRef.current });
+      await refresh();
+      if (r.completed) { toast.success("Book fully planned — starting to write"); navigate(`/dashboard/${book.id}?autostart=1`); }
+      else toast.success("Paused — everything finished so far is saved");
+    } finally { setAuto(null); }
   });
 
   const createMaster = () => run("master", async () => {
@@ -212,6 +226,22 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
 
   return (
     <div className="space-y-6 mt-4">
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle>Hands-off mode</CardTitle>
+          <CardDescription>One click plans the whole book — summary, chapters, sections, beats and detailed blueprints — approves each step, then starts writing. You just watch. It picks up where it left off.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handsOff} disabled={!!busy || (!master && !premise.trim())}>
+              {busy === "handsOff" ? <Loader2 className="w-4 h-4 animate-spin mr-2 shrink-0" /> : <Play className="w-4 h-4 mr-2 shrink-0" />}
+              {busy === "handsOff" ? "Working…" : "Auto setup: plan and start writing"}
+            </Button>
+            {busy === "handsOff" && <Button variant="outline" onClick={() => { stopAutoRef.current = true; toast.message("Stopping after the current step…"); }}><Pause className="w-4 h-4 mr-2" />Stop</Button>}
+          </div>
+          {auto && <div className="space-y-1"><Progress value={auto.total ? (auto.done / auto.total) * 100 : 0} /><p className="text-xs text-muted-foreground">{auto.label}</p></div>}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>1. {isFiction ? "Selected story" : "Selected book approach"}</CardTitle>
@@ -278,7 +308,7 @@ function PlanTab({ book, carry, isFiction, plans, busy, run, refresh }: { book: 
             {progress && <Progress value={(progress.done / progress.total) * 100} />}
             {chapters.length > 0 && <div className="space-y-2 border-t border-border pt-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={buildBlueprints} disabled={!!busy || master.status !== "APPROVED" || !chapters.every((ch) => has("SECTION", ch)) || missingBlueprints.length === 0}>
+                <Button variant="outline" onClick={buildBlueprints} disabled={!!busy || master.status !== "APPROVED" || missingBlueprints.length === 0}>
                   {busy === "blueprintsAll" ? <Loader2 className="w-4 h-4 animate-spin mr-2 shrink-0" /> : <Play className="w-4 h-4 mr-2 shrink-0" />}
                   {busy === "blueprintsAll" ? "Building detailed blueprints…" : missingBlueprints.length === 0 ? "All detailed blueprints built" : "Build all detailed blueprints"}
                 </Button>
