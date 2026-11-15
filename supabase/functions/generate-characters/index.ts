@@ -190,11 +190,7 @@ Return ONLY valid JSON:
     
     let parsed;
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-      let raw = jsonMatch[1].trim();
-      const a = raw.indexOf('{'), b = raw.lastIndexOf('}');
-      if (a >= 0 && b > a) raw = raw.slice(a, b + 1);
-      parsed = JSON.parse(raw);
+      parsed = parseCardJson(content);
     } catch { console.error('character JSON unreadable, length', content.length, 'tail:', content.slice(-200)); throw new Error(`The character card for ${target?.name ?? 'the cast'} came back incomplete; press Write again.`); }
 
     const characters = target && Array.isArray(parsed.characters)
@@ -247,3 +243,27 @@ Return ONLY valid JSON:
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", ...(error instanceof CharacterProfileError ? { code: error.code } : {}) }), { status: error instanceof CharacterProfileError ? error.status : error instanceof AIProviderError ? statusForAIError(error) : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
+
+/** Reads the model's card JSON even with code fences, inner backticks, raw newlines in strings or trailing commas. */
+function parseCardJson(content: string): any {
+  const slice = (t: string) => { const a = t.indexOf('{'), b = t.lastIndexOf('}'); return a >= 0 && b > a ? t.slice(a, b + 1) : t; };
+  const fence = content.match(/```(?:json)?\s*([\s\S]*)```/);
+  const candidates = [slice(content), fence ? slice(fence[1]) : ''].filter(Boolean);
+  const repair = (t: string) => {
+    let out = '', inStr = false, esc = false;
+    for (const ch of t) {
+      if (inStr) {
+        if (esc) { esc = false; out += ch; continue; }
+        if (ch === '\\') { esc = true; out += ch; continue; }
+        if (ch === '"') { inStr = false; out += ch; continue; }
+        if (ch === '\n') { out += '\\n'; continue; }
+        if (ch === '\r') continue;
+        if (ch === '\t') { out += '\\t'; continue; }
+        out += ch;
+      } else { if (ch === '"') inStr = true; out += ch; }
+    }
+    return out.replace(/,\s*([}\]])/g, '$1');
+  };
+  for (const c of candidates) { try { return JSON.parse(c); } catch { /* next */ } try { return JSON.parse(repair(c)); } catch { /* next */ } }
+  throw new Error('unreadable');
+}
