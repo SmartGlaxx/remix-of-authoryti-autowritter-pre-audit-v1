@@ -8,6 +8,7 @@ export async function callReview<T = any>(body: Record<string, unknown>): Promis
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify(body),
+    signal: body.action === "section_status" ? AbortSignal.timeout(30_000) : undefined,
   });
   const data = await res.json().catch(() => ({}));
   if (data?.error === "Invalid action") {
@@ -49,7 +50,8 @@ export async function awaitSectionOutcome(bookId: string, chapter: number, subse
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
     const r = await callReview<SectionOutcome>({ action: "section_status", bookId, chapter, subsection, since });
-    if (r.ok && r.data.state !== "pending") return r.data;
+    if (!r.ok) throw new Error((r.data as unknown as {error?:string}).error || "Could not check section status. Writing paused safely.");
+    if (r.data.state !== "pending") return r.data;
     await new Promise((res) => setTimeout(res, 3000));
   }
   // Still validating server-side: the draft is safe; the caller must pause, never regenerate.
@@ -59,7 +61,9 @@ export async function awaitSectionOutcome(bookId: string, chapter: number, subse
 /** Before writing a progressive section, see whether an earlier run already produced an outcome. */
 export async function priorSectionOutcome(bookId: string, chapter: number, subsection: number): Promise<SectionOutcome> {
   const r = await callReview<SectionOutcome>({ action: "section_status", bookId, chapter, subsection, since: "1970-01-01T00:00:00.000Z" });
-  return r.ok ? r.data : { state: "pending" };
+  if (!r.ok) throw new Error((r.data as unknown as {error?:string}).error || "Could not check existing writing. Retry before generating.");
+  if (r.data.state === "accepted" && !r.data.text?.trim()) throw new Error("This section is already accepted, but its text needs recovery. Writing stopped to protect your manuscript.");
+  return r.data;
 }
 
 export const isProgressiveBook = (controls: unknown) => (controls as Record<string, unknown> | null)?.planning_pipeline === "progressive";
