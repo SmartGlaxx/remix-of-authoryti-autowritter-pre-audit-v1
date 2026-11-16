@@ -20,11 +20,11 @@ async function waitForExtractionSettled(bookId: string, ch: number, sub: number,
     if (s === "completed") {
       // Progressive books: the writing gate reads the acceptance record, which is marked only after
       // identity and knowledge sync finish — wait for that too, or the next write is refused.
-      const { data: acc } = await supabase.from("book_section_acceptances").select("extraction_status")
-        .eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).limit(1);
-      const es = acc?.[0]?.extraction_status;
-      if (!acc?.length || es === "EXTRACTED") return true;
-      if (es === "FAILED") return false;
+      const { data: acc } = await supabase.from("book_section_acceptances").select("extraction_status, manuscript_status")
+        .eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub);
+      const live = (acc ?? []).filter((r) => r.manuscript_status !== "REVISED");
+      if (!live.length || live.some((r) => r.extraction_status === "EXTRACTED")) return true;
+      if (live.every((r) => r.extraction_status === "FAILED")) return false;
     }
     await new Promise((r) => setTimeout(r, 3000));
   }
