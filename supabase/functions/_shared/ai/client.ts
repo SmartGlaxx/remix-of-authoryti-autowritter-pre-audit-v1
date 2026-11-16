@@ -196,5 +196,5 @@ export function toChatSSE(chunks: AsyncGenerator<string>, onDone?: (full: string
 /** HTTP status for a controlled AI error. */
 export function statusForAIError(e: unknown): number {
   if (!(e instanceof AIProviderError)) return 500;
-  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, test_mode_blocked: 403, unknown: 500 } as const)[e.code];
+  return ({ missing_key: 424, auth: 424, rate_limit: 429, payment: 402, forbidden: 403, bad_request: 400, unavailable: 503, network: 503, inactive_role: 400, test_mode_blocked: 403, content_filter: 422, unknown: 500 } as const)[e.code];
 }
