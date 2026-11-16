@@ -16,8 +16,16 @@ async function waitForExtractionSettled(bookId: string, ch: number, sub: number,
       .eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub)
       .order("updated_at", { ascending: false }).limit(1);
     const s = data?.[0]?.status;
-    if (s === "completed") return true;
     if (s === "failed") return false;
+    if (s === "completed") {
+      // Progressive books: the writing gate reads the acceptance record, which is marked only after
+      // identity and knowledge sync finish — wait for that too, or the next write is refused.
+      const { data: acc } = await supabase.from("book_section_acceptances").select("extraction_status")
+        .eq("book_id", bookId).eq("chapter_index", ch).eq("subsection_index", sub).limit(1);
+      const es = acc?.[0]?.extraction_status;
+      if (!acc?.length || es === "EXTRACTED") return true;
+      if (es === "FAILED") return false;
+    }
     await new Promise((r) => setTimeout(r, 3000));
   }
   return false;
@@ -433,7 +441,7 @@ export function useBookGeneration(book: Book, options: UseBookGenerationOptions)
 
     // Self-heal: the previous accepted section's story memory was never updated. Update it, then retry.
     // Extraction can still be finishing when the first retry lands, so allow a few rounds.
-    for (let round = 0; round < 4 && response.status === 409; round++) {
+    for (let round = 0; round < 6 && response.status === 409; round++) {
       const errBody = await response.clone().json().catch(() => ({}));
       if (errBody?.code !== "RECOVER_EXTRACTION" || !bookData.id || !prevPos) break;
       const r = await runNarrativeExtraction(bookData.id, prevPos.c, prevPos.s, { timeoutMs: 120_000, attempts: 4 });
